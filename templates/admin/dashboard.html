@@ -1,0 +1,70 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Главная — Админ{% endblock %}
+
+{% block content %}
+<h1>Дашборд</h1>
+
+<div class="stats-summary">
+    <div class="result-card">
+        <div class="result-number">{{ stats.classes_count }}</div>
+        <div class="result-label">Классов</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ stats.students_count }}</div>
+        <div class="result-label">Учеников</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ stats.variants_count }}</div>
+        <div class="result-label">Вариантов</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ stats.attempts_count }}</div>
+        <div class="result-label">Попыток</div>
+    </div>
+</div>
+
+<div class="actions-bar">
+    <a href="{% url 'admin_export' %}" class="btn btn-secondary">Экспорт результатов (Excel)</a>
+</div>
+
+{% if class_stats %}
+<h2>Статистика по классам</h2>
+<table class="table">
+    <thead>
+        <tr><th>Класс</th><th>Учеников</th><th>Попыток</th><th>Средний %</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for cs in class_stats %}
+        <tr>
+            <td>{{ cs.school_class.name }}</td>
+            <td>{{ cs.school_class.student_count }}</td>
+            <td>{{ cs.attempts_count }}</td>
+            <td>{% if cs.avg_percentage is not None %}{{ cs.avg_percentage }}%{% else %}—{% endif %}</td>
+            <td><a href="{% url 'admin_class_stats' cs.school_class.id %}" class="btn btn-sm">Подробнее</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if recent_attempts %}
+<h2>Последние попытки</h2>
+<table class="table">
+    <thead>
+        <tr><th>Ученик</th><th>Класс</th><th>Вариант</th><th>Дата</th><th>Результат</th><th>Оценка</th></tr>
+    </thead>
+    <tbody>
+        {% for a in recent_attempts %}
+        <tr>
+            <td><a href="{% url 'admin_student_stats' a.student.id %}">{{ a.student.full_name }}</a></td>
+            <td>{{ a.student.school_class.name }}</td>
+            <td>{{ a.variant.number }}</td>
+            <td>{{ a.finished_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ a.correct_count }}/{{ a.total_count }}</td>
+            <td>{{ a.grade }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

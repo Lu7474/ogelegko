@@ -1,0 +1,57 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Варианты — Админ{% endblock %}
+
+{% block content %}
+<h1>Варианты</h1>
+
+<div class="actions-bar">
+    <a href="{% url 'admin_variant_add' %}" class="btn btn-primary">Создать вариант</a>
+    <a href="{% url 'admin_variant_import' %}" class="btn btn-secondary">Импорт с sdamgia.ru</a>
+
+    <form method="get" class="filter-form">
+        <select name="exam_type" onchange="this.form.submit()">
+            <option value="">Все типы</option>
+            {% for value, label in exam_types %}
+            <option value="{{ value }}" {% if exam_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<table class="table">
+    <thead>
+        <tr><th>Номер</th><th>Тип</th><th>Заданий</th><th>Попыток</th><th>Лимит</th><th>Статус</th><th>Действия</th></tr>
+    </thead>
+    <tbody>
+        {% for v in variants %}
+        <tr class="{% if not v.is_active %}row-inactive{% endif %}">
+            <td><strong>{{ v.number }}</strong></td>
+            <td>{{ v.get_exam_type_display }}</td>
+            <td>{{ v.task_count }}</td>
+            <td>{{ v.attempts_count }}</td>
+            <td>{% if v.max_attempts == 0 %}&infin;{% else %}{{ v.max_attempts }}{% endif %}</td>
+            <td>{% if v.is_active %}<span class="badge badge-green">Активен</span>{% else %}<span class="badge badge-gray">Скрыт</span>{% endif %}</td>
+            <td>
+                <a href="{% url 'admin_variant_stats' v.id %}" class="btn btn-sm">Статистика</a>
+                <a href="{% url 'admin_variant_edit' v.id %}" class="btn btn-sm">Редактировать</a>
+                <form method="post" action="{% url 'admin_variant_toggle' v.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-secondary">{% if v.is_active %}Скрыть{% else %}Активировать{% endif %}</button>
+                </form>
+                <form method="post" action="{% url 'admin_variant_duplicate' v.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-secondary">Дублировать</button>
+                </form>
+                <form method="post" action="{% url 'admin_variant_delete' v.id %}" style="display:inline;" onsubmit="return confirm('Удалить вариант {{v.number}}?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">Нет вариантов</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% include "includes/pagination.html" %}
+{% endblock %}

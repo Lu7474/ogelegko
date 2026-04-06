@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Профиль — {{ student.full_name }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block nav %}
+<nav class="navbar">
+    <span class="nav-title">Пробные ОГЭ/ЕГЭ</span>
+    <div class="nav-right">
+        <a href="{% url 'profile' %}" class="nav-profile active">{{ student.full_name }}</a>
+        <form method="post" action="{% url 'logout' %}" class="nav-logout-form">{% csrf_token %}<button type="submit" class="nav-link nav-logout-btn">Выйти</button></form>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>{{ student.full_name }}</h1>
+<p class="subtitle">{{ student.school_class }} — {{ student.school_class.get_exam_type_display }}</p>
+
+{% if avg_percentage is not None %}
+<div class="stats-summary">
+    <div class="result-card">
+        <div class="result-number">{{ avg_percentage }}%</div>
+        <div class="result-label">Средний результат</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ attempts|length }}</div>
+        <div class="result-label">Попыток</div>
+    </div>
+</div>
+
+<div class="chart-container">
+    <canvas id="progressChart"></canvas>
+</div>
+{% else %}
+<p>Вы ещё не решали варианты.</p>
+{% endif %}
+
+{% if attempts %}
+<h2>История</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Вариант</th>
+            <th>Дата</th>
+            <th>Результат</th>
+            <th>Оценка</th>
+            <th>Время</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for attempt in attempts %}
+        <tr>
+            <td>{{ attempt.variant.number }}</td>
+            <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
+            <td>
+                {{ attempt.correct_count }}/{{ attempt.total_count }} ({{ attempt.percentage }}%)
+            </td>
+            <td>{{ attempt.grade }}</td>
+            <td>{{ attempt.duration_display }}</td>
+            <td><a href="{% url 'results' attempt.id %}" class="btn btn-sm">Подробнее</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<a href="{% url 'choose_variant' %}" class="btn btn-primary" style="margin-top:20px; display:inline-block;">Решить вариант</a>
+{% endblock %}
+
+{% block scripts %}
+{% if avg_percentage is not None %}
+<script>
+const chartData = JSON.parse('{{ chart_data|escapejs }}');
+const ctx = document.getElementById('progressChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: chartData.map(d => d.date + ' (В' + d.variant + ')'),
+        datasets: [{
+            label: 'Результат (%)',
+            data: chartData.map(d => d.percentage),
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52,152,219,0.1)',
+            fill: true,
+            tension: 0.3,
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { min: 0, max: 100, ticks: { callback: v => v + '%' } }
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    afterLabel: item => {
+                        const d = chartData[item.dataIndex];
+                        return `Балл: ${d.score}/${d.max_score}`;
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Статистика — {{ school_class.name }}{% endblock %}
+
+{% block content %}
+<h1>{{ school_class.name }} — Статистика</h1>
+
+<div class="results-summary">
+    <div class="result-card">
+        <div class="result-number">{{ student_stats|length }}</div>
+        <div class="result-label">Учеников</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ total_attempts }}</div>
+        <div class="result-label">Попыток</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{% if class_avg is not None %}{{ class_avg }}%{% else %}—{% endif %}</div>
+        <div class="result-label">Средний результат</div>
+    </div>
+</div>
+
+<h2>Ученики</h2>
+<table class="table">
+    <thead>
+        <tr><th>ФИО</th><th>Попыток</th><th>Средний %</th><th>Последняя попытка</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for s in student_stats %}
+        <tr>
+            <td>{{ s.student.full_name }}</td>
+            <td>{{ s.attempts_count }}</td>
+            <td>{% if s.avg_percentage is not None %}{{ s.avg_percentage }}%{% else %}—{% endif %}</td>
+            <td>{% if s.last_attempt %}{{ s.last_attempt.finished_at|date:"d.m.Y" }} — {{ s.last_attempt.grade }}{% else %}—{% endif %}</td>
+            <td><a href="{% url 'admin_student_stats' s.student.id %}" class="btn btn-sm">Подробнее</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<a href="{% url 'admin_classes' %}" class="btn btn-secondary" style="margin-top:12px;">Назад к классам</a>
+{% endblock %}

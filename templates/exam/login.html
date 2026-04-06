@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <h1>Пробные ОГЭ/ЕГЭ</h1>
+    <h2>Вход</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="full_name">ФИО</label>
+            <input type="text" id="full_name" name="full_name" placeholder="Иванов Иван Иванович" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary btn-full">Войти</button>
+    </form>
+</div>
+{% endblock %}

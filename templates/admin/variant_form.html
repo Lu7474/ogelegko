@@ -1,0 +1,152 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{% if variant %}Редактировать{% else %}Создать{% endif %} вариант{% endblock %}
+
+{% block content %}
+<h1>{% if variant %}Редактировать вариант {{ variant.number }}{% else %}Создать вариант{% endif %}</h1>
+
+<form method="post" enctype="multipart/form-data" class="form-card" id="variantForm">
+    {% csrf_token %}
+    {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+    <div class="form-row">
+        <div class="form-group">
+            <label for="number">Номер варианта</label>
+            <input type="text" id="number" name="number" value="{{ variant.number|default:'' }}" placeholder="Например: 092" required>
+        </div>
+        <div class="form-group">
+            <label for="exam_type">Тип экзамена</label>
+            <select id="exam_type" name="exam_type" required>
+                <option value="">Выберите...</option>
+                {% for value, label in exam_types %}
+                <option value="{{ value }}" {% if variant.exam_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="max_attempts">Макс. попыток</label>
+            <input type="number" id="max_attempts" name="max_attempts" value="{{ variant.max_attempts|default:3 }}" min="0" style="width:100px;" title="0 = без ограничений">
+            <small style="color:#888;">0 = без ограничений</small>
+        </div>
+    </div>
+
+    <h2>Задания</h2>
+    <div id="tasksContainer">
+        {% if tasks %}
+            {% for task in tasks %}
+            <div class="task-form-block" data-index="{{ task.number }}">
+                <h3>Задание <span class="task-num">{{ task.number }}</span>
+                    <button type="button" class="btn btn-sm btn-danger remove-task">Удалить</button>
+                </h3>
+                <div class="form-group">
+                    <label>Текст задания</label>
+                    <textarea name="task_{{ task.number }}_text" rows="3">{{ task.text }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Изображение</label>
+                    <input type="file" name="task_{{ task.number }}_image" accept="image/*">
+                    {% if task.image %}
+                    <small>Текущее: {{ task.image.name }}</small>
+                    {% endif %}
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Правильный ответ *</label>
+                        <input type="text" name="task_{{ task.number }}_answer" value="{{ task.correct_answer }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Источник</label>
+                        <select name="task_{{ task.number }}_source">
+                            {% for value, label in sources %}
+                            <option value="{{ value }}" {% if task.source == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Тема</label>
+                        <select name="task_{{ task.number }}_topic">
+                            {% for value, label in topics %}
+                            <option value="{{ value }}" {% if task.topic == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Баллы</label>
+                        <input type="number" name="task_{{ task.number }}_points" value="{{ task.points }}" min="1" style="width:80px;">
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <button type="button" class="btn btn-secondary" id="addTask" style="margin:20px 0;">+ Добавить задание</button>
+
+    <div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{% url 'admin_variants' %}" class="btn btn-secondary">Отмена</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sourcesHtml = `{% for value, label in sources %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
+const topicsHtml = `{% for value, label in topics %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
+
+let taskCount = document.querySelectorAll('.task-form-block').length;
+
+document.getElementById('addTask').addEventListener('click', function() {
+    taskCount++;
+    const html = `
+    <div class="task-form-block" data-index="${taskCount}">
+        <h3>Задание <span class="task-num">${taskCount}</span>
+            <button type="button" class="btn btn-sm btn-danger remove-task">Удалить</button>
+        </h3>
+        <div class="form-group">
+            <label>Текст задания</label>
+            <textarea name="task_${taskCount}_text" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Изображение</label>
+            <input type="file" name="task_${taskCount}_image" accept="image/*">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Правильный ответ *</label>
+                <input type="text" name="task_${taskCount}_answer" required>
+            </div>
+            <div class="form-group">
+                <label>Источник</label>
+                <select name="task_${taskCount}_source">${sourcesHtml}</select>
+            </div>
+            <div class="form-group">
+                <label>Тема</label>
+                <select name="task_${taskCount}_topic">${topicsHtml}</select>
+            </div>
+            <div class="form-group">
+                <label>Баллы</label>
+                <input type="number" name="task_${taskCount}_points" value="1" min="1" style="width:80px;">
+            </div>
+        </div>
+    </div>`;
+    document.getElementById('tasksContainer').insertAdjacentHTML('beforeend', html);
+});
+
+document.getElementById('tasksContainer').addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-task')) {
+        e.target.closest('.task-form-block').remove();
+        // Перенумерация
+        document.querySelectorAll('.task-form-block').forEach((block, i) => {
+            const num = i + 1;
+            block.dataset.index = num;
+            block.querySelector('.task-num').textContent = num;
+            block.querySelectorAll('[name]').forEach(el => {
+                el.name = el.name.replace(/task_\d+_/, `task_${num}_`);
+            });
+        });
+        taskCount = document.querySelectorAll('.task-form-block').length;
+    }
+});
+</script>
+{% endblock %}

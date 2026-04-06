@@ -1,0 +1,90 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ student.full_name }} — Статистика{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1>{{ student.full_name }}</h1>
+<p class="subtitle">{{ student.school_class }} — {{ student.school_class.get_exam_type_display }}</p>
+
+{% if avg_percentage is not None %}
+<div class="stats-summary">
+    <div class="result-card">
+        <div class="result-number">{{ avg_percentage }}%</div>
+        <div class="result-label">Средний результат</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ attempts|length }}</div>
+        <div class="result-label">Попыток</div>
+    </div>
+</div>
+
+<div class="chart-container">
+    <canvas id="progressChart"></canvas>
+</div>
+{% else %}
+<p>Ученик ещё не решал варианты.</p>
+{% endif %}
+
+{% if attempts %}
+<h2>Попытки</h2>
+<table class="table">
+    <thead>
+        <tr><th>Вариант</th><th>Дата</th><th>Задания</th><th>Балл</th><th>Оценка</th><th>Время</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for attempt in attempts %}
+        <tr>
+            <td>{{ attempt.variant.number }}</td>
+            <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
+            <td>
+                {% for answer in attempt.answers.all %}
+                <span class="dot-small {% if answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}: {% if answer.is_correct %}✓{% else %}✗{% endif %}"></span>
+                {% endfor %}
+            </td>
+            <td>{{ attempt.score }}/{{ attempt.max_score }}</td>
+            <td>{{ attempt.grade }}</td>
+            <td>{{ attempt.duration_display }}</td>
+            <td>
+                <form method="post" action="{% url 'admin_attempt_delete' attempt.id %}" style="display:inline;" onsubmit="return confirm('Удалить эту попытку?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<a href="{% url 'admin_students' %}" class="btn btn-secondary" style="margin-top:20px; display:inline-block;">← Назад к ученикам</a>
+{% endblock %}
+
+{% block scripts %}
+{% if avg_percentage is not None %}
+<script>
+const chartData = JSON.parse('{{ chart_data|escapejs }}');
+const ctx = document.getElementById('progressChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: chartData.map(d => d.date + ' (В' + d.variant + ')'),
+        datasets: [{
+            label: 'Результат (%)',
+            data: chartData.map(d => d.percentage),
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52,152,219,0.1)',
+            fill: true,
+            tension: 0.3,
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

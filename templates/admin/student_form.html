@@ -1,0 +1,32 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{% if student %}Редактировать{% else %}Добавить{% endif %} ученика{% endblock %}
+
+{% block content %}
+<h1>{% if student %}Редактировать ученика{% else %}Добавить ученика{% endif %}</h1>
+
+<form method="post" class="form-card">
+    {% csrf_token %}
+    {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+    <div class="form-group">
+        <label for="full_name">ФИО</label>
+        <input type="text" id="full_name" name="full_name" value="{{ student.full_name|default:'' }}" required>
+    </div>
+    <div class="form-group">
+        <label for="password">Пароль{% if student %} (оставьте пустым, чтобы не менять){% endif %}</label>
+        <input type="text" id="password" name="password" {% if not student %}required{% endif %}>
+    </div>
+    <div class="form-group">
+        <label for="school_class">Класс</label>
+        <select id="school_class" name="school_class" required>
+            <option value="">Выберите...</option>
+            {% for cls in classes %}
+            <option value="{{ cls.id }}" {% if student.school_class_id == cls.id %}selected{% endif %}>{{ cls.name }} ({{ cls.get_exam_type_display }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+    <a href="{% url 'admin_students' %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

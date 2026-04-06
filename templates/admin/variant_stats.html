@@ -1,0 +1,69 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Статистика — Вариант {{ variant.number }}{% endblock %}
+
+{% block content %}
+<h1>Вариант {{ variant.number }} — Статистика</h1>
+
+<div class="results-summary">
+    <div class="result-card">
+        <div class="result-number">{{ attempts|length }}</div>
+        <div class="result-label">Попыток</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{% if avg_percentage is not None %}{{ avg_percentage }}%{% else %}—{% endif %}</div>
+        <div class="result-label">Средний результат</div>
+    </div>
+</div>
+
+{% if task_stats %}
+<h2>По заданиям</h2>
+<table class="table">
+    <thead>
+        <tr><th>#</th><th>Тема</th><th>Правильных</th><th>Всего</th><th>%</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for ts in task_stats %}
+        <tr>
+            <td>{{ ts.task.number }}</td>
+            <td>{{ ts.task.get_topic_display }}</td>
+            <td>{{ ts.correct }}</td>
+            <td>{{ ts.total }}</td>
+            <td>
+                <span style="color:{% if ts.percentage >= 70 %}#27ae60{% elif ts.percentage >= 40 %}#f39c12{% else %}#e74c3c{% endif %}; font-weight:600;">
+                    {{ ts.percentage }}%
+                </span>
+            </td>
+            <td>
+                <div style="width:100px; height:8px; background:var(--border,#e0e0e0); border-radius:4px;">
+                    <div style="width:{{ ts.percentage }}%; height:100%; background:{% if ts.percentage >= 70 %}#27ae60{% elif ts.percentage >= 40 %}#f39c12{% else %}#e74c3c{% endif %}; border-radius:4px;"></div>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if attempts %}
+<h2>Попытки</h2>
+<table class="table">
+    <thead>
+        <tr><th>Ученик</th><th>Класс</th><th>Дата</th><th>Результат</th><th>Оценка</th><th>Время</th></tr>
+    </thead>
+    <tbody>
+        {% for a in attempts %}
+        <tr>
+            <td>{{ a.student.full_name }}</td>
+            <td>{{ a.student.school_class.name }}</td>
+            <td>{{ a.finished_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ a.correct_count }}/{{ a.total_count }} ({{ a.percentage }}%)</td>
+            <td>{{ a.grade }}</td>
+            <td>{{ a.duration_display }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<a href="{% url 'admin_variants' %}" class="btn btn-secondary" style="margin-top:12px;">Назад к вариантам</a>
+{% endblock %}

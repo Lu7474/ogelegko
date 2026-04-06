@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% load static exam_tags %}
+{% block title %}Вариант {{ variant.number }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .sticky-panel { position: sticky; top: 0; z-index: 100; background: var(--card-bg, #fff); border-bottom: 2px solid var(--border, #e0e0e0); padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .timer { font-size: 1.3rem; font-weight: bold; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .timer.warning { color: #e74c3c; animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .task-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+    .task-nav a { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--border, #e0e0e0); text-decoration: none; color: var(--text, #333); font-size: 0.8rem; }
+    .task-nav a.answered { background: #3498db; color: #fff; }
+    .task-block { scroll-margin-top: 80px; }
+    .progress-bar-wrap { width: 100%; height: 6px; background: var(--border, #e0e0e0); border-radius: 3px; margin-top: 4px; }
+    .progress-bar-fill { height: 100%; background: #27ae60; border-radius: 3px; transition: width 0.3s; }
+    .progress-text { font-size: 0.75rem; color: var(--text-muted, #7f8c8d); white-space: nowrap; }
+    .save-indicator { font-size: 0.75rem; color: #27ae60; opacity: 0; transition: opacity 0.3s; margin-left: 4px; }
+    .save-indicator.show { opacity: 1; }
+    .save-indicator.error { color: #e74c3c; }
+    .answer-hint { font-size: 0.75rem; color: var(--text-muted, #7f8c8d); margin-top: 2px; }
+    .answer-preview { max-height: 300px; overflow-y: auto; text-align: left; margin: 12px 0; }
+    .answer-preview table { width: 100%; border-collapse: collapse; }
+    .answer-preview td { padding: 4px 8px; border-bottom: 1px solid var(--border, #eee); font-size: 0.9rem; }
+    .answer-preview .empty { color: #e74c3c; }
+    @media (max-width: 600px) {
+        .sticky-panel { padding: 8px 12px; gap: 8px; }
+        .timer { font-size: 1.1rem; }
+        .task-nav a { width: 26px; height: 26px; font-size: 0.7rem; }
+        .task-block { scroll-margin-top: 120px; }
+    }
+</style>
+{% endblock %}
+
+{% block nav %}
+<div class="sticky-panel">
+    <div class="timer" id="timer">00:00:00</div>
+    <div style="flex:1; min-width: 0;">
+        <div class="task-nav" id="taskNav">
+            {% for task in tasks %}
+            <a href="#task-{{ task.number }}" id="nav-{{ task.number }}" aria-label="Задание {{ task.number }}">{{ task.number }}</a>
+            {% endfor %}
+        </div>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+        </div>
+        <span class="progress-text" id="progressText">0/{{ tasks|length }}</span>
+    </div>
+    <div style="margin-left: auto; white-space: nowrap;">
+        <span class="nav-profile">{{ student.full_name }}</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Вариант {{ variant.number }}</h1>
+<p class="subtitle" style="margin-bottom: 12px; color: var(--text-muted, #7f8c8d); font-size: 0.85rem;">
+    Записывайте ответ в формате, указанном в задании. Десятичные дроби — через запятую.
+</p>
+
+<form id="examForm">
+    {% csrf_token %}
+    {% for task in tasks %}
+    <div class="task-block" id="task-{{ task.number }}">
+        <h3>Задание {{ task.number }}</h3>
+        {% if task.text %}
+        <div class="task-text">{{ task.text|safe }}</div>
+        {% endif %}
+        {% if task.image %}
+        <div class="task-image">
+            <img src="{{ task.image.url }}" alt="Задание {{ task.number }}">
+        </div>
+        {% endif %}
+        <div class="form-group">
+            <label for="answer-{{ task.number }}">Ответ:</label>
+            <input type="text" id="answer-{{ task.number }}"
+                   class="answer-input"
+                   data-task-number="{{ task.number }}"
+                   value="{% with answer=answers|get_answer:task.id %}{{ answer.student_answer }}{% endwith %}"
+                   autocomplete="off">
+            <span class="save-indicator" id="save-{{ task.number }}"></span>
+            {% if task.answer_hint %}
+            <div class="answer-hint">{{ task.answer_hint }}</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</form>
+
+<div class="finish-section">
+    <button type="button" class="btn btn-danger btn-lg" id="finishBtn">Завершить</button>
+</div>
+
+<!-- Модальное окно подтверждения -->
+<div class="modal-overlay" id="confirmModal" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal">
+        <h3>Завершить вариант?</h3>
+        <p id="confirmText"></p>
+        <div class="answer-preview" id="answerPreview"></div>
+        <div class="modal-buttons">
+            <button class="btn btn-secondary" id="cancelBtn">Отмена</button>
+            <form method="post" action="{% url 'finish_exam' attempt.id %}" id="finishForm">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Завершить</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// === Таймер ===
+let remaining = {{ remaining_seconds }};
+const timerEl = document.getElementById('timer');
+let timerSubmitted = false;
+let warningPlayed = false;
+
+function updateTimer() {
+    if (remaining <= 0 && !timerSubmitted) {
+        timerSubmitted = true;
+        document.getElementById('finishForm').submit();
+        return;
+    }
+    remaining--;
+    const h = Math.floor(remaining / 3600);
+    const m = Math.floor((remaining % 3600) / 60);
+    const s = remaining % 60;
+    timerEl.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+    // Предупреждение за 5 минут (#12)
+    if (remaining < 300) {
+        timerEl.classList.add('warning');
+        if (!warningPlayed && remaining <= 300 && remaining > 297) {
+            warningPlayed = true;
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.value = 800; gain.gain.value = 0.3;
+                osc.start(); osc.stop(ctx.currentTime + 0.3);
+            } catch(e) {}
+        }
+    }
+}
+updateTimer();
+setInterval(updateTimer, 1000);
+
+// === Прогресс (#23) ===
+const answerInputs = document.querySelectorAll('.answer-input');
+const totalTasks = answerInputs.length;
+
+function updateProgress() {
+    let answered = 0;
+    answerInputs.forEach(input => { if (input.value.trim()) answered++; });
+    document.getElementById('progressBar').style.width = (answered / totalTasks * 100) + '%';
+    document.getElementById('progressText').textContent = answered + '/' + totalTasks;
+}
+
+// === Автосохранение ===
+const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+const answerMap = JSON.parse('{{ answer_map_json|escapejs }}');
+
+answerInputs.forEach(input => {
+    let saveTimeout;
+    input.addEventListener('input', function() {
+        clearTimeout(saveTimeout);
+        const taskNumber = this.dataset.taskNumber;
+        const answerId = answerMap[taskNumber];
+        const value = this.value;
+        const indicator = document.getElementById('save-' + taskNumber);
+
+        // Навигация
+        const navEl = document.getElementById('nav-' + taskNumber);
+        if (value.trim()) { navEl.classList.add('answered'); }
+        else { navEl.classList.remove('answered'); }
+
+        updateProgress();
+
+        if (!answerId) return;
+        saveTimeout = setTimeout(() => {
+            indicator.textContent = '...';
+            indicator.className = 'save-indicator show';
+
+            fetch('{% url "save_answer" %}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                body: JSON.stringify({answer_id: answerId, value: value})
+            }).then(r => {
+                if (r.status === 403) {
+                    // Время истекло на сервере
+                    timerSubmitted = true;
+                    document.getElementById('finishForm').submit();
+                    return;
+                }
+                indicator.textContent = r.ok ? 'Сохранено' : 'Ошибка';
+                indicator.className = 'save-indicator show' + (r.ok ? '' : ' error');
+                setTimeout(() => { indicator.className = 'save-indicator'; }, 1500);
+            }).catch(() => {
+                indicator.textContent = 'Нет сети';
+                indicator.className = 'save-indicator show error';
+                setTimeout(() => { indicator.className = 'save-indicator'; }, 3000);
+            });
+        }, 500);
+    });
+});
+
+// === Подтверждение завершения с превью (#11) ===
+document.getElementById('finishBtn').addEventListener('click', function() {
+    let unanswered = 0;
+    let rows = '';
+    answerInputs.forEach(input => {
+        const num = input.dataset.taskNumber;
+        const val = input.value.trim();
+        if (!val) unanswered++;
+        rows += `<tr><td>${num}</td><td class="${val ? '' : 'empty'}">${val || '— пусто —'}</td></tr>`;
+    });
+
+    const text = unanswered > 0
+        ? `Не отвечено: ${unanswered} из ${totalTasks} заданий.`
+        : `Все ${totalTasks} заданий отвечены.`;
+    document.getElementById('confirmText').textContent = text;
+    document.getElementById('answerPreview').innerHTML = '<table>' + rows + '</table>';
+    document.getElementById('confirmModal').style.display = 'flex';
+
+    // Focus trap
+    document.getElementById('cancelBtn').focus();
+});
+
+// === Модальное окно: Escape + focus trap (#17) ===
+const modal = document.getElementById('confirmModal');
+document.getElementById('cancelBtn').addEventListener('click', function() {
+    modal.style.display = 'none';
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+    }
+    if (modal.style.display === 'flex' && e.key === 'Tab') {
+        const focusable = modal.querySelectorAll('button, [href], input, select, textarea');
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+            if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    }
+});
+
+// Инициализация
+answerInputs.forEach(input => {
+    const taskNumber = input.dataset.taskNumber;
+    const navEl = document.getElementById('nav-' + taskNumber);
+    if (navEl && input.value.trim()) navEl.classList.add('answered');
+});
+updateProgress();
+</script>
+{% endblock %}

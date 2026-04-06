@@ -1,0 +1,219 @@
+import re
+from django.db import models
+from django.contrib.auth.hashers import make_password, check_password
+
+
+class ExamType(models.TextChoices):
+    OGE = "oge", "ОГЭ"
+    EGE_PROFILE = "ege_profile", "ЕГЭ профиль"
+    EGE_BASE = "ege_base", "ЕГЭ база"
+
+
+EXAM_DURATION = {
+    ExamType.OGE: 235,           # 3ч 55мин
+    ExamType.EGE_PROFILE: 235,   # 3ч 55мин
+    ExamType.EGE_BASE: 180,      # 3ч
+}
+
+EXAM_TASK_COUNT = {
+    ExamType.OGE: 25,
+    ExamType.EGE_PROFILE: 18,
+    ExamType.EGE_BASE: 21,
+}
+
+
+class TaskSource(models.TextChoices):
+    FIPI = "fipi", "ФИПИ"
+    PRINT_SOLVE = "print_solve", "Распечатай и реши"
+    DINAMIKA = "dinamika", "Динамика"
+    MANUAL = "manual", "Вручную"
+
+
+class TaskTopic(models.TextChoices):
+    ALGEBRA = "algebra", "Алгебра"
+    GEOMETRY = "geometry", "Геометрия"
+    PROBABILITY = "probability", "Вероятность и статистика"
+    FUNCTIONS = "functions", "Функции"
+    EQUATIONS = "equations", "Уравнения и неравенства"
+    NUMBER_THEORY = "number_theory", "Теория чисел"
+    PRACTICAL = "practical", "Практические задачи"
+    OTHER = "other", "Другое"
+
+
+class SchoolClass(models.Model):
+    name = models.CharField("Название", max_length=20, unique=True)
+    exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
+    is_active = models.BooleanField("Активен", default=True)
+
+    class Meta:
+        verbose_name = "Класс"
+        verbose_name_plural = "Классы"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_exam_type_display()})"
+
+
+class Student(models.Model):
+    full_name = models.CharField("ФИО", max_length=255, unique=True)
+    password_hash = models.CharField("Пароль (хэш)", max_length=255)
+    school_class = models.ForeignKey(
+        SchoolClass, on_delete=models.CASCADE, verbose_name="Класс", related_name="students"
+    )
+    session_key = models.CharField("Ключ сессии", max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Ученик"
+        verbose_name_plural = "Ученики"
+        ordering = ["school_class", "full_name"]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.school_class.name})"
+
+    def set_password(self, raw_password):
+        self.password_hash = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password_hash)
+
+    @property
+    def exam_type(self):
+        return self.school_class.exam_type
+
+
+class Variant(models.Model):
+    number = models.CharField("Номер варианта", max_length=20, unique=True)
+    exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
+    is_active = models.BooleanField("Активен", default=True)
+    max_attempts = models.PositiveIntegerField(
+        "Макс. попыток", default=3,
+        help_text="0 = без ограничений",
+    )
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Вариант"
+        verbose_name_plural = "Варианты"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Вариант {self.number} ({self.get_exam_type_display()})"
+
+    @property
+    def duration_minutes(self):
+        return EXAM_DURATION.get(self.exam_type, 235)
+
+
+class Task(models.Model):
+    variant = models.ForeignKey(
+        Variant, on_delete=models.CASCADE, verbose_name="Вариант", related_name="tasks"
+    )
+    number = models.PositiveIntegerField("Номер задания")
+    text = models.TextField("Текст задания", blank=True)
+    image = models.ImageField("Изображение", upload_to="tasks/", blank=True, null=True)
+    correct_answer = models.CharField("Правильный ответ", max_length=255)
+    source = models.CharField(
+        "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL
+    )
+    topic = models.CharField(
+        "Тема", max_length=30, choices=TaskTopic.choices,
+        default=TaskTopic.OTHER, blank=True,
+    )
+    points = models.PositiveIntegerField("Баллы", default=1)
+
+    class Meta:
+        verbose_name = "Задание"
+        verbose_name_plural = "Задания"
+        ordering = ["variant", "number"]
+        unique_together = ["variant", "number"]
+
+    def __str__(self):
+        return f"Вариант {self.variant.number}, задание {self.number}"
+
+    @property
+    def answer_hint(self):
+        """Подсказка формата ответа на основе правильного ответа."""
+        a = self.correct_answer.strip()
+        if not a:
+            return ""
+        if re.match(r'^-?\d+$', a):
+            return "Целое число"
+        if re.match(r'^-?\d+[.,]\d+$', a):
+            return "Десятичная дробь (через запятую)"
+        if re.match(r'^[\d;]+$', a) and ';' in a:
+            return "Последовательность чисел через ;"
+        return ""
+
+
+class Attempt(models.Model):
+    student = models.ForeignKey(
+        Student, on_delete=models.CASCADE, verbose_name="Ученик", related_name="attempts"
+    )
+    variant = models.ForeignKey(
+        Variant, on_delete=models.CASCADE, verbose_name="Вариант", related_name="attempts"
+    )
+    started_at = models.DateTimeField("Начало", auto_now_add=True)
+    finished_at = models.DateTimeField("Конец", blank=True, null=True)
+    is_finished = models.BooleanField("Завершена", default=False)
+    score = models.PositiveIntegerField("Первичный балл", default=0)
+    max_score = models.PositiveIntegerField("Максимальный балл", default=0)
+    grade = models.CharField("Оценка", max_length=20, blank=True)
+
+    class Meta:
+        verbose_name = "Попытка"
+        verbose_name_plural = "Попытки"
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"{self.student.full_name} — Вариант {self.variant.number} ({self.started_at:%d.%m.%Y %H:%M})"
+
+    @property
+    def duration_seconds(self):
+        if self.finished_at and self.started_at:
+            return int((self.finished_at - self.started_at).total_seconds())
+        return None
+
+    @property
+    def duration_display(self):
+        s = self.duration_seconds
+        if s is None:
+            return "—"
+        hours, remainder = divmod(s, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours}ч {minutes}мин"
+        return f"{minutes}мин {seconds}сек"
+
+    @property
+    def correct_count(self):
+        return self.answers.filter(is_correct=True).count()
+
+    @property
+    def total_count(self):
+        return self.variant.tasks.count()
+
+    @property
+    def percentage(self):
+        if self.total_count == 0:
+            return 0
+        return round(self.correct_count / self.total_count * 100)
+
+
+class Answer(models.Model):
+    attempt = models.ForeignKey(
+        Attempt, on_delete=models.CASCADE, verbose_name="Попытка", related_name="answers"
+    )
+    task = models.ForeignKey(
+        Task, on_delete=models.CASCADE, verbose_name="Задание", related_name="answers"
+    )
+    student_answer = models.CharField("Ответ ученика", max_length=255, blank=True)
+    is_correct = models.BooleanField("Правильно", default=False)
+
+    class Meta:
+        verbose_name = "Ответ"
+        verbose_name_plural = "Ответы"
+        unique_together = ["attempt", "task"]
+
+    def __str__(self):
+        return f"Задание {self.task.number}: {self.student_answer} ({'✓' if self.is_correct else '✗'})"

@@ -1,0 +1,53 @@
+2026-04-06 11:34:20,105 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 11:36:02,104 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\views.py changed, reloading.
+2026-04-06 11:36:03,103 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:22:55,016 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\urls.py changed, reloading.
+2026-04-06 15:22:58,347 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:31:09,016 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:31:10,037 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:31:26,246 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:31:27,556 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:31:32,227 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:31:33,140 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:31:40,953 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:31:41,885 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:31:50,766 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:31:51,763 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:31:58,546 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:31:59,519 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:32:05,209 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:32:06,194 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:32:16,100 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:32:17,155 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 15:32:22,894 INFO django.utils.autoreload C:\Users\Махач\OneDrive\Рабочий стол\EGE\exam\admin_views.py changed, reloading.
+2026-04-06 15:32:23,962 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 19:55:07,240 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 20:01:34,976 WARNING django.request Method Not Allowed (GET): /admin/logout/
+2026-04-06 20:01:53,401 WARNING django.request Method Not Allowed (GET): /logout/
+2026-04-06 20:01:58,818 INFO exam.views Попытка 1 завершена: Экзаменов Экзамен — 0 баллов
+2026-04-06 20:01:58,840 INFO exam.views Попытка 2 завершена: Экзаменов Экзамен — 0 баллов
+2026-04-06 20:02:01,970 INFO exam.views Попытка 1 завершена: Экзаменов Экзамен — 1 баллов
+2026-04-06 20:02:54,473 INFO django.utils.autoreload Watching for file changes with StatReloader
+2026-04-06 20:05:20,033 INFO exam.parser Вариант 23163314: 21 заданий
+2026-04-06 20:06:25,848 INFO exam.parser   1/21 (ID 323514) — ответ: 8
+2026-04-06 20:06:34,702 INFO exam.parser   2/21 (ID 506412) — ответ: 4312
+2026-04-06 20:06:37,099 INFO exam.parser   3/21 (ID 26863) — ответ: 72
+2026-04-06 20:06:38,716 INFO exam.parser   4/21 (ID 506301) — ответ: 3,2
+2026-04-06 20:06:40,508 INFO exam.parser   5/21 (ID 320172) — ответ: 0,52
+2026-04-06 20:06:48,417 INFO exam.parser   6/21 (ID 506322) — ответ: 51, или 24, или 42
+2026-04-06 20:06:52,571 INFO exam.parser   7/21 (ID 509699) — ответ: 1432
+2026-04-06 20:06:57,504 INFO exam.parser   8/21 (ID 507066) — ответ: 4
+2026-04-06 20:07:01,852 INFO exam.parser   9/21 (ID 523095) — ответ: 35
+2026-04-06 20:07:03,503 INFO exam.parser   10/21 (ID 506331) — ответ: 1260
+2026-04-06 20:07:05,507 INFO exam.parser   11/21 (ID 318145) — ответ: 490
+2026-04-06 20:07:15,457 INFO exam.parser   12/21 (ID 510246) — ответ: 2,5
+2026-04-06 20:07:30,753 INFO exam.parser   13/21 (ID 528651) — ответ: 55
+2026-04-06 20:07:32,373 INFO exam.parser   14/21 (ID 506384) — ответ: 8,8
+2026-04-06 20:07:33,977 INFO exam.parser   15/21 (ID 26631) — ответ: 93 500
+2026-04-06 20:07:50,493 WARNING exam.parser   16/21 (ID 62429) ОШИБКА: Не удалось загрузить: HTTPSConnectionPool(host='mathb-ege.sdamgia.ru', port=443): Read timed out. (read timeout=15)
+2026-04-06 20:07:52,999 INFO exam.parser   17/21 (ID 509692) — ответ: 22,4
+2026-04-06 20:08:08,498 INFO exam.parser   18/21 (ID 510733) — ответ: 1243
+2026-04-06 20:08:10,923 INFO exam.parser   19/21 (ID 506834) — ответ: 7065, или 7175, или 7285, или 7395
+2026-04-06 20:08:13,252 INFO exam.parser   20/21 (ID 99569) — ответ: 11
+2026-04-06 20:08:15,383 INFO exam.parser   21/21 (ID 510016) — ответ: 25
+2026-04-06 20:10:54,307 WARNING django.security.csrf Forbidden (CSRF token from POST incorrect.): /choose/

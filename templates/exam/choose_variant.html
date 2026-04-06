@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Выбор варианта{% endblock %}
+
+{% block nav %}
+<nav class="navbar">
+    <span class="nav-title">Пробные ОГЭ/ЕГЭ</span>
+    <div class="nav-right">
+        <a href="{% url 'profile' %}" class="nav-profile">{{ student.full_name }}</a>
+        <form method="post" action="{% url 'logout' %}" class="nav-logout-form">{% csrf_token %}<button type="submit" class="nav-link nav-logout-btn">Выйти</button></form>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>Выбор варианта</h1>
+<p class="subtitle">{{ student.school_class }} — {{ student.school_class.get_exam_type_display }}</p>
+
+<div class="choose-section">
+    <div class="choose-card">
+        <h3>Случайный вариант</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="random">
+            <button type="submit" class="btn btn-primary">Случайный вариант</button>
+        </form>
+    </div>
+
+    <div class="choose-card">
+        <h3>По ID варианта</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="by_id">
+            <div class="form-group">
+                <input type="text" name="variant_number" placeholder="Например: 092" required>
+                {% if error %}
+                <div class="error-message-inline">{{ error }}</div>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary">Начать</button>
+        </form>
+    </div>
+</div>
+
+{% if past_attempts %}
+<h2>Ранее решённые варианты</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Вариант</th>
+            <th>Дата</th>
+            <th>Результат</th>
+            <th>Оценка</th>
+            <th>Время</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for attempt in past_attempts %}
+        <tr>
+            <td>{{ attempt.variant.number }}</td>
+            <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ attempt.correct_count }}/{{ attempt.total_count }} ({{ attempt.percentage }}%)</td>
+            <td>{{ attempt.grade }}</td>
+            <td>{{ attempt.duration_display }}</td>
+            <td><a href="{% url 'results' attempt.id %}" class="btn btn-sm">Подробнее</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

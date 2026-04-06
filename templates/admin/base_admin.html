@@ -1,0 +1,27 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Админ-панель{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="admin-body">
+    <nav class="navbar admin-navbar">
+        <span class="nav-title">Админ-панель</span>
+        <div class="nav-links">
+            <a href="{% url 'admin_dashboard' %}">Главная</a>
+            <a href="{% url 'admin_classes' %}">Классы</a>
+            <a href="{% url 'admin_students' %}">Ученики</a>
+            <a href="{% url 'admin_variants' %}">Варианты</a>
+        </div>
+        <form method="post" action="{% url 'admin_logout' %}" class="nav-logout-form">{% csrf_token %}<button type="submit" class="nav-link nav-logout-btn">Выйти</button></form>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

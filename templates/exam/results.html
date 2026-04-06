@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Итоги — Вариант {{ attempt.variant.number }}{% endblock %}
+
+{% block nav %}
+<nav class="navbar">
+    <span class="nav-title">Пробные ОГЭ/ЕГЭ</span>
+    <div class="nav-right">
+        <a href="{% url 'profile' %}" class="nav-profile">{{ student.full_name }}</a>
+        <form method="post" action="{% url 'logout' %}" class="nav-logout-form">{% csrf_token %}<button type="submit" class="nav-link nav-logout-btn">Выйти</button></form>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1>Итоги — Вариант {{ attempt.variant.number }}</h1>
+
+<div class="results-summary">
+    <div class="result-card">
+        <div class="result-number">{{ attempt.correct_count }}/{{ attempt.total_count }}</div>
+        <div class="result-label">Правильных ответов</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ attempt.score }}</div>
+        <div class="result-label">Первичный балл</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ attempt.grade }}</div>
+        <div class="result-label">{{ grade_display }}</div>
+    </div>
+    <div class="result-card">
+        <div class="result-number">{{ attempt.duration_display }}</div>
+        <div class="result-label">Время решения</div>
+    </div>
+</div>
+
+<!-- Кружки по заданиям -->
+<div class="answer-dots">
+    {% for answer in answers %}
+    <span class="dot {% if answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}">
+        {{ answer.task.number }}
+    </span>
+    {% endfor %}
+</div>
+
+{% if previous_attempts %}
+<h2>Предыдущие попытки</h2>
+<table class="table">
+    <thead>
+        <tr><th>Дата</th><th>Результат</th><th>Оценка</th><th>Время</th></tr>
+    </thead>
+    <tbody>
+        {% for pa in previous_attempts %}
+        <tr>
+            <td>{{ pa.finished_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ pa.correct_count }}/{{ pa.total_count }} ({{ pa.percentage }}%)</td>
+            <td>{{ pa.grade }}</td>
+            <td>{{ pa.duration_display }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<div class="results-actions">
+    <button class="btn btn-secondary" id="toggleWrong">Посмотреть неправильные ({{ wrong_answers|length }})</button>
+    <a href="{% url 'view_attempt' attempt.id %}" class="btn btn-secondary">Посмотреть весь вариант</a>
+    <a href="{% url 'choose_variant' %}" class="btn btn-primary">Решить ещё</a>
+</div>
+
+<div id="wrongAnswers" style="display:none;">
+    <h2>Неправильные ответы</h2>
+    {% for answer in wrong_answers %}
+    <div class="wrong-answer-block">
+        <h3>Задание {{ answer.task.number }}</h3>
+        {% if answer.task.text %}
+        <div class="task-text">{{ answer.task.text|safe }}</div>
+        {% endif %}
+        {% if answer.task.image %}
+        <div class="task-image"><img src="{{ answer.task.image.url }}" alt="Задание {{ answer.task.number }}"></div>
+        {% endif %}
+        <div class="answer-compare">
+            <span class="your-answer">Ваш ответ: <strong>{{ answer.student_answer|default:"—" }}</strong></span>
+            <span class="correct-answer">Правильный: <strong>{{ answer.task.correct_answer }}</strong></span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('toggleWrong').addEventListener('click', function() {
+    const el = document.getElementById('wrongAnswers');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    this.textContent = el.style.display === 'none'
+        ? 'Посмотреть неправильные ({{ wrong_answers|length }})'
+        : 'Скрыть неправильные';
+});
+</script>
+{% endblock %}

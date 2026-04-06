@@ -1,0 +1,40 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Импорт учеников — Админ{% endblock %}
+
+{% block content %}
+<h1>Импорт учеников из Excel</h1>
+
+<div class="info-box">
+    <p><strong>Формат файла Excel:</strong></p>
+    <table class="table" style="max-width:400px;">
+        <thead><tr><th>A (ФИО)</th><th>B (Пароль)</th><th>C (Класс)</th></tr></thead>
+        <tbody><tr><td>Иванов Иван</td><td>1234</td><td>9А</td></tr></tbody>
+    </table>
+    <p>Первая строка — заголовки (будет пропущена). Классы должны быть созданы заранее.</p>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form-card">
+    {% csrf_token %}
+    <div class="form-group">
+        <label for="file">Excel-файл (.xlsx)</label>
+        <input type="file" id="file" name="file" accept=".xlsx" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Импортировать</button>
+    <a href="{% url 'admin_students' %}" class="btn btn-secondary">Отмена</a>
+</form>
+
+{% if success_count %}
+<div class="success-message">Успешно добавлено: {{ success_count }} учеников</div>
+{% endif %}
+
+{% if errors %}
+<div class="error-list">
+    <h3>Ошибки:</h3>
+    <ul>
+        {% for err in errors %}
+        <li>{{ err }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

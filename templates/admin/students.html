@@ -1,0 +1,46 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Ученики — Админ{% endblock %}
+
+{% block content %}
+<h1>Ученики</h1>
+
+<div class="actions-bar">
+    <a href="{% url 'admin_student_add' %}" class="btn btn-primary">Добавить ученика</a>
+    <a href="{% url 'admin_student_import' %}" class="btn btn-secondary">Импорт из Excel</a>
+
+    <form method="get" class="filter-form">
+        <select name="class" onchange="this.form.submit()">
+            <option value="">Все классы</option>
+            {% for cls in classes %}
+            <option value="{{ cls.id }}" {% if class_filter == cls.id|stringformat:"d" %}selected{% endif %}>{{ cls.name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<table class="table">
+    <thead>
+        <tr><th>ФИО</th><th>Класс</th><th>Тип</th><th>Попыток</th><th>Действия</th></tr>
+    </thead>
+    <tbody>
+        {% for student in students %}
+        <tr>
+            <td><a href="{% url 'admin_student_stats' student.id %}">{{ student.full_name }}</a></td>
+            <td>{{ student.school_class.name }}</td>
+            <td>{{ student.school_class.get_exam_type_display }}</td>
+            <td>{{ student.attempts_count }}</td>
+            <td>
+                <a href="{% url 'admin_student_edit' student.id %}" class="btn btn-sm">Редактировать</a>
+                <form method="post" action="{% url 'admin_student_delete' student.id %}" style="display:inline;" onsubmit="return confirm('Удалить ученика {{student.full_name}}?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">Нет учеников</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% include "includes/pagination.html" %}
+{% endblock %}

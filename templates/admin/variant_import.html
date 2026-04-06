@@ -1,0 +1,123 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Импорт варианта — Админ{% endblock %}
+
+{% block content %}
+<h1>Импорт варианта с sdamgia.ru</h1>
+
+<div class="info-box">
+    <p><strong>Поддерживаемые ссылки:</strong></p>
+    <ul>
+        <li>Решу ОГЭ: <code>https://math-oge.sdamgia.ru/test?id=XXXXXXXX</code></li>
+        <li>Решу ЕГЭ: <code>https://math-ege.sdamgia.ru/test?id=XXXXXXXX</code></li>
+    </ul>
+    <p>Система автоматически скачает все задания, изображения и ответы.</p>
+    <p><strong>Внимание:</strong> импорт может занять 30-60 секунд (зависит от количества заданий).</p>
+</div>
+
+{% if success and variant %}
+<div class="success-message">
+    Вариант <strong>{{ variant.number }}</strong> успешно импортирован!
+    ({{ variant.tasks.count }} заданий)
+    <br>
+    <a href="{% url 'admin_variant_edit' variant.id %}">Редактировать вариант</a> |
+    <a href="{% url 'admin_variants' %}">К списку вариантов</a>
+</div>
+{% endif %}
+
+{% if errors %}
+<div class="error-list">
+    <h3>Ошибки:</h3>
+    <ul>
+        {% for err in errors %}
+        <li>{{ err }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<form method="post" class="form-card" id="import-form">
+    {% csrf_token %}
+    <div class="form-group">
+        <label for="url">URL варианта</label>
+        <input type="url" id="url" name="url" placeholder="https://math-oge.sdamgia.ru/test?id=78137357" required>
+    </div>
+    <div class="form-group">
+        <label for="variant_number">Номер варианта (необязательно)</label>
+        <input type="text" id="variant_number" name="variant_number" placeholder="Если пусто — будет сгенерирован автоматически">
+    </div>
+    <button type="submit" class="btn btn-primary" id="import-btn">Импортировать</button>
+    <a href="{% url 'admin_variants' %}" class="btn btn-secondary">Отмена</a>
+</form>
+
+<div id="import-overlay" style="display:none;">
+    <div class="import-progress">
+        <div class="spinner"></div>
+        <h3>Импорт варианта...</h3>
+        <p>Скачиваем задания, изображения и ответы.</p>
+        <p class="import-timer">Прошло: <span id="elapsed">0</span> сек</p>
+        <p class="import-hint">Обычно это занимает 30-60 секунд. Не закрывайте страницу.</p>
+    </div>
+</div>
+
+<style>
+#import-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.import-progress {
+    background: #fff;
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+.import-progress h3 {
+    margin: 16px 0 8px;
+}
+.import-timer {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #2563eb;
+    margin: 16px 0 8px;
+}
+.import-hint {
+    color: #666;
+    font-size: 0.9em;
+}
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #e5e7eb;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+
+<script>
+document.getElementById('import-form').addEventListener('submit', function() {
+    var overlay = document.getElementById('import-overlay');
+    var elapsed = document.getElementById('elapsed');
+    var btn = document.getElementById('import-btn');
+
+    overlay.style.display = 'flex';
+    btn.disabled = true;
+
+    var seconds = 0;
+    setInterval(function() {
+        seconds++;
+        elapsed.textContent = seconds;
+    }, 1000);
+});
+</script>
+{% endblock %}
