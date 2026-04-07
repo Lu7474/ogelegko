@@ -1,5 +1,7 @@
 import json
 import logging
+import threading
+import uuid
 import time as _time
 from functools import wraps
 from django.conf import settings as django_settings
@@ -10,7 +12,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Count, Q, Avg
 from django.db import IntegrityError
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
 from .models import (
@@ -619,37 +621,74 @@ def variant_delete(request, variant_id):
     return redirect("admin_variants")
 
 
+_import_jobs = {}  # job_id -> {status, variant_id, errors}
+
+
+def _run_import_job(job_id, url, variant_number):
+    """Фоновый поток для импорта варианта."""
+    try:
+        from .parser import import_variant_from_sdamgia
+        variant, parse_errors = import_variant_from_sdamgia(
+            url, variant_number=variant_number or None
+        )
+        _import_jobs[job_id] = {
+            "status": "done",
+            "variant_id": variant.id if variant else None,
+            "errors": parse_errors,
+        }
+    except Exception as e:
+        logger.exception("Ошибка импорта варианта")
+        _import_jobs[job_id] = {
+            "status": "error",
+            "variant_id": None,
+            "errors": [str(e)],
+        }
+    finally:
+        from django.db import connection
+        connection.close()
+
+
 @admin_required
 def variant_import(request):
     """Импорт варианта с sdamgia.ru."""
-    variant = None
-    errors = []
-    success = False
-
     if request.method == "POST":
         url = request.POST.get("url", "").strip()
         variant_number = request.POST.get("variant_number", "").strip()
 
+        errors = []
         if not url:
             errors.append("Введите URL варианта")
         elif "sdamgia.ru" not in url:
             errors.append("Поддерживается только sdamgia.ru (Решу ОГЭ / Решу ЕГЭ)")
-        else:
-            from .parser import import_variant_from_sdamgia, ParserError
-            try:
-                variant, parse_errors = import_variant_from_sdamgia(
-                    url, variant_number=variant_number or None
-                )
-                errors.extend(parse_errors)
-                if variant:
-                    success = True
-            except Exception as e:
-                logger.exception("Ошибка импорта варианта")
-                errors.append(f"Ошибка импорта: {str(e)}")
 
-    return render(request, "admin/variant_import.html", {
-        "errors": errors,
-        "success": success,
+        if errors:
+            return render(request, "admin/variant_import.html", {"errors": errors})
+
+        job_id = str(uuid.uuid4())
+        _import_jobs[job_id] = {"status": "running", "variant_id": None, "errors": []}
+        threading.Thread(
+            target=_run_import_job, args=(job_id, url, variant_number), daemon=True
+        ).start()
+        return redirect("admin_variant_import_status", job_id=job_id)
+
+    return render(request, "admin/variant_import.html", {"errors": []})
+
+
+@admin_required
+def variant_import_status(request, job_id):
+    """Страница/API опроса статуса импорта."""
+    job = _import_jobs.get(job_id, {"status": "unknown", "variant_id": None, "errors": ["Задание не найдено"]})
+
+    if request.GET.get("json"):
+        return JsonResponse(job)
+
+    variant = None
+    if job["status"] == "done" and job.get("variant_id"):
+        variant = Variant.objects.filter(id=job["variant_id"]).first()
+
+    return render(request, "admin/variant_import_status.html", {
+        "job_id": job_id,
+        "job": job,
         "variant": variant,
     })
 

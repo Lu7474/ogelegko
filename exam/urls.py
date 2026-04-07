@@ -45,6 +45,7 @@ urlpatterns = [
     path("admin/variants/<int:variant_id>/delete/", admin_views.variant_delete, name="admin_variant_delete"),
     path("admin/variants/<int:variant_id>/stats/", admin_views.variant_stats, name="admin_variant_stats"),
     path("admin/variants/import/", admin_views.variant_import, name="admin_variant_import"),
+    path("admin/variants/import/<str:job_id>/status/", admin_views.variant_import_status, name="admin_variant_import_status"),
 
     # Админ — попытки
     path("admin/attempts/<int:attempt_id>/delete/", admin_views.attempt_delete, name="admin_attempt_delete"),
