@@ -70,6 +70,8 @@ class SdamgiaParser:
     def _detect_exam_type(self, url):
         if "oge" in url:
             return ExamType.OGE
+        if "mathb" in url:
+            return ExamType.EGE_BASE
         return ExamType.EGE_PROFILE
 
     def _base_url(self, url):
