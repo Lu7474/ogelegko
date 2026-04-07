@@ -137,8 +137,9 @@ a:hover { text-decoration: underline; }
 .task-text { margin-bottom: 12px; line-height: 1.7; }
 .task-text img { max-width: 100%; vertical-align: middle; }
 .task-text img.tex { max-width: none; vertical-align: baseline; }
-.task-text table { border-collapse: collapse; margin: 10px auto; }
-.task-text table th, .task-text table td { border: 1px solid #ccc; padding: 6px 12px; text-align: center; }
+.task-text { overflow-x: auto; }
+.task-text table { border-collapse: collapse; margin: 10px auto; max-width: 100%; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.task-text table th, .task-text table td { border: 1px solid #ccc; padding: 6px 12px; text-align: center; white-space: nowrap; }
 .task-text table th { background: var(--table-header-bg); font-weight: 600; }
 .task-image { margin-bottom: 12px; }
 .task-image img { max-width: 100%; border-radius: 8px; }
