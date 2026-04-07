@@ -19,29 +19,6 @@
     --focus-ring: rgba(52,152,219,0.3);
 }
 
-/* === Dark Mode (#20) === */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #121212;
-        --card-bg: #1e1e1e;
-        --text: #e0e0e0;
-        --text-secondary: #b0b0b0;
-        --text-muted: #888;
-        --heading: #e0e0e0;
-        --border: #333;
-        --input-border: #444;
-        --input-bg: #2a2a2a;
-        --table-header-bg: #252525;
-        --table-border: #333;
-        --hover-bg: #252525;
-        --navbar-bg: #0d1117;
-        --admin-navbar-bg: #080c11;
-        --card-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        --link: #58a6ff;
-        --focus-ring: rgba(88,166,255,0.3);
-    }
-    img { opacity: 0.9; }
-}
 
 /* === Reset & Base === */
 * { margin: 0; padding: 0; box-sizing: border-box; }
