@@ -4,17 +4,20 @@
 
 {% block extra_head %}
 <style>
-    .sticky-panel { position: sticky; top: 0; z-index: 100; background: var(--card-bg, #fff); border-bottom: 2px solid var(--border, #e0e0e0); padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .timer { font-size: 1.3rem; font-weight: bold; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sticky-panel { position: sticky; top: 0; z-index: 100; background: var(--card-bg, #fff); border-bottom: 2px solid var(--border, #e0e0e0); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+    .timer { font-size: 1.2rem; font-weight: bold; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
     .timer.warning { color: #e74c3c; animation: pulse 1s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .task-nav { display: flex; gap: 4px; flex-wrap: wrap; }
-    .task-nav a { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--border, #e0e0e0); text-decoration: none; color: var(--text, #333); font-size: 0.8rem; }
-    .task-nav a.answered { background: #3498db; color: #fff; }
-    .task-block { scroll-margin-top: 80px; }
-    .progress-bar-wrap { width: 100%; height: 6px; background: var(--border, #e0e0e0); border-radius: 3px; margin-top: 4px; }
+    .task-nav-wrap { flex: 1; min-width: 0; overflow: hidden; }
+    .task-nav { display: flex; gap: 4px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -ms-overflow-style: none; }
+    .task-nav::-webkit-scrollbar { display: none; }
+    .task-nav a { flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 7px; background: var(--border, #e0e0e0); text-decoration: none; color: var(--text, #333); font-size: 0.78rem; font-weight: 600; }
+    .task-nav a.answered { background: #3b82f6; color: #fff; }
+    .task-block { scroll-margin-top: 64px; }
+    .progress-bar-wrap { height: 3px; background: var(--border, #e0e0e0); border-radius: 3px; margin-top: 3px; }
     .progress-bar-fill { height: 100%; background: #27ae60; border-radius: 3px; transition: width 0.3s; }
-    .progress-text { font-size: 0.75rem; color: var(--text-muted, #7f8c8d); white-space: nowrap; }
+    .progress-text { font-size: 0.7rem; color: var(--text-muted, #7f8c8d); white-space: nowrap; }
+    .panel-right { white-space: nowrap; flex-shrink: 0; font-size: 0.82rem; }
     .save-indicator { font-size: 0.75rem; color: #27ae60; opacity: 0; transition: opacity 0.3s; margin-left: 4px; }
     .save-indicator.show { opacity: 1; }
     .save-indicator.error { color: #e74c3c; }
@@ -24,10 +27,11 @@
     .answer-preview td { padding: 4px 8px; border-bottom: 1px solid var(--border, #eee); font-size: 0.9rem; }
     .answer-preview .empty { color: #e74c3c; }
     @media (max-width: 600px) {
-        .sticky-panel { padding: 8px 12px; gap: 8px; }
-        .timer { font-size: 1.1rem; }
-        .task-nav a { width: 26px; height: 26px; font-size: 0.7rem; }
-        .task-block { scroll-margin-top: 120px; }
+        .sticky-panel { padding: 6px 10px; gap: 8px; }
+        .timer { font-size: 1rem; }
+        .task-nav a { width: 28px; height: 28px; font-size: 0.7rem; }
+        .task-block { scroll-margin-top: 60px; }
+        .panel-right { display: none; }
     }
 </style>
 {% endblock %}
@@ -35,7 +39,7 @@
 {% block nav %}
 <div class="sticky-panel">
     <div class="timer" id="timer">00:00:00</div>
-    <div style="flex:1; min-width: 0;">
+    <div class="task-nav-wrap">
         <div class="task-nav" id="taskNav">
             {% for task in tasks %}
             <a href="#task-{{ task.number }}" id="nav-{{ task.number }}" aria-label="Задание {{ task.number }}">{{ task.number }}</a>
@@ -44,10 +48,11 @@
         <div class="progress-bar-wrap">
             <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
         </div>
-        <span class="progress-text" id="progressText">0/{{ tasks|length }}</span>
     </div>
-    <div style="margin-left: auto; white-space: nowrap;">
-        <span class="nav-profile">{{ student.full_name }}</span>
+    <div class="panel-right">
+        <span class="progress-text" id="progressText">0/{{ tasks|length }}</span>
+        &nbsp;·&nbsp;
+        <span class="nav-profile" style="font-size:0.82rem">{{ student.full_name }}</span>
     </div>
 </div>
 {% endblock %}
