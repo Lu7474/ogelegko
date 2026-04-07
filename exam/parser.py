@@ -138,6 +138,16 @@ class SdamgiaParser:
         # Сортируем по номеру задания
         result.sort(key=lambda x: x[0] if x[0] is not None else 9999)
 
+        # Убираем дубли по номеру задания (оставляем первое вхождение)
+        seen_nums = set()
+        deduped = []
+        for task_num, pid in result:
+            key = task_num if task_num is not None else pid
+            if key not in seen_nums:
+                seen_nums.add(key)
+                deduped.append((task_num, pid))
+        result = deduped
+
         # Запасной способ если prob_nums не найдены
         if not result:
             for div in soup.find_all("div", class_="prob_maindiv"):
@@ -469,7 +479,13 @@ def import_variant_from_sdamgia(url, variant_number=None):
     )
 
     no_answer = []
+    seen_numbers = set()
     for td in data["tasks"]:
+        if td["number"] in seen_numbers:
+            logger.warning("Пропуск дублирующегося задания №%s", td["number"])
+            continue
+        seen_numbers.add(td["number"])
+
         task = Task(
             variant=variant,
             number=td["number"],
