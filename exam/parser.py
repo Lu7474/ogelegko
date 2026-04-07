@@ -273,6 +273,18 @@ class SdamgiaParser:
         parts = [self._pbody_to_html(pb, base_url) for pb in pbodies]
         return "<br><br>".join(parts)
 
+    def _extract_criteria_from_block(self, block):
+        """Извлекает текст критериев проверки (для заданий части 2)."""
+        for tag in block.find_all(string=re.compile(r'Критерии')):
+            parent = tag.parent
+            if parent:
+                text = parent.get_text(" ", strip=True)
+                m = re.search(r'Критерии[^:]*:\s*(.+)', text, re.DOTALL)
+                if m:
+                    criteria = m.group(1).strip()[:200]
+                    return f"Критерии: {criteria}"
+        return ""
+
     def _extract_answer_from_block(self, block):
         """Извлекает ответ из блока задания."""
         # Сначала ищем через BeautifulSoup — надёжнее для разных форматов
@@ -482,23 +494,24 @@ def import_variant_from_sdamgia(url, variant_number=None):
 
     no_answer = []
     for td in data["tasks"]:
-
+        manual = not bool(td["correct_answer"])
         task = Task(
             variant=variant,
             number=td["number"],
             text=td["text"],
             correct_answer=td["correct_answer"],
             source=TaskSource.PRINT_SOLVE,
+            manual_grading=manual,
         )
         if td.get("image_data"):
             img = td["image_data"]
             task.image.save(img["filename"], ContentFile(img["content"]), save=False)
         task.save()
 
-        if not td["correct_answer"]:
+        if manual:
             no_answer.append(td["number"])
 
     if no_answer:
-        errors.append(f"Нет ответа для заданий: {', '.join(map(str, no_answer))}. Заполните вручную.")
+        errors.append(f"Задания с ручной проверкой: {', '.join(map(str, no_answer))}. Учитель проверяет вручную.")
 
     return variant, errors

@@ -1,0 +1,88 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Проверка попытки — Админ{% endblock %}
+
+{% block content %}
+<h1>Проверка попытки</h1>
+
+<div class="info-box" style="margin-bottom:20px">
+    <strong>Ученик:</strong> {{ attempt.student.full_name }}<br>
+    <strong>Вариант:</strong> {{ attempt.variant.number }}<br>
+    <strong>Дата:</strong> {{ attempt.finished_at|date:"d.m.Y H:i" }}<br>
+    <strong>Балл:</strong> {{ attempt.score }} / {{ attempt.max_score }}<br>
+    <strong>Оценка:</strong> {{ attempt.grade }}
+    {% if has_pending %}
+    <br><span style="color:#e67e22">⚠ Есть задания, ожидающие проверки</span>
+    {% endif %}
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>№</th>
+            <th>Ответ ученика</th>
+            <th>Правильный ответ</th>
+            <th>Результат</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for answer in answers %}
+        <tr>
+            <td><strong>{{ answer.task.number }}</strong></td>
+            <td>{{ answer.student_answer|default:"—" }}</td>
+            <td>
+                {% if answer.task.manual_grading %}
+                    <em style="color:#888">ручная проверка</em>
+                {% else %}
+                    {{ answer.task.correct_answer }}
+                {% endif %}
+            </td>
+            <td>
+                {% if answer.task.manual_grading %}
+                    {% if answer.is_correct is None %}
+                        <span style="color:#e67e22">⏳ Ожидает</span>
+                        <div style="margin-top:6px;display:flex;gap:8px">
+                            <form method="post" action="{% url 'admin_grade_answer' answer.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="is_correct" value="true">
+                                <button class="btn btn-primary" style="padding:4px 12px">✓ Верно</button>
+                            </form>
+                            <form method="post" action="{% url 'admin_grade_answer' answer.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="is_correct" value="false">
+                                <button class="btn btn-danger" style="padding:4px 12px">✗ Неверно</button>
+                            </form>
+                        </div>
+                    {% elif answer.is_correct %}
+                        <span style="color:#27ae60">✓ Верно</span>
+                        <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
+                            {% csrf_token %}
+                            <input type="hidden" name="is_correct" value="false">
+                            <button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>
+                        </form>
+                    {% else %}
+                        <span style="color:#e74c3c">✗ Неверно</span>
+                        <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
+                            {% csrf_token %}
+                            <input type="hidden" name="is_correct" value="true">
+                            <button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>
+                        </form>
+                    {% endif %}
+                {% elif answer.is_correct %}
+                    <span style="color:#27ae60">✓</span>
+                {% else %}
+                    <span style="color:#e74c3c">✗</span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div style="margin-top:20px;display:flex;gap:12px">
+    <a href="{% url 'admin_student_stats' attempt.student.id %}" class="btn btn-secondary">← Назад к ученику</a>
+    <form method="post" action="{% url 'admin_attempt_delete' attempt.id %}">
+        {% csrf_token %}
+        <button class="btn btn-danger" onclick="return confirm('Удалить попытку?')">Удалить попытку</button>
+    </form>
+</div>
+{% endblock %}

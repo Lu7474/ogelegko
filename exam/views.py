@@ -301,20 +301,39 @@ def _finish_attempt(attempt):
     if attempt.is_finished:
         return
     total_score = 0
+    max_score = 0
     for answer in attempt.answers.select_related("task").all():
         if answer.task is None:
             continue
-        is_correct = check_answer(answer.student_answer, answer.task.correct_answer)
-        answer.is_correct = is_correct
-        answer.save(update_fields=["is_correct"])
-        if is_correct:
-            total_score += answer.task.points
+        max_score += answer.task.points
+        if answer.task.manual_grading:
+            answer.is_correct = None  # ожидает проверки учителя
+            answer.save(update_fields=["is_correct"])
+        else:
+            is_correct = check_answer(answer.student_answer, answer.task.correct_answer)
+            answer.is_correct = is_correct
+            answer.save(update_fields=["is_correct"])
+            if is_correct:
+                total_score += answer.task.points
 
     attempt.is_finished = True
     attempt.finished_at = timezone.now()
     attempt.score = total_score
+    attempt.max_score = max_score
     attempt.grade = get_grade(attempt.variant.exam_type, total_score)
     attempt.save()
+
+
+def _recalculate_attempt_score(attempt):
+    """Пересчитывает балл после ручной проверки учителем."""
+    total_score = sum(
+        a.task.points
+        for a in attempt.answers.select_related("task").all()
+        if a.is_correct is True
+    )
+    attempt.score = total_score
+    attempt.grade = get_grade(attempt.variant.exam_type, total_score)
+    attempt.save(update_fields=["score", "grade"])
     logger.info("Попытка %d завершена: %s — %d баллов",
                 attempt.id, attempt.student.full_name, total_score)
 

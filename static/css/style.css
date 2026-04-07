@@ -105,6 +105,7 @@ a:hover { text-decoration: underline; }
 .dot { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; color: #fff; }
 .dot-correct { background: #27ae60; }
 .dot-wrong { background: #e74c3c; }
+.dot-pending { background: #e67e22; }
 .dot-small { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
 .dot-inline { font-size: 0.9rem; margin-left: 8px; padding: 2px 8px; border-radius: 12px; color: #fff; }
 

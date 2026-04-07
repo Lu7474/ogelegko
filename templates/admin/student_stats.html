@@ -41,13 +41,14 @@
             <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
             <td>
                 {% for answer in attempt.answers.all %}
-                <span class="dot-small {% if answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}: {% if answer.is_correct %}✓{% else %}✗{% endif %}"></span>
+                <span class="dot-small {% if answer.is_correct %}dot-correct{% elif answer.is_correct is None %}dot-pending{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}: {% if answer.is_correct %}✓{% elif answer.is_correct is None %}⏳{% else %}✗{% endif %}"></span>
                 {% endfor %}
             </td>
             <td>{{ attempt.score }}/{{ attempt.max_score }}</td>
             <td>{{ attempt.grade }}</td>
             <td>{{ attempt.duration_display }}</td>
             <td>
+                <a href="{% url 'admin_attempt_detail' attempt.id %}" class="btn btn-sm btn-secondary">Проверить</a>
                 <form method="post" action="{% url 'admin_attempt_delete' attempt.id %}" style="display:inline;" onsubmit="return confirm('Удалить эту попытку?')">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-danger">Удалить</button>

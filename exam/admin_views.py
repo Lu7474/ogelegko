@@ -732,6 +732,37 @@ def variant_stats(request, variant_id):
     })
 
 
+# --- Просмотр и ручная проверка попытки ---
+
+@admin_required
+def attempt_detail(request, attempt_id):
+    attempt = get_object_or_404(Attempt, id=attempt_id, is_finished=True)
+    answers = attempt.answers.select_related("task").order_by("task__id")
+    has_pending = answers.filter(is_correct=None).exists()
+    return render(request, "admin/attempt_detail.html", {
+        "attempt": attempt,
+        "answers": answers,
+        "has_pending": has_pending,
+    })
+
+
+@admin_required
+@require_POST
+def attempt_grade_answer(request, answer_id):
+    from .views import _recalculate_attempt_score
+    answer = get_object_or_404(Answer, id=answer_id, task__manual_grading=True)
+    value = request.POST.get("is_correct")
+    if value == "true":
+        answer.is_correct = True
+    elif value == "false":
+        answer.is_correct = False
+    else:
+        answer.is_correct = None
+    answer.save(update_fields=["is_correct"])
+    _recalculate_attempt_score(answer.attempt)
+    return redirect("admin_attempt_detail", attempt_id=answer.attempt_id)
+
+
 # --- Удаление попытки ---
 
 @admin_required

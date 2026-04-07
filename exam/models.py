@@ -121,6 +121,7 @@ class Task(models.Model):
         default=TaskTopic.OTHER, blank=True,
     )
     points = models.PositiveIntegerField("Баллы", default=1)
+    manual_grading = models.BooleanField("Ручная проверка", default=False)
 
     class Meta:
         verbose_name = "Задание"
@@ -208,7 +209,7 @@ class Answer(models.Model):
         Task, on_delete=models.CASCADE, verbose_name="Задание", related_name="answers"
     )
     student_answer = models.CharField("Ответ ученика", max_length=255, blank=True)
-    is_correct = models.BooleanField("Правильно", default=False)
+    is_correct = models.BooleanField("Правильно", default=False, null=True, blank=True)
 
     class Meta:
         verbose_name = "Ответ"
