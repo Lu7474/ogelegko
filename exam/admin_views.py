@@ -126,6 +126,10 @@ def dashboard(request):
         is_finished=True
     ).select_related("student", "variant", "student__school_class").order_by("-finished_at")[:10]
 
+    pending_grading = Attempt.objects.filter(
+        is_finished=True, answers__is_correct=None
+    ).distinct().count()
+
     # Статистика по классам
     classes = SchoolClass.objects.filter(is_active=True).annotate(
         student_count=Count("students")
@@ -151,6 +155,7 @@ def dashboard(request):
         "stats": stats,
         "recent_attempts": recent_attempts,
         "class_stats": class_stats_list,
+        "pending_grading": pending_grading,
     })
 
 
@@ -540,7 +545,7 @@ def variant_add(request):
 @admin_required
 def variant_edit(request, variant_id):
     variant = get_object_or_404(Variant, id=variant_id)
-    tasks = variant.tasks.order_by("number")
+    tasks = variant.tasks.order_by("id")
     error = ""
 
     if request.method == "POST":
@@ -709,7 +714,7 @@ def variant_stats(request, variant_id):
 
     # Статистика по заданиям
     task_stats = []
-    for task in variant.tasks.order_by("number"):
+    for task in variant.tasks.order_by("id"):
         total = Answer.objects.filter(
             task=task, attempt__is_finished=True
         ).count()

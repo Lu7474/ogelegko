@@ -9,3 +9,5 @@ dj-database-url==2.3.0
 psycopg2-binary==2.9.10
 requests==2.32.3
 beautifulsoup4==4.13.4
+cloudinary==1.42.1
+django-cloudinary-storage==0.3.0

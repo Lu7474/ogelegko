@@ -4,6 +4,13 @@
 {% block content %}
 <h1>Дашборд</h1>
 
+{% if pending_grading %}
+<div class="info-box" style="background:#fff3cd;border-color:#ffc107;margin-bottom:20px">
+    ⚠ <strong>Требуют проверки:</strong> {{ pending_grading }} попыт{{ pending_grading|pluralize:"ка,ки,ок" }} с незачтёнными заданиями.
+    Зайдите в <a href="{% url 'admin_students' %}">Ученики</a> → выберите ученика → нажмите <strong>Проверить</strong>.
+</div>
+{% endif %}
+
 <div class="stats-summary">
     <div class="result-card">
         <div class="result-number">{{ stats.classes_count }}</div>

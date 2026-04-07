@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from django.core.files.base import ContentFile
+from django.db import transaction
 
 from .models import Variant, Task, ExamType, TaskSource
 
@@ -489,29 +490,35 @@ def import_variant_from_sdamgia(url, variant_number=None):
     if Variant.objects.filter(number=variant_number).exists():
         return None, [f"Вариант с номером '{variant_number}' уже существует"]
 
-    variant = Variant.objects.create(
-        number=variant_number,
-        exam_type=data["exam_type"],
-    )
+    try:
+        with transaction.atomic():
+            variant = Variant.objects.create(
+                number=variant_number,
+                exam_type=data["exam_type"],
+            )
 
-    no_answer = []
-    for td in data["tasks"]:
-        manual = not bool(td["correct_answer"])
-        task = Task(
-            variant=variant,
-            number=td["number"],
-            text=td["text"],
-            correct_answer=td["correct_answer"],
-            source=TaskSource.PRINT_SOLVE,
-            manual_grading=manual,
-        )
-        if td.get("image_data"):
-            img = td["image_data"]
-            task.image.save(img["filename"], ContentFile(img["content"]), save=False)
-        task.save()
+            no_answer = []
+            for td in data["tasks"]:
+                manual = not bool(td["correct_answer"])
+                task = Task(
+                    variant=variant,
+                    number=td["number"],
+                    text=td["text"],
+                    correct_answer=td["correct_answer"],
+                    source=TaskSource.PRINT_SOLVE,
+                    manual_grading=manual,
+                )
+                if td.get("image_data"):
+                    img = td["image_data"]
+                    task.image.save(img["filename"], ContentFile(img["content"]), save=False)
+                task.save()
 
-        if manual:
-            no_answer.append(td["number"])
+                if manual:
+                    no_answer.append(td["number"])
+
+    except Exception as e:
+        logger.exception("Ошибка сохранения варианта в БД")
+        return None, [f"Ошибка сохранения: {e}"]
 
     if no_answer:
         errors.append(f"Задания с ручной проверкой: {', '.join(map(str, no_answer))}. Учитель проверяет вручную.")

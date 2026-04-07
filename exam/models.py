@@ -135,8 +135,10 @@ class Task(models.Model):
     @property
     def answer_hint(self):
         """Подсказка формата ответа на основе правильного ответа."""
+        if self.manual_grading:
+            return ""
         a = self.correct_answer.strip()
-        if not a:
+        if not a or a.startswith("Критерии"):
             return ""
         if re.match(r'^-?\d+$', a):
             return "Целое число"

@@ -230,7 +230,7 @@ def start_exam(request, variant_id):
                 for task in variant.tasks.all()
             ])
 
-    tasks = variant.tasks.order_by("number")
+    tasks = variant.tasks.order_by("id")
     answers = {a.task_id: a for a in attempt.answers.select_related("task").all()}
 
     elapsed = (timezone.now() - attempt.started_at).total_seconds()
@@ -356,7 +356,7 @@ def results_view(request, attempt_id):
         Attempt, id=attempt_id, student=student, is_finished=True
     )
 
-    answers = attempt.answers.select_related("task").order_by("task__number")
+    answers = attempt.answers.select_related("task").order_by("task__id")
     wrong_answers = answers.filter(is_correct=False)
 
     previous_attempts = Attempt.objects.filter(
@@ -415,7 +415,7 @@ def view_attempt(request, attempt_id):
     attempt = get_object_or_404(
         Attempt, id=attempt_id, student=student, is_finished=True
     )
-    answers = attempt.answers.select_related("task").order_by("task__number")
+    answers = attempt.answers.select_related("task").order_by("task__id")
 
     return render(request, "exam/view_attempt.html", {
         "student": student,
