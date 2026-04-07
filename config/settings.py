@@ -25,8 +25,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "exam",
-    "cloudinary",
-    "cloudinary_storage",
 ]
 
 MIDDLEWARE = [
@@ -96,6 +94,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # Cloudinary — постоянное хранилище медиафайлов (изображения заданий)
 _CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL")
 if _CLOUDINARY_URL:
+    INSTALLED_APPS += ["cloudinary", "cloudinary_storage"]
     STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
     CLOUDINARY_STORAGE = {"CLOUDINARY_URL": _CLOUDINARY_URL}
 
