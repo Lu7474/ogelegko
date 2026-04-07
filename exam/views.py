@@ -358,6 +358,7 @@ def results_view(request, attempt_id):
 
     answers = attempt.answers.select_related("task").order_by("task__id")
     wrong_answers = answers.filter(is_correct=False)
+    manual_answers = answers.filter(task__manual_grading=True)
 
     previous_attempts = Attempt.objects.filter(
         student=student, variant=attempt.variant, is_finished=True
@@ -370,6 +371,7 @@ def results_view(request, attempt_id):
         "attempt": attempt,
         "answers": answers,
         "wrong_answers": wrong_answers,
+        "manual_answers": manual_answers,
         "previous_attempts": previous_attempts,
         "grade_display": grade_display,
     })

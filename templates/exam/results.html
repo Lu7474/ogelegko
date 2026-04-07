@@ -50,6 +50,32 @@
     {% endfor %}
 </div>
 
+{% if manual_answers %}
+<h2>Часть 2 — развёрнутые ответы</h2>
+<table class="table">
+    <thead>
+        <tr><th>№</th><th>Ваш ответ</th><th>Статус</th></tr>
+    </thead>
+    <tbody>
+    {% for answer in manual_answers %}
+        <tr>
+            <td><strong>{{ answer.task.number }}</strong></td>
+            <td style="max-width:300px;word-break:break-word;white-space:pre-wrap">{{ answer.student_answer|default:"—" }}</td>
+            <td style="white-space:nowrap">
+                {% if answer.is_correct is None %}
+                    <span style="color:#f59e0b;font-weight:600">⏳ Ожидает проверки учителя</span>
+                {% elif answer.is_correct %}
+                    <span style="color:#10b981;font-weight:600">✓ Верно</span>
+                {% else %}
+                    <span style="color:#ef4444;font-weight:600">✗ Неверно</span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
 {% if previous_attempts %}
 <h2>Предыдущие попытки</h2>
 <table class="table">

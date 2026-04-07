@@ -31,10 +31,14 @@ def normalize_answer(answer: str) -> str:
 
 
 def check_answer(student_answer: str, correct_answer: str) -> bool:
-    """Проверяет правильность ответа с нормализацией."""
+    """Проверяет правильность ответа с нормализацией.
+    Правильный ответ может содержать несколько вариантов через | (например, 234|243|324).
+    """
     if not student_answer or not student_answer.strip():
         return False
-    return normalize_answer(student_answer) == normalize_answer(correct_answer)
+    norm_student = normalize_answer(student_answer)
+    alternatives = [normalize_answer(a) for a in correct_answer.split("|")]
+    return norm_student in alternatives
 
 
 # Таблицы перевода баллов (2025/2026)
