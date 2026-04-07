@@ -22,7 +22,7 @@ HEADERS = {
     "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
 }
 
-REQUEST_DELAY = 1.5
+REQUEST_DELAY = 0.8
 
 
 class ParserError(Exception):
@@ -182,7 +182,7 @@ class SdamgiaParser:
             result.append(pb)
         return result
 
-    def _parse_problem(self, problem_id, base_url, task_number, is_first_in_group=True):
+    def _parse_problem(self, problem_id, base_url, task_number):
         """
         Парсит задание. Страница problem?id=X содержит все задания группы
         в блоках .prob_maindiv. sdamgia всегда ставит запрошенное задание
@@ -386,46 +386,6 @@ class SdamgiaParser:
 
     # ---- Главный метод ----
 
-    def _detect_groups(self, problem_ids, base_url):
-        """
-        Определяет группы заданий — задания на одной странице.
-        Возвращает dict: problem_id → set(all_ids_on_that_page).
-        Делаем один запрос для первого ID — если на странице несколько блоков,
-        все они в одной группе.
-        """
-        groups = {}  # pid → set of pids in same group
-        visited = set()
-
-        for pid in problem_ids:
-            if pid in visited:
-                continue
-            try:
-                url = f"{base_url}/problem?id={pid}"
-                resp = self._get(url)
-                soup = BeautifulSoup(resp.text, "html.parser")
-                blocks = soup.find_all("div", class_="prob_maindiv")
-
-                group_pids = set()
-                for block in blocks:
-                    prob_nums = block.find("span", class_="prob_nums")
-                    if prob_nums:
-                        link = prob_nums.find("a", href=re.compile(r"/problem\?id=(\d+)"))
-                        if link:
-                            m = re.search(r"id=(\d+)", link["href"])
-                            if m:
-                                group_pids.add(m.group(1))
-
-                for gid in group_pids:
-                    groups[gid] = group_pids
-                    visited.add(gid)
-
-                if pid not in visited:
-                    visited.add(pid)
-            except ParserError:
-                visited.add(pid)
-
-        return groups
-
     def parse_variant(self, url):
         base_url = self._base_url(url)
         exam_type = self._detect_exam_type(url)
@@ -441,24 +401,10 @@ class SdamgiaParser:
 
         logger.info("Вариант %s: %d заданий", sdamgia_id, len(problem_ids))
 
-        pid_list = [pid for _, pid in problem_ids]
-
-        # Определяем группы заданий
-        groups = self._detect_groups(pid_list, base_url)
-
-        # Отслеживаем какие группы уже встречались (для is_first_in_group)
-        seen_groups = set()
-
         tasks = []
         for i, (display_number, pid) in enumerate(problem_ids, start=1):
             try:
-                group = groups.get(pid, {pid})
-                group_key = frozenset(group)
-                is_first = group_key not in seen_groups
-                seen_groups.add(group_key)
-
-                task = self._parse_problem(pid, base_url, task_number=display_number,
-                                           is_first_in_group=is_first)
+                task = self._parse_problem(pid, base_url, task_number=display_number)
                 tasks.append(task)
                 logger.info("  %d/%d №%s (ID %s) — ответ: %s",
                             i, len(problem_ids), display_number, pid, task["correct_answer"] or "НЕТ")
