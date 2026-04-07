@@ -109,7 +109,7 @@ class Task(models.Model):
     variant = models.ForeignKey(
         Variant, on_delete=models.CASCADE, verbose_name="Вариант", related_name="tasks"
     )
-    number = models.PositiveIntegerField("Номер задания")
+    number = models.CharField("Номер задания", max_length=20)
     text = models.TextField("Текст задания", blank=True)
     image = models.ImageField("Изображение", upload_to="tasks/", blank=True, null=True)
     correct_answer = models.CharField("Правильный ответ", max_length=255)
@@ -125,7 +125,7 @@ class Task(models.Model):
     class Meta:
         verbose_name = "Задание"
         verbose_name_plural = "Задания"
-        ordering = ["variant", "number"]
+        ordering = ["variant", "id"]
         unique_together = ["variant", "number"]
 
     def __str__(self):

@@ -114,32 +114,54 @@ class SdamgiaParser:
 
     def _get_problem_ids_from_variant(self, variant_url):
         """
-        Возвращает список problem_id в порядке появления на странице.
-        Порядок в HTML = правильный порядок заданий в варианте.
+        Возвращает список (display_number, problem_id) в порядке HTML.
+        Если «Тип N» встречается несколько раз — нумерует 19.1, 19.2, ...
+        Если один раз — просто «19».
         """
         resp = self._get(variant_url)
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        seen = set()
-        result = []
+        seen_pids = set()
+        raw = []  # [(type_num_str, pid)]
 
         for span in soup.find_all("span", class_="prob_nums"):
+            text = span.get_text(" ", strip=True)
+            type_m = re.search(r'Тип\s+(\d+)', text)
+            type_str = type_m.group(1) if type_m else None
+
             link = span.find("a", href=re.compile(r"/problem\?id=\d+"))
             if link:
                 m = re.search(r"id=(\d+)", link.get("href", ""))
-                if m and m.group(1) not in seen:
-                    seen.add(m.group(1))
-                    result.append(m.group(1))
+                if m and m.group(1) not in seen_pids:
+                    seen_pids.add(m.group(1))
+                    raw.append((type_str, m.group(1)))
 
-        # Запасной способ если prob_nums не найдены
-        if not result:
+        # Запасной способ
+        if not raw:
             for div in soup.find_all("div", class_="prob_maindiv"):
                 link = div.find("a", href=re.compile(r"/problem\?id=\d+"))
                 if link:
                     m = re.search(r"id=(\d+)", link.get("href", ""))
-                    if m and m.group(1) not in seen:
-                        seen.add(m.group(1))
-                        result.append(m.group(1))
+                    if m and m.group(1) not in seen_pids:
+                        seen_pids.add(m.group(1))
+                        raw.append((None, m.group(1)))
+
+        # Считаем сколько раз каждый тип встречается
+        from collections import Counter
+        type_count = Counter(t for t, _ in raw if t is not None)
+
+        # Генерируем display_number
+        type_index = {}  # type_str -> текущий счётчик
+        result = []
+        for i, (type_str, pid) in enumerate(raw, start=1):
+            if type_str is None:
+                display = str(i)
+            elif type_count[type_str] > 1:
+                type_index[type_str] = type_index.get(type_str, 0) + 1
+                display = f"{type_str}.{type_index[type_str]}"
+            else:
+                display = type_str
+            result.append((display, pid))
 
         return result
 
@@ -400,29 +422,31 @@ class SdamgiaParser:
 
         logger.info("Вариант %s: %d заданий", sdamgia_id, len(problem_ids))
 
+        pid_list = [pid for _, pid in problem_ids]
+
         # Определяем группы заданий
-        groups = self._detect_groups(problem_ids, base_url)
+        groups = self._detect_groups(pid_list, base_url)
 
         # Отслеживаем какие группы уже встречались (для is_first_in_group)
         seen_groups = set()
 
         tasks = []
-        for i, pid in enumerate(problem_ids, start=1):
+        for i, (display_number, pid) in enumerate(problem_ids, start=1):
             try:
                 group = groups.get(pid, {pid})
                 group_key = frozenset(group)
                 is_first = group_key not in seen_groups
                 seen_groups.add(group_key)
 
-                task = self._parse_problem(pid, base_url, task_number=i,
+                task = self._parse_problem(pid, base_url, task_number=display_number,
                                            is_first_in_group=is_first)
                 tasks.append(task)
-                logger.info("  %d/%d (ID %s) — ответ: %s",
-                            i, len(problem_ids), pid, task["correct_answer"] or "НЕТ")
+                logger.info("  %d/%d №%s (ID %s) — ответ: %s",
+                            i, len(problem_ids), display_number, pid, task["correct_answer"] or "НЕТ")
             except ParserError as e:
                 logger.warning("  %d/%d (ID %s) ОШИБКА: %s", i, len(problem_ids), pid, e)
                 tasks.append({
-                    "number": i,
+                    "number": display_number,
                     "text": f"[Ошибка парсинга задания {pid}]",
                     "correct_answer": "",
                     "image_data": None,
