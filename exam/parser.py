@@ -5,9 +5,11 @@ import re
 import time
 import uuid
 import logging
+import threading
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from concurrent.futures import ThreadPoolExecutor
 from django.core.files.base import ContentFile
 from django.db import transaction
 
@@ -53,15 +55,22 @@ def sanitize_html(html):
     return html
 
 
+_thread_local = threading.local()
+
+
 class SdamgiaParser:
-    def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update(HEADERS)
+    def _session(self):
+        """Возвращает сессию для текущего потока (thread-safe)."""
+        if not hasattr(_thread_local, "session"):
+            s = requests.Session()
+            s.headers.update(HEADERS)
+            _thread_local.session = s
+        return _thread_local.session
 
     def _get(self, url):
         try:
             time.sleep(REQUEST_DELAY)
-            resp = self.session.get(url, timeout=15)
+            resp = self._session().get(url, timeout=15)
             resp.raise_for_status()
             resp.encoding = "utf-8"
             return resp
@@ -401,22 +410,28 @@ class SdamgiaParser:
 
         logger.info("Вариант %s: %d заданий", sdamgia_id, len(problem_ids))
 
-        tasks = []
-        for i, (display_number, pid) in enumerate(problem_ids, start=1):
+        total = len(problem_ids)
+
+        def fetch_one(args):
+            i, display_number, pid = args
             try:
                 task = self._parse_problem(pid, base_url, task_number=display_number)
-                tasks.append(task)
                 logger.info("  %d/%d №%s (ID %s) — ответ: %s",
-                            i, len(problem_ids), display_number, pid, task["correct_answer"] or "НЕТ")
+                            i, total, display_number, pid, task["correct_answer"] or "НЕТ")
+                return task
             except ParserError as e:
-                logger.warning("  %d/%d (ID %s) ОШИБКА: %s", i, len(problem_ids), pid, e)
-                tasks.append({
+                logger.warning("  %d/%d (ID %s) ОШИБКА: %s", i, total, pid, e)
+                return {
                     "number": display_number,
                     "text": f"[Ошибка парсинга задания {pid}]",
                     "correct_answer": "",
                     "image_data": None,
                     "source_id": pid,
-                })
+                }
+
+        jobs = [(i, dn, pid) for i, (dn, pid) in enumerate(problem_ids, start=1)]
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            tasks = list(executor.map(fetch_one, jobs))
 
         return {
             "sdamgia_id": sdamgia_id,
