@@ -538,3 +538,111 @@ h3 { color: var(--heading); font-size: 1rem; }
     .task-block { padding: 18px 16px; }
     .notif-dropdown { width: 290px; right: -60px; }
 }
+
+/* === Login gradient background === */
+body.login-body {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #0891b2 100%);
+    min-height: 100vh;
+}
+body.login-body .auth-container { margin-top: 72px; box-shadow: 0 20px 60px rgba(0,0,0,.25); border-color: rgba(255,255,255,.15); }
+
+/* === Circular progress ring (results page) === */
+.progress-ring-wrap {
+    position: relative; width: 104px; height: 104px;
+    margin: 0 auto 10px;
+}
+.progress-ring { width: 104px; height: 104px; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--border); stroke-width: 9; }
+.ring-fill {
+    fill: none; stroke: var(--primary); stroke-width: 9;
+    stroke-linecap: round;
+    stroke-dasharray: 264;
+    stroke-dashoffset: 264;
+    transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1);
+}
+.ring-text {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.15rem; font-weight: 800; color: var(--heading); line-height: 1; text-align: center;
+}
+
+/* === Grade card accent colors === */
+.grade-card-5 { border-top: 3px solid #10b981; }
+.grade-card-5 .result-number { color: #059669; }
+.grade-card-4 { border-top: 3px solid #3b82f6; }
+.grade-card-4 .result-number { color: #2563eb; }
+.grade-card-3 { border-top: 3px solid #f59e0b; }
+.grade-card-3 .result-number { color: #d97706; }
+.grade-card-2 { border-top: 3px solid #ef4444; }
+.grade-card-2 .result-number { color: #dc2626; }
+
+/* === Stat cards with icons (admin dashboard) === */
+.stat-card { text-align: center; }
+.stat-card-icon { font-size: 2rem; margin-bottom: 8px; display: block; line-height: 1; }
+.stat-card-blue  { border-top: 3px solid #3b82f6; }
+.stat-card-green { border-top: 3px solid #10b981; }
+.stat-card-purple{ border-top: 3px solid #8b5cf6; }
+.stat-card-orange{ border-top: 3px solid #f59e0b; }
+.stat-card-blue  .result-number { color: #2563eb; }
+.stat-card-green .result-number { color: #059669; }
+.stat-card-purple.result-number { color: #7c3aed; }
+.stat-card-orange .result-number { color: #d97706; }
+
+/* === Admin mobile burger menu === */
+.burger-btn {
+    display: none; background: none; border: none; cursor: pointer;
+    padding: 6px 8px; color: #94a3b8; font-size: 1.4rem; line-height: 1;
+    border-radius: var(--radius-sm); transition: color .15s, background .15s;
+}
+.burger-btn:hover { color: #fff; background: rgba(255,255,255,.1); }
+@media (max-width: 700px) {
+    .burger-btn { display: inline-flex; align-items: center; }
+    .admin-navbar { position: relative; flex-wrap: wrap; height: auto; min-height: 56px; }
+    .admin-navbar .nav-links {
+        display: none; position: absolute; top: 100%; left: 0; right: 0;
+        background: var(--admin-navbar-bg);
+        border-top: 1px solid rgba(255,255,255,.08);
+        border-bottom: 3px solid #6366f1;
+        flex-direction: column; padding: 8px 16px 14px;
+        z-index: 300; gap: 2px;
+    }
+    .admin-navbar .nav-links.open { display: flex; }
+    .admin-navbar .nav-links a { padding: 10px 14px; font-size: 0.95rem; }
+}
+
+/* === Row hover-reveal actions === */
+.row-actions {
+    display: flex; gap: 4px; align-items: center;
+    opacity: 0; transition: opacity .15s;
+}
+tr:hover .row-actions { opacity: 1; }
+@media (hover: none), (max-width: 768px) { .row-actions { opacity: 1; } }
+
+/* === Empty state === */
+.empty-state {
+    padding: 60px 24px; text-align: center;
+    background: var(--card-bg);
+    border-radius: var(--radius); border: 2px dashed var(--border);
+    margin-bottom: 20px;
+}
+.empty-state-icon { font-size: 3.2rem; margin-bottom: 14px; display: block; line-height: 1; }
+.empty-state h3 { color: var(--text-secondary); font-weight: 600; margin-bottom: 6px; font-size: 1.1rem; }
+.empty-state p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; }
+
+/* === Improved task nav (solve) === */
+.task-nav a {
+    width: 36px !important; height: 36px !important;
+    border-radius: 8px !important;
+    background: rgba(255,255,255,.1) !important;
+    border: 1.5px solid rgba(255,255,255,.18) !important;
+    color: #cbd5e1 !important;
+    font-size: 0.78rem !important; font-weight: 600 !important;
+    transition: all .15s !important;
+}
+.task-nav a.answered {
+    background: #3b82f6 !important;
+    border-color: #3b82f6 !important;
+    color: #fff !important;
+    box-shadow: 0 2px 6px rgba(59,130,246,.4) !important;
+}
+.task-nav a:hover { border-color: rgba(255,255,255,.45) !important; color: #fff !important; }

@@ -30,15 +30,24 @@
             <td>{{ student.school_class.get_exam_type_display }}</td>
             <td>{{ student.attempts_count }}</td>
             <td>
+                <div class="row-actions">
                 <a href="{% url 'admin_student_edit' student.id %}" class="btn btn-sm">Редактировать</a>
-                <form method="post" action="{% url 'admin_student_delete' student.id %}" style="display:inline;" onsubmit="return confirm('Удалить ученика {{student.full_name}}?')">
+                <form method="post" action="{% url 'admin_student_delete' student.id %}" onsubmit="return confirm('Удалить ученика {{ student.full_name }}?')">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
                 </form>
+                </div>
             </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5">Нет учеников</td></tr>
+        <tr><td colspan="5" style="padding:0;border:none">
+            <div class="empty-state">
+                <span class="empty-state-icon">👤</span>
+                <h3>Учеников пока нет</h3>
+                <p>Добавьте учеников вручную или загрузите список из Excel</p>
+                <a href="{% url 'admin_student_add' %}" class="btn btn-primary">Добавить ученика</a>
+            </div>
+        </td></tr>
         {% endfor %}
     </tbody>
 </table>

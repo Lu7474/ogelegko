@@ -26,12 +26,13 @@
 <body class="admin-body">
     <nav class="navbar admin-navbar">
         <span class="nav-title">Админ-панель</span>
-        <div class="nav-links">
+        <div class="nav-links" id="adminNavLinks">
             <a href="{% url 'admin_dashboard' %}">Главная</a>
             <a href="{% url 'admin_classes' %}">Классы</a>
             <a href="{% url 'admin_students' %}">Ученики</a>
             <a href="{% url 'admin_variants' %}">Варианты</a>
         </div>
+        <button class="burger-btn" id="burgerBtn" aria-label="Меню">☰</button>
         <div class="notif-wrap">
             <button class="notif-btn" id="notifBtn" title="Уведомления">🔔<span class="notif-badge" id="notifBadge" style="display:none"></span></button>
             <div class="notif-dropdown" id="notifDropdown">
@@ -45,6 +46,16 @@
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}
+<script>
+document.getElementById('burgerBtn').addEventListener('click', function(){
+    document.getElementById('adminNavLinks').classList.toggle('open');
+});
+document.addEventListener('click', function(e){
+    if (!e.target.closest('.admin-navbar')) {
+        document.getElementById('adminNavLinks').classList.remove('open');
+    }
+});
+</script>
 <script>
 (function(){
     var API = "{% url 'admin_api_new_attempts' %}";

@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Вход{% endblock %}
 
+{% block extra_head %}
+<style>body { background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #0891b2 100%) !important; min-height: 100vh; } .auth-container { margin-top: 72px; box-shadow: 0 20px 60px rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.15); }</style>
+{% endblock %}
+
 {% block content %}
 <div class="auth-container">
     <div class="auth-logo">📝</div>

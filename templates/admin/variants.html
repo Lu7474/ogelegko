@@ -32,7 +32,7 @@
             <td>{% if v.max_attempts == 0 %}&infin;{% else %}{{ v.max_attempts }}{% endif %}</td>
             <td>{% if v.is_active %}<span class="badge badge-green">Активен</span>{% else %}<span class="badge badge-gray">Скрыт</span>{% endif %}</td>
             <td style="white-space:nowrap">
-                <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+                <div class="row-actions" style="flex-wrap:wrap;">
                 <a href="{% url 'admin_variant_stats' v.id %}" class="btn btn-sm">Статистика</a>
                 <a href="{% url 'admin_variant_edit' v.id %}" class="btn btn-sm">Редактировать</a>
                 <form method="post" action="{% url 'admin_variant_toggle' v.id %}">
@@ -51,7 +51,14 @@
             </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7">Нет вариантов</td></tr>
+        <tr><td colspan="7" style="padding:0;border:none">
+            <div class="empty-state">
+                <span class="empty-state-icon">📋</span>
+                <h3>Вариантов пока нет</h3>
+                <p>Создайте вариант вручную или импортируйте с sdamgia.ru</p>
+                <a href="{% url 'admin_variant_add' %}" class="btn btn-primary">Создать вариант</a>
+            </div>
+        </td></tr>
         {% endfor %}
     </tbody>
 </table>

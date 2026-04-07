@@ -15,30 +15,38 @@
 <h1>Итоги — Вариант {{ attempt.variant.number }}</h1>
 
 <div class="results-summary">
+    <div class="result-card" style="min-width:130px">
+        <div class="progress-ring-wrap">
+            <svg class="progress-ring" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="42"/>
+                <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="42"/>
+            </svg>
+            <div class="ring-text" id="ringText">0%</div>
+        </div>
+        <div class="result-label">Выполнено</div>
+    </div>
     <div class="result-card">
         <div class="result-number">{{ attempt.correct_count }}/{{ attempt.total_count }}</div>
-        <div class="result-label">Правильных ответов</div>
+        <div class="result-label">Правильных</div>
     </div>
     <div class="result-card">
         <div class="result-number">{{ attempt.score }}</div>
         <div class="result-label">Первичный балл</div>
     </div>
-    <div class="result-card">
+    <div class="result-card {% if attempt.grade == '5' %}grade-card-5{% elif attempt.grade == '4' %}grade-card-4{% elif attempt.grade == '3' %}grade-card-3{% elif attempt.grade == '2' %}grade-card-2{% endif %}">
         <div class="result-number">{{ attempt.grade }}</div>
         <div class="result-label">{{ grade_display }}</div>
     </div>
     <div class="result-card">
-        <div class="result-number">{{ attempt.duration_display }}</div>
-        <div class="result-label">Время решения</div>
+        <div class="result-number" style="font-size:1.4rem">{{ attempt.duration_display }}</div>
+        <div class="result-label">Время</div>
     </div>
 </div>
 
 <!-- Кружки по заданиям -->
 <div class="answer-dots">
     {% for answer in answers %}
-    <span class="dot {% if answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}">
-        {{ answer.task.number }}
-    </span>
+    <span class="dot {% if answer.is_correct is None %}dot-pending{% elif answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}">{{ answer.task.number }}</span>
     {% endfor %}
 </div>
 
@@ -63,8 +71,8 @@
 
 <div class="results-actions">
     <button class="btn btn-secondary" id="toggleWrong">Посмотреть неправильные ({{ wrong_answers|length }})</button>
-    <a href="{% url 'view_attempt' attempt.id %}" class="btn btn-secondary">Посмотреть весь вариант</a>
-    <a href="{% url 'choose_variant' %}" class="btn btn-primary">Решить ещё</a>
+    <a href="{% url 'view_attempt' attempt.id %}" class="btn btn-secondary">Весь вариант</a>
+    <a href="{% url 'choose_variant' %}" class="btn btn-primary">Решить ещё →</a>
 </div>
 
 <div id="wrongAnswers" style="display:none;">
@@ -72,12 +80,8 @@
     {% for answer in wrong_answers %}
     <div class="wrong-answer-block">
         <h3>Задание {{ answer.task.number }}</h3>
-        {% if answer.task.text %}
-        <div class="task-text">{{ answer.task.text|safe }}</div>
-        {% endif %}
-        {% if answer.task.image %}
-        <div class="task-image"><img src="{{ answer.task.image.url }}" alt="Задание {{ answer.task.number }}"></div>
-        {% endif %}
+        {% if answer.task.text %}<div class="task-text">{{ answer.task.text|safe }}</div>{% endif %}
+        {% if answer.task.image %}<div class="task-image"><img src="{{ answer.task.image.url }}" alt="Задание {{ answer.task.number }}"></div>{% endif %}
         <div class="answer-compare">
             <span class="your-answer">Ваш ответ: <strong>{{ answer.student_answer|default:"—" }}</strong></span>
             <span class="correct-answer">Правильный: <strong>{{ answer.task.correct_answer }}</strong></span>
@@ -85,11 +89,26 @@
     </div>
     {% endfor %}
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
+// Animated ring
+const pct = {{ attempt.percentage }};
+const ring = document.getElementById('ringFill');
+const text = document.getElementById('ringText');
+const circumference = 264;
+setTimeout(() => {
+    const offset = circumference - (circumference * pct / 100);
+    ring.style.strokeDashoffset = offset;
+    // Color by percentage
+    if (pct >= 80) ring.style.stroke = '#10b981';
+    else if (pct >= 60) ring.style.stroke = '#3b82f6';
+    else if (pct >= 40) ring.style.stroke = '#f59e0b';
+    else ring.style.stroke = '#ef4444';
+    text.textContent = pct + '%';
+}, 100);
+
 document.getElementById('toggleWrong').addEventListener('click', function() {
     const el = document.getElementById('wrongAnswers');
     el.style.display = el.style.display === 'none' ? 'block' : 'none';

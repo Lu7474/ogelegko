@@ -12,19 +12,23 @@
 {% endif %}
 
 <div class="stats-summary">
-    <div class="result-card">
+    <div class="result-card stat-card stat-card-blue">
+        <span class="stat-card-icon">🏫</span>
         <div class="result-number">{{ stats.classes_count }}</div>
         <div class="result-label">Классов</div>
     </div>
-    <div class="result-card">
+    <div class="result-card stat-card stat-card-green">
+        <span class="stat-card-icon">👥</span>
         <div class="result-number">{{ stats.students_count }}</div>
         <div class="result-label">Учеников</div>
     </div>
-    <div class="result-card">
+    <div class="result-card stat-card stat-card-purple">
+        <span class="stat-card-icon">📋</span>
         <div class="result-number">{{ stats.variants_count }}</div>
         <div class="result-label">Вариантов</div>
     </div>
-    <div class="result-card">
+    <div class="result-card stat-card stat-card-orange">
+        <span class="stat-card-icon">✏️</span>
         <div class="result-number">{{ stats.attempts_count }}</div>
         <div class="result-label">Попыток</div>
     </div>
