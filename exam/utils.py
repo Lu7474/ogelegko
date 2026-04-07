@@ -32,6 +32,8 @@ def normalize_answer(answer: str) -> str:
 
 def check_answer(student_answer: str, correct_answer: str) -> bool:
     """Проверяет правильность ответа с нормализацией."""
+    if not student_answer or not student_answer.strip():
+        return False
     return normalize_answer(student_answer) == normalize_answer(correct_answer)
 
 
