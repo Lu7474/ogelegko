@@ -112,17 +112,30 @@ class SdamgiaParser:
 
     def _get_problem_ids_from_variant(self, variant_url):
         resp = self._get(variant_url)
-        # Ищем "Тип N № <a href=...>ID</a>" — только заголовки заданий
-        ids = re.findall(
-            r'Тип\s+\d+[^<]*?№[^<]*?<a[^>]+href="[^"]*?/problem\?id=(\d+)"',
-            resp.text
-        )
+        soup = BeautifulSoup(resp.text, "html.parser")
+
         seen = set()
         result = []
-        for pid in ids:
-            if pid not in seen:
-                seen.add(pid)
-                result.append(pid)
+
+        # Основной способ: заголовки заданий через span.prob_nums
+        for span in soup.find_all("span", class_="prob_nums"):
+            link = span.find("a", href=re.compile(r"/problem\?id=\d+"))
+            if link:
+                m = re.search(r"id=(\d+)", link.get("href", ""))
+                if m and m.group(1) not in seen:
+                    seen.add(m.group(1))
+                    result.append(m.group(1))
+
+        # Запасной способ: любые ссылки на задания в блоках prob_maindiv
+        if not result:
+            for div in soup.find_all("div", class_="prob_maindiv"):
+                link = div.find("a", href=re.compile(r"/problem\?id=\d+"))
+                if link:
+                    m = re.search(r"id=(\d+)", link.get("href", ""))
+                    if m and m.group(1) not in seen:
+                        seen.add(m.group(1))
+                        result.append(m.group(1))
+
         return result
 
     # ---- Шаг 2: парсить задание со страницы problem?id=X ----
@@ -235,40 +248,52 @@ class SdamgiaParser:
 
     def _extract_answer_from_block(self, block):
         """Извлекает ответ из блока задания."""
+        # Сначала ищем через BeautifulSoup — надёжнее для разных форматов
+        for tag in block.find_all(string=re.compile(r'Ответ\s*:')):
+            parent = tag.parent
+            # Берём весь текст после "Ответ:" в этом элементе и следующих
+            full = parent.get_text(" ", strip=True) if parent else str(tag)
+            m = re.search(r'Ответ\s*:\s*(.+)', full)
+            if m:
+                answer = m.group(1).strip()
+                for stop in ["Аналоги", "Источники", "Критерии", "Спрятать",
+                              "Раздел", "Приведем", "Примечание", "Решение"]:
+                    idx = answer.find(stop)
+                    if idx > 0:
+                        answer = answer[:idx]
+                answer = answer.replace("\u00AD", "").replace("\u202f", " ").replace("&nbsp;", " ")
+                answer = answer.rstrip(". \t\n\r").strip()
+                if answer:
+                    return answer
+
         html = str(block)
         # Ищем паттерн: Ответ:</span> VALUE или Ответ: VALUE
-        m = re.search(
+        patterns = [
             r'Ответ\s*(?:</span>)?\s*:\s*(?:</span>)?\s*(.+?)(?:<!--|\.\s*<(?:div|p\b|br))',
-            html, re.DOTALL
-        )
-        if not m:
-            # Попробуем менее строгий паттерн
-            m = re.search(
-                r'Ответ\s*(?:</span>)?\s*:\s*(?:</span>)?\s*(.+?)(?:<div|<a\s)',
-                html, re.DOTALL
-            )
-        if m:
-            raw = m.group(1)
-            # Если ответ — формула-картинка, берём alt-текст
-            img_match = re.search(r'<img[^>]+alt="([^"]+)"', raw)
-            if img_match:
-                answer = img_match.group(1).replace("\u00AD", "").strip()
-                return answer
+            r'Ответ\s*(?:</span>)?\s*:\s*(?:</span>)?\s*(.+?)(?:<div|<a\s)',
+            r'Ответ\s*(?:</span>)?\s*:\s*(?:</span>)?\s*(.+?)(?:<)',
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, html, re.DOTALL)
+            if m:
+                raw = m.group(1)
+                # Если ответ — формула-картинка, берём alt-текст
+                img_match = re.search(r'<img[^>]+alt="([^"]+)"', raw)
+                if img_match:
+                    answer = img_match.group(1).replace("\u00AD", "").strip()
+                    return answer
 
-            # Убираем HTML-теги и entities
-            answer = re.sub(r'<[^>]+>', '', raw)
-            answer = answer.replace("\u00AD", "").replace("&nbsp;", " ")
-            answer = answer.replace("&#8239;", " ").replace("\u202f", " ")
-            # Обрезаем по стоп-словам
-            for stop in ["Аналоги", "Источники", "Критерии", "Спрятать",
-                          "Раздел", "Приведем", "Примечание"]:
-                idx = answer.find(stop)
-                if idx > 0:
-                    answer = answer[:idx]
-            answer = answer.rstrip(". \t\n\r")
-            answer = answer.strip()
-            if answer:
-                return answer
+                answer = re.sub(r'<[^>]+>', '', raw)
+                answer = answer.replace("\u00AD", "").replace("&nbsp;", " ")
+                answer = answer.replace("&#8239;", " ").replace("\u202f", " ")
+                for stop in ["Аналоги", "Источники", "Критерии", "Спрятать",
+                              "Раздел", "Приведем", "Примечание", "Решение"]:
+                    idx = answer.find(stop)
+                    if idx > 0:
+                        answer = answer[:idx]
+                answer = answer.rstrip(". \t\n\r").strip()
+                if answer:
+                    return answer
         return ""
 
     def _download_image(self, img_url):
