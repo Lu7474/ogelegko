@@ -47,6 +47,9 @@ urlpatterns = [
     path("admin/variants/import/", admin_views.variant_import, name="admin_variant_import"),
     path("admin/variants/import/<str:job_id>/status/", admin_views.variant_import_status, name="admin_variant_import_status"),
 
+    # Админ — API
+    path("admin/api/new-attempts/", admin_views.api_new_attempts, name="admin_api_new_attempts"),
+
     # Админ — попытки
     path("admin/attempts/<int:attempt_id>/", admin_views.attempt_detail, name="admin_attempt_detail"),
     path("admin/attempts/<int:attempt_id>/delete/", admin_views.attempt_delete, name="admin_attempt_delete"),

@@ -14,6 +14,7 @@ from django.db.models import Count, Q, Avg
 from django.db import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from datetime import timedelta
 
 from .models import (
     SchoolClass, Student, Variant, Task, Attempt, Answer,
@@ -766,6 +767,45 @@ def attempt_grade_answer(request, answer_id):
     answer.save(update_fields=["is_correct"])
     _recalculate_attempt_score(answer.attempt)
     return redirect("admin_attempt_detail", attempt_id=answer.attempt_id)
+
+
+# --- API: уведомления о новых попытках ---
+
+@admin_required
+def api_new_attempts(request):
+    """JSON: попытки завершённые после переданного ISO-timestamp (или за последние 24ч)."""
+    since_str = request.GET.get("since", "")
+    try:
+        from datetime import datetime
+        since_dt = datetime.fromisoformat(since_str.replace("Z", "+00:00"))
+        if timezone.is_naive(since_dt):
+            since_dt = timezone.make_aware(since_dt)
+    except (ValueError, TypeError, AttributeError):
+        since_dt = timezone.now() - timedelta(hours=24)
+
+    attempts = (
+        Attempt.objects
+        .filter(is_finished=True, finished_at__gt=since_dt)
+        .select_related("student", "variant", "student__school_class")
+        .order_by("-finished_at")[:20]
+    )
+
+    from django.urls import reverse
+    data = {
+        "count": attempts.count(),
+        "attempts": [
+            {
+                "student": a.student.full_name,
+                "class": a.student.school_class.name,
+                "variant": a.variant.number,
+                "finished_at": a.finished_at.strftime("%d.%m %H:%M"),
+                "grade": a.grade,
+                "url": reverse("admin_attempt_detail", args=[a.id]),
+            }
+            for a in attempts
+        ],
+    }
+    return JsonResponse(data)
 
 
 # --- Удаление попытки ---

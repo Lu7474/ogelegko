@@ -7,6 +7,20 @@
     <title>{% block title %}Админ-панель{% endblock %}</title>
     <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>
+        .notif-wrap { position: relative; display: inline-flex; align-items: center; }
+        .notif-btn { background: none; border: none; cursor: pointer; font-size: 1.3rem; padding: 0 4px; line-height: 1; position: relative; color: inherit; }
+        .notif-badge { position: absolute; top: -4px; right: -4px; background: #e74c3c; color: #fff; border-radius: 50%; font-size: 0.65rem; font-weight: bold; min-width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; padding: 0 3px; pointer-events: none; }
+        .notif-dropdown { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 320px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.15); z-index: 1000; overflow: hidden; }
+        .notif-dropdown.open { display: block; }
+        .notif-header { padding: 10px 14px; font-weight: bold; font-size: 0.85rem; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; color: #333; }
+        .notif-item { display: block; padding: 10px 14px; border-bottom: 1px solid #f0f0f0; text-decoration: none; color: #333; font-size: 0.85rem; transition: background .15s; }
+        .notif-item:hover { background: #f5f5f5; }
+        .notif-item:last-child { border-bottom: none; }
+        .notif-item-name { font-weight: 600; }
+        .notif-item-meta { color: #7f8c8d; font-size: 0.78rem; margin-top: 2px; }
+        .notif-empty { padding: 16px 14px; color: #7f8c8d; font-size: 0.85rem; text-align: center; }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="admin-body">
@@ -18,11 +32,80 @@
             <a href="{% url 'admin_students' %}">Ученики</a>
             <a href="{% url 'admin_variants' %}">Варианты</a>
         </div>
+        <div class="notif-wrap">
+            <button class="notif-btn" id="notifBtn" title="Уведомления">🔔<span class="notif-badge" id="notifBadge" style="display:none"></span></button>
+            <div class="notif-dropdown" id="notifDropdown">
+                <div class="notif-header">Последние попытки</div>
+                <div id="notifList"><div class="notif-empty">Загрузка...</div></div>
+            </div>
+        </div>
         <form method="post" action="{% url 'admin_logout' %}" class="nav-logout-form">{% csrf_token %}<button type="submit" class="nav-link nav-logout-btn">Выйти</button></form>
     </nav>
     <main class="container">
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}
+<script>
+(function(){
+    var API = "{% url 'admin_api_new_attempts' %}";
+    var LS_KEY = "admin_notif_seen";
+    var badge = document.getElementById('notifBadge');
+    var dropdown = document.getElementById('notifDropdown');
+    var list = document.getElementById('notifList');
+    var btn = document.getElementById('notifBtn');
+
+    function getLastSeen() { return localStorage.getItem(LS_KEY) || ''; }
+    function markSeen() { localStorage.setItem(LS_KEY, new Date().toISOString()); }
+
+    function renderAttempts(data) {
+        if (!data.attempts.length) {
+            list.innerHTML = '<div class="notif-empty">Новых попыток нет</div>';
+            return;
+        }
+        list.innerHTML = data.attempts.map(function(a) {
+            return '<a href="' + a.url + '" class="notif-item">' +
+                '<div class="notif-item-name">' + a.student + '</div>' +
+                '<div class="notif-item-meta">' + a['class'] + ' · Вариант ' + a.variant +
+                ' · Оценка ' + a.grade + ' · ' + a.finished_at + '</div>' +
+                '</a>';
+        }).join('');
+    }
+
+    function poll(silent) {
+        var since = getLastSeen();
+        fetch(API + (since ? '?since=' + encodeURIComponent(since) : ''))
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if (data.count > 0) {
+                    badge.textContent = data.count > 9 ? '9+' : data.count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+                if (!silent) renderAttempts(data);
+            }).catch(function(){});
+    }
+
+    btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var open = dropdown.classList.toggle('open');
+        if (open) {
+            poll(false);
+            markSeen();
+            badge.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('click', function(e){
+        if (!dropdown.contains(e.target) && e.target !== btn) {
+            dropdown.classList.remove('open');
+        }
+    });
+
+    // Первичный опрос и затем каждые 30с
+    poll(true);
+    setInterval(function(){ poll(true); }, 30000);
+})();
+</script>
 </body>
 </html>

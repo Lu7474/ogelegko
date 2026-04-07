@@ -31,21 +31,23 @@
             <td>{{ v.attempts_count }}</td>
             <td>{% if v.max_attempts == 0 %}&infin;{% else %}{{ v.max_attempts }}{% endif %}</td>
             <td>{% if v.is_active %}<span class="badge badge-green">Активен</span>{% else %}<span class="badge badge-gray">Скрыт</span>{% endif %}</td>
-            <td>
+            <td style="white-space:nowrap">
+                <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
                 <a href="{% url 'admin_variant_stats' v.id %}" class="btn btn-sm">Статистика</a>
                 <a href="{% url 'admin_variant_edit' v.id %}" class="btn btn-sm">Редактировать</a>
-                <form method="post" action="{% url 'admin_variant_toggle' v.id %}" style="display:inline;">
+                <form method="post" action="{% url 'admin_variant_toggle' v.id %}">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-secondary">{% if v.is_active %}Скрыть{% else %}Активировать{% endif %}</button>
                 </form>
-                <form method="post" action="{% url 'admin_variant_duplicate' v.id %}" style="display:inline;">
+                <form method="post" action="{% url 'admin_variant_duplicate' v.id %}">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-secondary">Дублировать</button>
                 </form>
-                <form method="post" action="{% url 'admin_variant_delete' v.id %}" style="display:inline;" onsubmit="return confirm('Удалить вариант {{v.number}}?')">
+                <form method="post" action="{% url 'admin_variant_delete' v.id %}" onsubmit="return confirm('Удалить вариант {{ v.number }}?')">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
                 </form>
+                </div>
             </td>
         </tr>
         {% empty %}
