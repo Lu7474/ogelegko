@@ -257,6 +257,8 @@ class SdamgiaParser:
 
         # Извлекаем ответ
         answer = self._extract_answer_from_block(target_block)
+        if not answer:
+            answer = self._extract_criteria_from_block(target_block)
 
         # Картинки уже встроены в HTML текст — отдельно не скачиваем
         return {
