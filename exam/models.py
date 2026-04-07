@@ -210,7 +210,7 @@ class Answer(models.Model):
     task = models.ForeignKey(
         Task, on_delete=models.CASCADE, verbose_name="Задание", related_name="answers"
     )
-    student_answer = models.CharField("Ответ ученика", max_length=255, blank=True)
+    student_answer = models.TextField("Ответ ученика", blank=True)
     is_correct = models.BooleanField("Правильно", default=False, null=True, blank=True)
 
     class Meta:

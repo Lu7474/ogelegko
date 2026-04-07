@@ -72,16 +72,27 @@
         </div>
         {% endif %}
         <div class="form-group">
+            {% if task.manual_grading %}
+            <label for="answer-{{ task.number }}">Решение (запишите ход работы):</label>
+            <textarea id="answer-{{ task.number }}"
+                      class="answer-input"
+                      data-task-number="{{ task.number }}"
+                      rows="5"
+                      style="width:100%;resize:vertical;font-family:inherit;font-size:1rem;padding:8px;border:1px solid var(--border,#ddd);border-radius:4px;"
+                      autocomplete="off">{% with answer=answers|get_answer:task.id %}{{ answer.student_answer }}{% endwith %}</textarea>
+            <div class="answer-hint">Развёрнутый ответ — учитель проверит вручную</div>
+            {% else %}
             <label for="answer-{{ task.number }}">Ответ:</label>
             <input type="text" id="answer-{{ task.number }}"
                    class="answer-input"
                    data-task-number="{{ task.number }}"
                    value="{% with answer=answers|get_answer:task.id %}{{ answer.student_answer }}{% endwith %}"
                    autocomplete="off">
-            <span class="save-indicator" id="save-{{ task.number }}"></span>
             {% if task.answer_hint %}
             <div class="answer-hint">{{ task.answer_hint }}</div>
             {% endif %}
+            {% endif %}
+            <span class="save-indicator" id="save-{{ task.number }}"></span>
         </div>
     </div>
     {% endfor %}

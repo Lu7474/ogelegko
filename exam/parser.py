@@ -278,14 +278,18 @@ class SdamgiaParser:
 
     def _extract_criteria_from_block(self, block):
         """Извлекает текст критериев проверки (для заданий части 2)."""
+        # Сначала ищем pbody, начинающийся с "Критерии"
+        for pb in block.find_all("div", class_="pbody"):
+            text = pb.get_text(" ", strip=True).replace("\u00AD", "")
+            if text.startswith("Критерии"):
+                return text[:500]
+        # Запасной: любой элемент с текстом "Критерии"
         for tag in block.find_all(string=re.compile(r'Критерии')):
             parent = tag.parent
             if parent:
-                text = parent.get_text(" ", strip=True)
-                m = re.search(r'Критерии[^:]*:\s*(.+)', text, re.DOTALL)
-                if m:
-                    criteria = m.group(1).strip()[:200]
-                    return f"Критерии: {criteria}"
+                text = parent.get_text(" ", strip=True).replace("\u00AD", "")
+                if "Критерии" in text:
+                    return text[:500]
         return ""
 
     def _extract_answer_from_block(self, block):
@@ -499,12 +503,13 @@ def import_variant_from_sdamgia(url, variant_number=None):
 
             no_answer = []
             for td in data["tasks"]:
-                manual = not bool(td["correct_answer"])
+                correct_answer = td["correct_answer"]
+                manual = not correct_answer or correct_answer.startswith("Критерии")
                 task = Task(
                     variant=variant,
                     number=td["number"],
                     text=td["text"],
-                    correct_answer=td["correct_answer"],
+                    correct_answer=correct_answer,
                     source=TaskSource.PRINT_SOLVE,
                     manual_grading=manual,
                 )
