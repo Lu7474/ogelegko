@@ -111,22 +111,32 @@ class SdamgiaParser:
     # ---- Шаг 1: получить problem_ids со страницы варианта ----
 
     def _get_problem_ids_from_variant(self, variant_url):
+        """
+        Возвращает список (task_number, problem_id) в правильном порядке.
+        Номер задания берётся из «Тип N» — это и есть позиция в экзамене.
+        """
         resp = self._get(variant_url)
         soup = BeautifulSoup(resp.text, "html.parser")
 
         seen = set()
-        result = []
+        result = []  # [(task_num, problem_id)]
 
-        # Основной способ: заголовки заданий через span.prob_nums
         for span in soup.find_all("span", class_="prob_nums"):
+            text = span.get_text(" ", strip=True)
+            type_m = re.search(r'Тип\s+(\d+)', text)
+            task_num = int(type_m.group(1)) if type_m else None
+
             link = span.find("a", href=re.compile(r"/problem\?id=\d+"))
             if link:
                 m = re.search(r"id=(\d+)", link.get("href", ""))
                 if m and m.group(1) not in seen:
                     seen.add(m.group(1))
-                    result.append(m.group(1))
+                    result.append((task_num, m.group(1)))
 
-        # Запасной способ: любые ссылки на задания в блоках prob_maindiv
+        # Сортируем по номеру задания
+        result.sort(key=lambda x: x[0] if x[0] is not None else 9999)
+
+        # Запасной способ если prob_nums не найдены
         if not result:
             for div in soup.find_all("div", class_="prob_maindiv"):
                 link = div.find("a", href=re.compile(r"/problem\?id=\d+"))
@@ -134,7 +144,7 @@ class SdamgiaParser:
                     m = re.search(r"id=(\d+)", link.get("href", ""))
                     if m and m.group(1) not in seen:
                         seen.add(m.group(1))
-                        result.append(m.group(1))
+                        result.append((None, m.group(1)))
 
         return result
 
@@ -395,29 +405,34 @@ class SdamgiaParser:
 
         logger.info("Вариант %s: %d заданий", sdamgia_id, len(problem_ids))
 
+        # problem_ids теперь список (task_num, pid)
+        pid_list = [pid for _, pid in problem_ids]
+
         # Определяем группы заданий
-        groups = self._detect_groups(problem_ids, base_url)
+        groups = self._detect_groups(pid_list, base_url)
 
         # Отслеживаем какие группы уже встречались (для is_first_in_group)
         seen_groups = set()
 
         tasks = []
-        for i, pid in enumerate(problem_ids, start=1):
+        for idx, (task_num, pid) in enumerate(problem_ids, start=1):
+            # Используем номер из «Тип N», при его отсутствии — порядковый
+            number = task_num if task_num is not None else idx
             try:
                 group = groups.get(pid, {pid})
                 group_key = frozenset(group)
                 is_first = group_key not in seen_groups
                 seen_groups.add(group_key)
 
-                task = self._parse_problem(pid, base_url, task_number=i,
+                task = self._parse_problem(pid, base_url, task_number=number,
                                            is_first_in_group=is_first)
                 tasks.append(task)
-                logger.info("  %d/%d (ID %s) — ответ: %s",
-                            i, len(problem_ids), pid, task["correct_answer"] or "НЕТ")
+                logger.info("  %d/%d задание №%d (ID %s) — ответ: %s",
+                            idx, len(problem_ids), number, pid, task["correct_answer"] or "НЕТ")
             except ParserError as e:
-                logger.warning("  %d/%d (ID %s) ОШИБКА: %s", i, len(problem_ids), pid, e)
+                logger.warning("  %d/%d (ID %s) ОШИБКА: %s", idx, len(problem_ids), pid, e)
                 tasks.append({
-                    "number": i,
+                    "number": number,
                     "text": f"[Ошибка парсинга задания {pid}]",
                     "correct_answer": "",
                     "image_data": None,
