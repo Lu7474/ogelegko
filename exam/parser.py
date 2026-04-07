@@ -440,6 +440,19 @@ class SdamgiaParser:
         }
 
 
+_FORMULA_KEYWORDS = [
+    "дробь", "числитель", "знаменатель", "корень из", "квадратный корень",
+    "фигурная скобка", "принадлежит", "степень", "логарифм",
+    "синус", "косинус", "тангенс", "котангенс", "арксинус", "арккосинус",
+]
+
+
+def _is_formula_answer(answer: str) -> bool:
+    """Ответ — alt-текст формулы-картинки, ученик не сможет его ввести."""
+    a = answer.lower()
+    return any(kw in a for kw in _FORMULA_KEYWORDS)
+
+
 def import_variant_from_sdamgia(url, variant_number=None):
     parser = SdamgiaParser()
     errors = []
@@ -462,10 +475,22 @@ def import_variant_from_sdamgia(url, variant_number=None):
                 exam_type=data["exam_type"],
             )
 
+            exam_type = data["exam_type"]
             no_answer = []
             for td in data["tasks"]:
                 correct_answer = td["correct_answer"]
-                manual = not correct_answer or correct_answer.startswith("Критерии")
+                manual = (
+                    not correct_answer
+                    or correct_answer.startswith("Критерии")
+                    or _is_formula_answer(correct_answer)
+                )
+                # ЕГЭ профиль: задания 13–19 всегда ручная проверка
+                if not manual and exam_type == ExamType.EGE_PROFILE:
+                    try:
+                        if int(str(td["number"]).split(".")[0]) >= 13:
+                            manual = True
+                    except (ValueError, TypeError):
+                        pass
                 task = Task(
                     variant=variant,
                     number=td["number"],
