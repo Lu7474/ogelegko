@@ -532,7 +532,7 @@ def import_task_to_catalog(url, task_number=None):
             exam_type=exam_type,
             text=task_data["text"],
             correct_answer=correct_answer,
-            source=TaskSource.PRINT_SOLVE,
+            source=TaskSource.SDAMGIA,
             manual_grading=manual,
             sdamgia_id=problem_id,
         )
@@ -585,7 +585,7 @@ def import_variant_to_catalog(url):
                 exam_type=exam_type,
                 text=td["text"],
                 correct_answer=correct_answer,
-                source=TaskSource.PRINT_SOLVE,
+                source=TaskSource.SDAMGIA,
                 manual_grading=manual,
                 sdamgia_id=problem_id if problem_id else None,
             )
@@ -638,7 +638,7 @@ def import_variant_from_sdamgia(url, variant_number=None):
                     number=td["number"],
                     text=td["text"],
                     correct_answer=correct_answer,
-                    source=TaskSource.PRINT_SOLVE,
+                    source=TaskSource.SDAMGIA,
                     manual_grading=manual,
                 )
                 if td.get("image_data"):

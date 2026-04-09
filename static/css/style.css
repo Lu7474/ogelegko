@@ -685,7 +685,8 @@ tr:hover .row-actions { opacity: 1; }
     border-radius: 20px; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
 }
 .source-fipi { background: #dbeafe; color: #1e40af; }
-.source-print_solve { background: #dcfce7; color: #166534; }
+.source-sdamgia { background: #dcfce7; color: #166534; }
+.source-print_solve { background: #d1fae5; color: #065f46; }
 .source-dinamika { background: #fce7f3; color: #9d174d; }
 .source-manual { background: #f3f4f6; color: #374151; }
 

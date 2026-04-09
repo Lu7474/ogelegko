@@ -24,6 +24,7 @@ EXAM_TASK_COUNT = {
 
 class TaskSource(models.TextChoices):
     FIPI = "fipi", "ФИПИ"
+    SDAMGIA = "sdamgia", "СдамГИА"
     PRINT_SOLVE = "print_solve", "Распечатай и реши"
     DINAMIKA = "dinamika", "Динамика"
     MANUAL = "manual", "Вручную"
