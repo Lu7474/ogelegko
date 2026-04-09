@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from .models import Variant, Task, ExamType, TaskSource, CatalogTask
+from .models import Variant, Task, ExamType, TaskSource, CatalogTask, CatalogImportSession
 
 logger = logging.getLogger(__name__)
 
@@ -268,6 +268,10 @@ class SdamgiaParser:
         # Извлекаем ответ
         answer = self._extract_answer_from_block(target_block)
         if not answer:
+            # Пробуем найти «Ответ:» внутри раздела критериев (задание 24 и т.п.)
+            answer = self._extract_answer_from_criteria(target_block)
+        if not answer:
+            # Последний fallback: берём критерии для ручной проверки
             answer = self._extract_criteria_from_block(target_block)
 
         # Картинки уже встроены в HTML текст — отдельно не скачиваем
@@ -301,52 +305,87 @@ class SdamgiaParser:
                     return text[:500]
         return ""
 
+    def _clean_answer(self, raw):
+        """Очищает извлечённый ответ от мусора."""
+        stop_words = ["Аналоги", "Источники", "Критерии", "Спрятать",
+                      "Раздел", "Приведем", "Примечание", "Решение", "Пояснение"]
+        raw = raw.replace("\u00AD", "").replace("\u202f", " ").replace("&nbsp;", " ")
+        raw = raw.replace("&#8239;", " ")
+        raw = raw.strip()
+        for stop in stop_words:
+            idx = raw.find(stop)
+            if idx > 0:
+                raw = raw[:idx]
+        return raw.rstrip(". \t\n\r").strip()
+
     def _extract_answer_from_block(self, block):
         """Извлекает ответ из блока задания."""
-        # Сначала ищем через BeautifulSoup — надёжнее для разных форматов
-        for tag in block.find_all(string=re.compile(r'Ответ\s*:')):
-            parent = tag.parent
-            # Берём весь текст после "Ответ:" в этом элементе и следующих
-            full = parent.get_text(" ", strip=True) if parent else str(tag)
-            m = re.search(r'Ответ\s*:\s*(.+)', full)
-            if m:
-                answer = m.group(1).strip()
-                for stop in ["Аналоги", "Источники", "Критерии", "Спрятать",
-                              "Раздел", "Приведем", "Примечание", "Решение"]:
-                    idx = answer.find(stop)
-                    if idx > 0:
-                        answer = answer[:idx]
-                answer = answer.replace("\u00AD", "").replace("\u202f", " ").replace("&nbsp;", " ")
-                answer = answer.rstrip(". \t\n\r").strip()
-                if answer:
-                    return answer
 
+        # 1. BS4: ищем "Ответ:" и идём вверх по родителям, чтобы захватить
+        #    соседние span/b с самим значением ответа.
+        for tag in block.find_all(string=re.compile(r'Ответ\s*:', re.IGNORECASE)):
+            node = tag.parent
+            # Поднимаемся до 3 уровней вверх, пока не найдём текст с ответом
+            for _ in range(3):
+                if node is None:
+                    break
+                full = node.get_text(" ", strip=True).replace("\u00AD", "")
+                m = re.search(r'Ответ\s*:\s*(.+)', full, re.DOTALL)
+                if m:
+                    answer = self._clean_answer(m.group(1))
+                    if answer and len(answer) < 200:
+                        return answer
+                node = node.parent
+
+        # 2. Ищем ответ в соседней ячейке таблицы (некоторые задания на СдамГИА
+        #    помещают «Ответ:» в одну <td>, а само значение — в следующую).
+        for td in block.find_all("td"):
+            text = td.get_text(" ", strip=True).replace("\u00AD", "")
+            if re.match(r'^Ответ\s*:?\s*$', text, re.IGNORECASE):
+                sib = td.find_next_sibling("td")
+                if sib:
+                    answer = self._clean_answer(sib.get_text(" ", strip=True))
+                    if answer:
+                        return answer
+
+        # 3. Regex по raw HTML — расширенный набор паттернов
         html = str(block)
-        # Ищем паттерн: Ответ:</span> VALUE или Ответ: VALUE
         patterns = [
-            r'Ответ\s*(?:</span>)?\s*:\s*(?:</span>)?\s*(.+?)(?:<!--|\.\s*<(?:div|p\b|br))',
-            r'Ответ\s*(?:</span>)?\s*:\s*(?:</span>)?\s*(.+?)(?:<div|<a\s)',
-            r'Ответ\s*(?:</span>)?\s*:\s*(?:</span>)?\s*(.+?)(?:<)',
+            # Ответ: <span>…</span> или Ответ: <b>…</b>
+            r'Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<!--|\.\s*<(?:div|p\b|br|tr|td))',
+            r'Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<div|<p\b|<br|<tr|<a\s)',
+            r'Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<)',
         ]
         for pattern in patterns:
-            m = re.search(pattern, html, re.DOTALL)
+            m = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
             if m:
                 raw = m.group(1)
                 # Если ответ — формула-картинка, берём alt-текст
-                img_match = re.search(r'<img[^>]+alt="([^"]+)"', raw)
-                if img_match:
-                    answer = img_match.group(1).replace("\u00AD", "").strip()
+                img_m = re.search(r'<img[^>]+alt="([^"]+)"', raw)
+                if img_m:
+                    answer = self._clean_answer(img_m.group(1))
+                    if answer:
+                        return answer
+                answer = self._clean_answer(re.sub(r'<[^>]+>', '', raw))
+                if answer:
                     return answer
+        return ""
 
-                answer = re.sub(r'<[^>]+>', '', raw)
-                answer = answer.replace("\u00AD", "").replace("&nbsp;", " ")
-                answer = answer.replace("&#8239;", " ").replace("\u202f", " ")
-                for stop in ["Аналоги", "Источники", "Критерии", "Спрятать",
-                              "Раздел", "Приведем", "Примечание", "Решение"]:
-                    idx = answer.find(stop)
-                    if idx > 0:
-                        answer = answer[:idx]
-                answer = answer.rstrip(". \t\n\r").strip()
+    def _extract_answer_from_criteria(self, block):
+        """Пытается найти числовой ответ ВНУТРИ блока критериев.
+
+        Задания 24 и некоторые другие на СдамГИА содержат «Ответ: X»
+        прямо в разделе «Критерии оценивания».  Эта функция извлекает
+        только числовое значение, игнорируя остальной текст критериев.
+        """
+        for pb in block.find_all("div", class_="pbody"):
+            text = pb.get_text(" ", strip=True).replace("\u00AD", "")
+            if not text.startswith("Критерии"):
+                continue
+            # Ищем «Ответ:» в тексте критериев
+            m = re.search(r'Ответ\s*:\s*([^\n.]{1,80})', text)
+            if m:
+                answer = self._clean_answer(m.group(1))
                 if answer:
                     return answer
         return ""

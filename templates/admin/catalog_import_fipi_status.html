@@ -1,0 +1,98 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Статус импорта ФИПИ{% endblock %}
+
+{% block extra_head %}
+<style>
+.import-status-card { max-width: 600px; }
+.status-running { color: var(--primary, #1a73e8); }
+.status-done { color: #27ae60; }
+.status-error { color: #e74c3c; }
+.stat-row { display: flex; gap: 24px; margin: 16px 0; flex-wrap: wrap; }
+.stat-box { text-align: center; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; padding: 12px 20px; min-width: 100px; }
+.stat-box .num { font-size: 1.8rem; font-weight: 700; }
+.stat-box .lbl { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+.spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #ddd; border-top-color: var(--primary, #1a73e8); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.duplicate-hint { margin-top: 12px; padding: 10px 14px; background: #fff8e1; border-left: 3px solid #f39c12; border-radius: 4px; font-size: 0.875rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Импорт ФИПИ — статус</h1>
+
+<div class="card import-status-card" style="padding:24px;margin-top:16px;">
+    <div id="statusBlock">
+        {% if job.status == "running" %}
+        <p class="status-running"><span class="spinner"></span> Импорт выполняется...</p>
+        {% elif job.status == "done" %}
+        <p class="status-done" style="font-size:1.1rem;font-weight:600;">✓ Импорт завершён</p>
+        {% elif job.status == "error" %}
+        <p class="status-error" style="font-size:1.1rem;font-weight:600;">✗ Ошибка импорта</p>
+        {% else %}
+        <p>Неизвестный статус: {{ job.status }}</p>
+        {% endif %}
+    </div>
+
+    <div class="stat-row" id="statRow">
+        <div class="stat-box">
+            <div class="num" id="cntAdded">{{ job.added }}</div>
+            <div class="lbl">Добавлено</div>
+        </div>
+        <div class="stat-box">
+            <div class="num" id="cntSkipped">{{ job.skipped }}</div>
+            <div class="lbl">Пропущено</div>
+        </div>
+        <div class="stat-box">
+            <div class="num" id="cntDuplicate">{{ job.duplicate }}</div>
+            <div class="lbl">Дублей</div>
+        </div>
+    </div>
+
+    {% if job.status == "error" and job.errors %}
+    <div class="error-message">{{ job.errors|join:", " }}</div>
+    {% endif %}
+
+    {% if job.status == "done" and job.duplicate > 0 %}
+    <div class="duplicate-hint">
+        Найдено <b>{{ job.duplicate }}</b> дубль(-ей) по тексту (уже есть в каталоге с другим источником).
+        {% if session %}
+        <a href="{% url 'admin_import_list' %}">Посмотреть в истории импортов →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+        {% if job.status == "done" %}
+        <a href="{% url 'admin_catalog' %}" class="btn btn-primary">Перейти в каталог</a>
+        {% endif %}
+        <a href="{% url 'admin_import_list' %}" class="btn btn-secondary">История импортов</a>
+        <a href="{% url 'admin_fipi_import' %}" class="btn btn-secondary">Новый импорт</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if job.status == "running" %}
+<script>
+(function(){
+    var job_id = "{{ job_id }}";
+    var url = "{% url 'admin_fipi_import_status' job_id=job_id %}?json=1";
+
+    function poll() {
+        fetch(url).then(function(r){ return r.json(); }).then(function(data){
+            document.getElementById('cntAdded').textContent = data.added || 0;
+            document.getElementById('cntSkipped').textContent = data.skipped || 0;
+            document.getElementById('cntDuplicate').textContent = data.duplicate || 0;
+
+            if (data.status !== 'running') {
+                window.location.reload();
+            } else {
+                setTimeout(poll, 2000);
+            }
+        }).catch(function(){ setTimeout(poll, 3000); });
+    }
+    setTimeout(poll, 2000);
+})();
+</script>
+{% endif %}
+{% endblock %}

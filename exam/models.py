@@ -203,6 +203,37 @@ class Attempt(models.Model):
         return round(self.correct_count / self.total_count * 100)
 
 
+class ImportSource(models.TextChoices):
+    FIPI = "fipi", "ФИПИ"
+    SDAMGIA = "sdamgia", "СдамГИА"
+    MANUAL = "manual", "Вручную"
+
+
+class CatalogImportSession(models.Model):
+    """История импортов в каталог."""
+    source = models.CharField("Источник", max_length=20, choices=ImportSource.choices)
+    url = models.TextField("URL", blank=True)
+    proj_guid = models.CharField("GUID проекта ФИПИ", max_length=64, blank=True)
+    status = models.CharField("Статус", max_length=20, default="running")
+    tasks_added = models.PositiveIntegerField("Добавлено", default=0)
+    tasks_skipped = models.PositiveIntegerField("Пропущено", default=0)
+    tasks_duplicate = models.PositiveIntegerField("Дублей", default=0)
+    created_at = models.DateTimeField("Дата", auto_now_add=True)
+    notes = models.TextField("Заметки", blank=True)
+
+    class Meta:
+        verbose_name = "Сессия импорта"
+        verbose_name_plural = "Сессии импорта"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_source_display()} — {self.created_at:%d.%m.%Y %H:%M} (+{self.tasks_added})"
+
+    @property
+    def url_short(self):
+        return self.url[:80] + "…" if len(self.url) > 80 else self.url
+
+
 class CatalogTask(models.Model):
     """Задание в каталоге — независимо от конкретного варианта."""
     task_number = models.IntegerField(
@@ -226,6 +257,17 @@ class CatalogTask(models.Model):
     sdamgia_id = models.CharField(
         "ID СдамГИА", max_length=20, blank=True, null=True, unique=True
     )
+    fipi_guid = models.CharField(
+        "GUID ФИПИ", max_length=64, blank=True, null=True, unique=True
+    )
+    text_hash = models.CharField(
+        "Хэш текста", max_length=32, blank=True, null=True, db_index=True
+    )
+    import_session = models.ForeignKey(
+        CatalogImportSession, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="tasks",
+        verbose_name="Сессия импорта",
+    )
 
     class Meta:
         verbose_name = "Задание каталога"
@@ -241,6 +283,12 @@ class CatalogTask(models.Model):
         import re as _re
         plain = _re.sub(r"<[^>]+>", " ", self.text or "").strip()
         return plain[:120] + "…" if len(plain) > 120 else plain
+
+    @staticmethod
+    def compute_hash(text):
+        import hashlib, re as _re
+        plain = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", text or "")).strip().lower()
+        return hashlib.md5(plain.encode("utf-8")).hexdigest() if plain else None
 
 
 class Answer(models.Model):

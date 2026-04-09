@@ -1,0 +1,118 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}История импортов{% endblock %}
+
+{% block extra_head %}
+<style>
+.import-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.import-table th { padding: 10px 12px; text-align: left; border-bottom: 2px solid #e0e0e0; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.import-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.import-table tr:last-child td { border-bottom: none; }
+.import-table tr:hover td { background: var(--bg-secondary, #f8f9fa); }
+.status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.78rem; font-weight: 600; }
+.status-done { background: #d4edda; color: #155724; }
+.status-running { background: #cce5ff; color: #004085; }
+.status-error { background: #f8d7da; color: #721c24; }
+.url-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 0.8rem; }
+.del-dropdown { position: relative; display: inline-block; }
+.del-dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.12); z-index: 100; min-width: 220px; overflow: hidden; }
+.del-dropdown-menu.open { display: block; }
+.del-dropdown-menu form { margin: 0; }
+.del-dropdown-menu button { width: 100%; text-align: left; padding: 10px 14px; border: none; background: none; cursor: pointer; font-size: 0.875rem; display: block; }
+.del-dropdown-menu button:hover { background: #f5f5f5; }
+.del-dropdown-menu button.danger { color: #e74c3c; }
+.del-dropdown-menu .sep { border-top: 1px solid #f0f0f0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">История импортов</h1>
+    <a href="{% url 'admin_fipi_import' %}" class="btn btn-primary" style="margin-left:auto;">+ Импорт ФИПИ</a>
+    <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary">Импорт СдамГИА</a>
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">← Каталог</a>
+</div>
+
+{% if sessions %}
+<div class="card" style="overflow-x:auto;">
+    <table class="import-table">
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Источник</th>
+                <th>URL / проект</th>
+                <th>Статус</th>
+                <th style="text-align:center;">Добавлено</th>
+                <th style="text-align:center;">Пропущено</th>
+                <th style="text-align:center;">Дублей</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sessions %}
+            <tr>
+                <td style="white-space:nowrap;">{{ s.created_at|date:"d.m.Y H:i" }}</td>
+                <td>{{ s.get_source_display }}</td>
+                <td class="url-cell" title="{{ s.url }}">{{ s.url_short }}</td>
+                <td>
+                    <span class="status-badge status-{{ s.status }}">
+                        {% if s.status == "done" %}Готово
+                        {% elif s.status == "running" %}Выполняется
+                        {% elif s.status == "error" %}Ошибка
+                        {% else %}{{ s.status }}{% endif %}
+                    </span>
+                </td>
+                <td style="text-align:center;font-weight:600;color:#27ae60;">{{ s.tasks_added }}</td>
+                <td style="text-align:center;color:var(--text-muted);">{{ s.tasks_skipped }}</td>
+                <td style="text-align:center;color:#f39c12;">{{ s.tasks_duplicate }}</td>
+                <td>
+                    <div class="del-dropdown" id="dd{{ s.id }}">
+                        <button class="btn btn-secondary" style="padding:4px 10px;font-size:0.8rem;"
+                                onclick="toggleDd('{{ s.id }}')">Удалить ▾</button>
+                        <div class="del-dropdown-menu" id="ddm{{ s.id }}">
+                            <form method="post" action="{% url 'admin_import_session_delete' session_id=s.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_tasks" value="0">
+                                <button type="submit">Удалить запись (задания сохранятся)</button>
+                            </form>
+                            <div class="sep"></div>
+                            <form method="post" action="{% url 'admin_import_session_delete' session_id=s.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_tasks" value="1">
+                                <button type="submit" class="danger"
+                                        onclick="return confirm('Удалить запись И все {{ s.tasks_added }} заданий из каталога?')">
+                                    Удалить вместе с заданиями ({{ s.tasks_added }})
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="padding:40px;text-align:center;color:var(--text-muted);">
+    <div style="font-size:2.5rem;margin-bottom:8px;">📭</div>
+    <p>Импортов ещё не было.</p>
+    <a href="{% url 'admin_fipi_import' %}" class="btn btn-primary">Импортировать из ФИПИ</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleDd(id) {
+    var menu = document.getElementById('ddm' + id);
+    var isOpen = menu.classList.contains('open');
+    // Закрыть все
+    document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){ m.classList.remove('open'); });
+    if (!isOpen) menu.classList.add('open');
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.del-dropdown')) {
+        document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){ m.classList.remove('open'); });
+    }
+});
+</script>
+{% endblock %}

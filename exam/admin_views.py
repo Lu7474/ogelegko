@@ -18,7 +18,7 @@ from datetime import timedelta
 
 from .models import (
     SchoolClass, Student, Variant, Task, Attempt, Answer,
-    ExamType, TaskSource, TaskTopic, CatalogTask,
+    ExamType, TaskSource, TaskTopic, CatalogTask, CatalogImportSession, ImportSource,
 )
 
 logger = logging.getLogger(__name__)
@@ -1214,3 +1214,165 @@ def variant_from_catalog(request):
 
     from django.urls import reverse
     return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})
+
+
+# ===== ФИПИ ИМПОРТ =====
+
+_fipi_import_jobs = {}  # job_id -> {status, session_id, added, skipped, duplicate, errors}
+
+
+def _run_fipi_import_job(job_id, proj, exam_type, theme_filter, session_id):
+    """Фоновый поток: импортирует задания ФИПИ в каталог."""
+    try:
+        from .fipi_parser import import_fipi_to_catalog
+        import_fipi_to_catalog(proj, exam_type, theme_filter, session_id)
+        sess = CatalogImportSession.objects.get(id=session_id)
+        _fipi_import_jobs[job_id] = {
+            "status": "done",
+            "session_id": session_id,
+            "added": sess.tasks_added,
+            "skipped": sess.tasks_skipped,
+            "duplicate": sess.tasks_duplicate,
+            "errors": [],
+        }
+    except Exception as e:
+        logger.exception("Ошибка ФИПИ импорта")
+        _fipi_import_jobs[job_id] = {
+            "status": "error",
+            "session_id": session_id,
+            "added": 0,
+            "skipped": 0,
+            "duplicate": 0,
+            "errors": [str(e)],
+        }
+        try:
+            CatalogImportSession.objects.filter(id=session_id).update(
+                status="error", notes=str(e)
+            )
+        except Exception:
+            pass
+    finally:
+        from django.db import connection
+        connection.close()
+
+
+@admin_required
+def catalog_fipi_import(request):
+    """Страница импорта из ФИПИ: превью + запуск."""
+    return render(request, "admin/catalog_import_fipi.html", {
+        "exam_types": ExamType.choices,
+    })
+
+
+@admin_required
+def catalog_fipi_preview(request):
+    """AJAX: получить инфо о проекте ФИПИ по URL."""
+    url = request.GET.get("url", "").strip()
+    if not url:
+        return JsonResponse({"error": "Введите URL"}, status=400)
+    try:
+        from .fipi_parser import fipi_get_preview
+        data = fipi_get_preview(url)
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@admin_required
+@require_POST
+def catalog_fipi_start(request):
+    """POST: запустить фоновый импорт ФИПИ."""
+    proj = request.POST.get("proj", "").strip()
+    exam_type = request.POST.get("exam_type", "").strip()
+    theme_filter = request.POST.get("theme_filter", "").strip()
+
+    errors = []
+    if not proj:
+        errors.append("Не найден GUID проекта")
+    if exam_type not in dict(ExamType.choices):
+        errors.append("Выберите тип экзамена")
+    if errors:
+        return JsonResponse({"error": "; ".join(errors)}, status=400)
+
+    sess = CatalogImportSession.objects.create(
+        source=ImportSource.FIPI,
+        url=request.POST.get("url", ""),
+        proj_guid=proj,
+        status="running",
+    )
+    job_id = str(uuid.uuid4())
+    _fipi_import_jobs[job_id] = {
+        "status": "running",
+        "session_id": sess.id,
+        "added": 0,
+        "skipped": 0,
+        "duplicate": 0,
+        "errors": [],
+    }
+    threading.Thread(
+        target=_run_fipi_import_job,
+        args=(job_id, proj, exam_type, theme_filter, sess.id),
+        daemon=True,
+    ).start()
+    from django.urls import reverse
+    return JsonResponse({
+        "ok": True,
+        "job_id": job_id,
+        "redirect": reverse("admin_fipi_import_status", args=[job_id]),
+    })
+
+
+@admin_required
+def catalog_fipi_status(request, job_id):
+    """Страница/API статуса импорта ФИПИ."""
+    job = _fipi_import_jobs.get(job_id, {
+        "status": "unknown", "session_id": None,
+        "added": 0, "skipped": 0, "duplicate": 0, "errors": ["Задание не найдено"],
+    })
+
+    # Дополнить из БД если есть session_id
+    if job.get("session_id") and job["status"] == "running":
+        try:
+            sess = CatalogImportSession.objects.get(id=job["session_id"])
+            job = dict(job,
+                added=sess.tasks_added,
+                skipped=sess.tasks_skipped,
+                duplicate=sess.tasks_duplicate,
+                status=sess.status if sess.status != "running" else "running",
+            )
+        except CatalogImportSession.DoesNotExist:
+            pass
+
+    if request.GET.get("json"):
+        return JsonResponse(job)
+
+    session_obj = None
+    if job.get("session_id"):
+        session_obj = CatalogImportSession.objects.filter(id=job["session_id"]).first()
+
+    return render(request, "admin/catalog_import_fipi_status.html", {
+        "job_id": job_id,
+        "job": job,
+        "session": session_obj,
+    })
+
+
+@admin_required
+def catalog_import_list(request):
+    """Список всех сессий импорта."""
+    sessions = CatalogImportSession.objects.order_by("-created_at")
+    return render(request, "admin/catalog_import_list.html", {
+        "sessions": sessions,
+    })
+
+
+@admin_required
+@require_POST
+def catalog_import_session_delete(request, session_id):
+    """Удалить сессию импорта (с заданиями или без)."""
+    sess = get_object_or_404(CatalogImportSession, id=session_id)
+    delete_tasks = request.POST.get("delete_tasks") == "1"
+    if delete_tasks:
+        CatalogTask.objects.filter(import_session=sess).delete()
+    sess.delete()
+    return redirect("admin_import_list")

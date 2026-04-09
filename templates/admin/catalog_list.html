@@ -6,7 +6,9 @@
     <h1 style="margin:0;">Каталог заданий</h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <a href="{% url 'admin_catalog_add' %}" class="btn btn-primary">+ Добавить вручную</a>
-        <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary">⬇ Импорт с СдамГИА</a>
+        <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary">⬇ СдамГИА</a>
+        <a href="{% url 'admin_fipi_import' %}" class="btn btn-secondary">⬇ ФИПИ</a>
+        <a href="{% url 'admin_import_list' %}" class="btn btn-secondary">История импортов</a>
         <a href="{% url 'admin_catalog_unclassified' %}" class="btn btn-secondary">
             Неопределённые{% if unclassified_count %} <span class="notif-badge" style="position:static;display:inline-flex;margin-left:4px;">{{ unclassified_count }}</span>{% endif %}
         </a>

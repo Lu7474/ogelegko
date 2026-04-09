@@ -537,11 +537,10 @@ h3 { color: var(--heading); font-size: 1rem; }
     .btn-sm { padding: 4px 8px; font-size: 0.74rem; }
     .task-block { padding: 18px 16px; }
     .notif-dropdown {
-        position: fixed;
-        top: 56px;
-        left: 12px;
-        right: 12px;
-        width: auto;
+        position: absolute;
+        right: 0;
+        width: calc(100vw - 24px);
+        max-width: 320px;
     }
 }
 

@@ -1,0 +1,207 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Импорт из ФИПИ{% endblock %}
+
+{% block extra_head %}
+<style>
+.fipi-preview-box { margin-top: 20px; display: none; }
+.fipi-topics { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.fipi-topic-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #e0e0e0; border-radius: 6px; font-size: 0.875rem; }
+.fipi-topic-item input[type=checkbox] { width: 15px; height: 15px; flex-shrink: 0; }
+.fipi-topic-item label { flex: 1; cursor: pointer; }
+.fipi-topic-item .topic-cnt { color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
+.fipi-stat { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: var(--primary-light, #e8f0fe); border-radius: 20px; font-weight: 600; color: var(--primary, #1a73e8); font-size: 0.9rem; }
+.fipi-actions { margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.spinner-sm { display: inline-block; width: 18px; height: 18px; border: 2px solid #ccc; border-top-color: var(--primary, #1a73e8); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+    <h1 style="margin:0;">Импорт из банка ФИПИ</h1>
+    <a href="{% url 'admin_import_list' %}" class="btn btn-secondary" style="margin-left:auto;">История импортов</a>
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">← Каталог</a>
+</div>
+
+<div class="card" style="padding:24px;max-width:700px;">
+    <p style="color:var(--text-muted);margin-top:0;">
+        Вставьте URL проекта банка заданий ФИПИ вида<br>
+        <code>https://oge.fipi.ru/bank/index.php?proj=XXXX...</code><br>
+        Нажмите «Анализировать» — система покажет сколько заданий и темы. Затем выберите тип экзамена и нажмите «Запустить импорт».
+    </p>
+
+    <div class="form-group">
+        <label><b>URL банка ФИПИ</b></label>
+        <div style="display:flex;gap:8px;">
+            <input type="url" id="fipiUrl" placeholder="https://oge.fipi.ru/bank/index.php?proj=..."
+                   style="flex:1;" oninput="resetPreview()">
+            <button class="btn btn-secondary" onclick="doPreview()">
+                <span id="previewBtnText">Анализировать</span>
+                <span id="previewSpinner" class="spinner-sm" style="display:none;"></span>
+            </button>
+        </div>
+        <div id="previewError" style="color:#e74c3c;font-size:0.85rem;margin-top:6px;display:none;"></div>
+    </div>
+
+    <!-- Результат превью -->
+    <div class="fipi-preview-box" id="previewBox">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span class="fipi-stat" id="statTotal">— заданий</span>
+            <span class="fipi-stat" id="statPages" style="background:#f0f0f0;color:#555;">— страниц</span>
+        </div>
+
+        <!-- Темы -->
+        <div id="topicsSection" style="display:none;margin-top:16px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <b style="font-size:0.95rem;">Темы</b>
+                <small style="color:var(--text-muted);">Оставьте все отмеченными — или выберите нужные</small>
+                <a href="#" onclick="toggleAll(true);return false;" style="font-size:0.8rem;">Все</a> /
+                <a href="#" onclick="toggleAll(false);return false;" style="font-size:0.8rem;">Ни одной</a>
+            </div>
+            <div class="fipi-topics" id="topicsList"></div>
+        </div>
+
+        <!-- Параметры запуска -->
+        <div style="margin-top:20px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group" style="margin:0;">
+                <label><b>Тип экзамена</b></label>
+                <select id="examTypeSelect" style="min-width:180px;">
+                    {% for val, label in exam_types %}
+                    <option value="{{ val }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="fipi-actions">
+            <button class="btn btn-primary" onclick="startImport()">Запустить импорт</button>
+            <span id="startError" style="color:#e74c3c;font-size:0.85rem;display:none;"></span>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="projGuid" value="">
+{% endblock %}
+
+{% block scripts %}
+<script>
+var PREVIEW_URL = "{% url 'admin_fipi_preview' %}";
+var START_URL = "{% url 'admin_fipi_start' %}";
+var CSRF = "{{ csrf_token }}";
+var topicsData = [];
+
+function resetPreview() {
+    document.getElementById('previewBox').style.display = 'none';
+    document.getElementById('previewError').style.display = 'none';
+    document.getElementById('projGuid').value = '';
+    topicsData = [];
+}
+
+function doPreview() {
+    var url = document.getElementById('fipiUrl').value.trim();
+    if (!url) return;
+
+    document.getElementById('previewBtnText').textContent = 'Анализ...';
+    document.getElementById('previewSpinner').style.display = 'inline-block';
+    document.getElementById('previewError').style.display = 'none';
+    document.getElementById('previewBox').style.display = 'none';
+
+    fetch(PREVIEW_URL + '?url=' + encodeURIComponent(url))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('previewBtnText').textContent = 'Анализировать';
+            document.getElementById('previewSpinner').style.display = 'none';
+
+            if (data.error) {
+                var el = document.getElementById('previewError');
+                el.textContent = data.error;
+                el.style.display = 'block';
+                return;
+            }
+
+            document.getElementById('projGuid').value = data.proj;
+            document.getElementById('statTotal').textContent = data.total + ' заданий';
+            document.getElementById('statPages').textContent = data.pages + ' страниц (~' + Math.round(data.pages * 0.7) + ' сек)';
+
+            topicsData = data.topics || [];
+            var tList = document.getElementById('topicsList');
+            if (topicsData.length > 0) {
+                tList.innerHTML = topicsData.map(function(t, i) {
+                    return '<div class="fipi-topic-item">' +
+                        '<input type="checkbox" id="t' + i + '" value="' + t.code + '" checked>' +
+                        '<label for="t' + i + '">' + t.name + '</label>' +
+                        '<span class="topic-cnt">' + (t.count || '?') + '</span>' +
+                        '</div>';
+                }).join('');
+                document.getElementById('topicsSection').style.display = 'block';
+            } else {
+                document.getElementById('topicsSection').style.display = 'none';
+            }
+
+            document.getElementById('previewBox').style.display = 'block';
+        })
+        .catch(function(e) {
+            document.getElementById('previewBtnText').textContent = 'Анализировать';
+            document.getElementById('previewSpinner').style.display = 'none';
+            var el = document.getElementById('previewError');
+            el.textContent = 'Ошибка соединения: ' + e.message;
+            el.style.display = 'block';
+        });
+}
+
+function toggleAll(checked) {
+    document.querySelectorAll('#topicsList input[type=checkbox]').forEach(function(cb) {
+        cb.checked = checked;
+    });
+}
+
+function startImport() {
+    var proj = document.getElementById('projGuid').value;
+    var examType = document.getElementById('examTypeSelect').value;
+    var url = document.getElementById('fipiUrl').value.trim();
+
+    // Собрать выбранные темы
+    var checked = Array.from(document.querySelectorAll('#topicsList input[type=checkbox]:checked'));
+    var themeFilter = '';
+    // Если все галки стоят — импортируем без фильтра по теме
+    var allChecked = checked.length === topicsData.length;
+    if (!allChecked && checked.length === 1) {
+        themeFilter = checked[0].value;
+    } else if (!allChecked && checked.length > 1) {
+        // Несколько тем — пока передаём первую (упрощение)
+        themeFilter = checked[0].value;
+    }
+
+    var errEl = document.getElementById('startError');
+    if (!proj) { errEl.textContent = 'Сначала нажмите «Анализировать»'; errEl.style.display = 'inline'; return; }
+    errEl.style.display = 'none';
+
+    var body = new FormData();
+    body.append('csrfmiddlewaretoken', CSRF);
+    body.append('proj', proj);
+    body.append('exam_type', examType);
+    body.append('theme_filter', themeFilter);
+    body.append('url', url);
+
+    fetch(START_URL, { method: 'POST', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                window.location = data.redirect;
+            } else {
+                errEl.textContent = data.error || 'Ошибка';
+                errEl.style.display = 'inline';
+            }
+        })
+        .catch(function(e) {
+            errEl.textContent = 'Ошибка: ' + e.message;
+            errEl.style.display = 'inline';
+        });
+}
+
+// Enter в поле url
+document.getElementById('fipiUrl').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); doPreview(); }
+});
+</script>
+{% endblock %}
