@@ -1216,6 +1216,127 @@ def variant_from_catalog(request):
     return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})
 
 
+# ===== ПЕЧАТЬ ВАРИАНТА (DOCX) =====
+
+def _html_to_text(html):
+    """Конвертирует HTML в plain text, сохраняя переносы строк."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html or "", "html.parser")
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+    for p in soup.find_all(["p", "div", "tr"]):
+        p.insert_after("\n")
+    return soup.get_text(" ").strip()
+
+
+def _build_variant_docx(variant, include_answers):
+    """Строит docx-документ для варианта. Возвращает BytesIO."""
+    import io
+    from docx import Document
+    from docx.shared import Pt, Cm, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    import requests as _req
+
+    doc = Document()
+
+    # Поля страницы
+    for section in doc.sections:
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2)
+
+    # Заголовок
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = title.add_run(f"Вариант {variant.number}")
+    run.bold = True
+    run.font.size = Pt(16)
+
+    subtitle = doc.add_paragraph()
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle.add_run(variant.get_exam_type_display()).font.size = Pt(12)
+
+    if include_answers:
+        label_p = doc.add_paragraph()
+        label_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = label_p.add_run("(с ответами — для учителя)")
+        r.font.color.rgb = RGBColor(0x7F, 0x8C, 0x8D)
+        r.font.size = Pt(10)
+
+    doc.add_paragraph()  # отступ
+
+    tasks = variant.tasks.order_by("id")
+    for task in tasks:
+        # Заголовок задания
+        heading = doc.add_paragraph()
+        h_run = heading.add_run(f"Задание {task.number}")
+        h_run.bold = True
+        h_run.font.size = Pt(12)
+
+        # Текст задания
+        text = _html_to_text(task.text)
+        if text:
+            p = doc.add_paragraph(text)
+            p.paragraph_format.left_indent = Cm(0.5)
+
+        # Картинка
+        if task.image:
+            try:
+                img_url = task.image.url
+                if img_url.startswith("http"):
+                    img_data = _req.get(img_url, timeout=10).content
+                else:
+                    img_data = task.image.read()
+                img_io = io.BytesIO(img_data)
+                doc.add_picture(img_io, width=Cm(14))
+            except Exception:
+                pass
+
+        # Ответ (только для учительского варианта)
+        if include_answers:
+            ans_p = doc.add_paragraph()
+            ans_p.paragraph_format.left_indent = Cm(0.5)
+            ans_run = ans_p.add_run(
+                "Ответ: " + (task.correct_answer or "(ручная проверка)")
+            )
+            ans_run.bold = True
+            ans_run.font.color.rgb = RGBColor(0x27, 0xAE, 0x60)
+        else:
+            # Строка для ответа ученика
+            ans_p = doc.add_paragraph("Ответ: _______________________")
+            ans_p.paragraph_format.left_indent = Cm(0.5)
+
+        doc.add_paragraph()  # отступ между заданиями
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@admin_required
+def variant_print_docx(request, variant_id, mode):
+    """Скачать docx: mode='teacher' (с ответами) или 'student' (без)."""
+    import io
+
+    variant = get_object_or_404(Variant, id=variant_id)
+    safe_name = variant.number.replace(" ", "_").replace("/", "-")
+    include_answers = (mode == "teacher")
+    suffix = "с_ответами" if include_answers else "задания"
+
+    buf = _build_variant_docx(variant, include_answers=include_answers)
+
+    response = HttpResponse(
+        buf,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="variant_{safe_name}_{suffix}.docx"'
+    )
+    return response
+
+
 # ===== ФИПИ ИМПОРТ =====
 
 _fipi_import_jobs = {}  # job_id -> {status, session_id, added, skipped, duplicate, errors}

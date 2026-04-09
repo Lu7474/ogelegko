@@ -44,6 +44,7 @@ urlpatterns = [
     path("admin/variants/<int:variant_id>/duplicate/", admin_views.variant_duplicate, name="admin_variant_duplicate"),
     path("admin/variants/<int:variant_id>/delete/", admin_views.variant_delete, name="admin_variant_delete"),
     path("admin/variants/<int:variant_id>/stats/", admin_views.variant_stats, name="admin_variant_stats"),
+    path("admin/variants/<int:variant_id>/print/<str:mode>/", admin_views.variant_print_docx, name="admin_variant_print"),
     path("admin/variants/import/", admin_views.variant_import, name="admin_variant_import"),
     path("admin/variants/import/<str:job_id>/status/", admin_views.variant_import_status, name="admin_variant_import_status"),
 
