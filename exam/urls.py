@@ -47,7 +47,21 @@ urlpatterns = [
     path("admin/variants/import/", admin_views.variant_import, name="admin_variant_import"),
     path("admin/variants/import/<str:job_id>/status/", admin_views.variant_import_status, name="admin_variant_import_status"),
 
+    # Админ — каталог
+    path("admin/catalog/", admin_views.catalog_list, name="admin_catalog"),
+    path("admin/catalog/add/", admin_views.catalog_add, name="admin_catalog_add"),
+    path("admin/catalog/import/", admin_views.catalog_import, name="admin_catalog_import"),
+    path("admin/catalog/import/<str:job_id>/status/", admin_views.catalog_import_status, name="admin_catalog_import_status"),
+    path("admin/catalog/unclassified/", admin_views.catalog_unclassified, name="admin_catalog_unclassified"),
+    path("admin/catalog/<int:task_id>/edit/", admin_views.catalog_edit, name="admin_catalog_edit"),
+    path("admin/catalog/<int:task_id>/delete/", admin_views.catalog_delete, name="admin_catalog_delete"),
+    path("admin/catalog/<int:task_id>/assign/", admin_views.catalog_assign_number, name="admin_catalog_assign"),
+
+    # Админ — создание варианта из каталога
+    path("admin/variants/from-catalog/", admin_views.variant_from_catalog, name="admin_variant_from_catalog"),
+
     # Админ — API
+    path("admin/api/catalog/", admin_views.api_catalog_tasks, name="admin_api_catalog"),
     path("admin/api/new-attempts/", admin_views.api_new_attempts, name="admin_api_new_attempts"),
 
     # Админ — попытки

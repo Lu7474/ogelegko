@@ -18,7 +18,7 @@ from datetime import timedelta
 
 from .models import (
     SchoolClass, Student, Variant, Task, Attempt, Answer,
-    ExamType, TaskSource, TaskTopic,
+    ExamType, TaskSource, TaskTopic, CatalogTask,
 )
 
 logger = logging.getLogger(__name__)
@@ -867,3 +867,350 @@ def export_results(request):
     response["Content-Disposition"] = 'attachment; filename="results.xlsx"'
     wb.save(response)
     return response
+
+
+# ===== КАТАЛОГ ЗАДАНИЙ =====
+
+_catalog_import_jobs = {}  # job_id -> {status, added, errors}
+
+
+def _run_catalog_import_job(job_id, url):
+    """Фоновый поток: парсит вариант и добавляет все задания в каталог."""
+    try:
+        from .parser import import_variant_to_catalog
+        added, errors = import_variant_to_catalog(url)
+        _catalog_import_jobs[job_id] = {
+            "status": "done",
+            "added": added,
+            "errors": errors,
+        }
+    except Exception as e:
+        logger.exception("Ошибка импорта в каталог")
+        _catalog_import_jobs[job_id] = {
+            "status": "error",
+            "added": 0,
+            "errors": [str(e)],
+        }
+    finally:
+        from django.db import connection
+        connection.close()
+
+
+@admin_required
+def catalog_list(request):
+    """Список заданий каталога с фильтрацией."""
+    exam_type_filter = request.GET.get("exam_type", "")
+    num_filter = request.GET.get("task_number", "")
+    source_filter = request.GET.get("source", "")
+    search = request.GET.get("q", "").strip()
+
+    tasks = CatalogTask.objects.exclude(task_number__isnull=True)
+
+    if exam_type_filter:
+        tasks = tasks.filter(exam_type=exam_type_filter)
+    if num_filter:
+        tasks = tasks.filter(task_number=_safe_int(num_filter))
+    if source_filter:
+        tasks = tasks.filter(source=source_filter)
+    if search:
+        tasks = tasks.filter(
+            Q(text__icontains=search) | Q(correct_answer__icontains=search)
+        )
+
+    tasks = tasks.order_by("task_number", "-created_at")
+
+    # Подсчёт по номерам (для левой панели)
+    from django.db.models import Count as _Count
+    number_counts = (
+        CatalogTask.objects
+        .filter(task_number__isnull=False)
+        .values("task_number", "exam_type")
+        .annotate(cnt=_Count("id"))
+        .order_by("task_number")
+    )
+
+    unclassified_count = CatalogTask.objects.filter(task_number__isnull=True).count()
+
+    page = _paginate(request, tasks, per_page=30)
+
+    return render(request, "admin/catalog_list.html", {
+        "page": page,
+        "exam_types": ExamType.choices,
+        "sources": TaskSource.choices,
+        "exam_type_filter": exam_type_filter,
+        "num_filter": num_filter,
+        "source_filter": source_filter,
+        "search": search,
+        "number_counts": list(number_counts),
+        "unclassified_count": unclassified_count,
+    })
+
+
+@admin_required
+def catalog_add(request):
+    """Добавить задание в каталог вручную."""
+    error = None
+    if request.method == "POST":
+        task_number_raw = request.POST.get("task_number", "").strip()
+        task_number = _safe_int(task_number_raw) if task_number_raw else None
+        exam_type = request.POST.get("exam_type", "")
+        text = request.POST.get("text", "").strip()
+        correct_answer = request.POST.get("correct_answer", "").strip()
+        source = request.POST.get("source", TaskSource.MANUAL)
+        topic = request.POST.get("topic", TaskTopic.OTHER)
+        points = _safe_int(request.POST.get("points", "1"), 1) or 1
+        manual_grading = request.POST.get("manual_grading") == "on"
+        image = request.FILES.get("image")
+
+        if exam_type not in dict(ExamType.choices):
+            error = "Выберите тип экзамена"
+        elif not text and not image:
+            error = "Введите текст задания или загрузите изображение"
+        elif not correct_answer and not manual_grading:
+            error = "Введите правильный ответ или отметьте 'Ручная проверка'"
+        else:
+            ct = CatalogTask(
+                task_number=task_number,
+                exam_type=exam_type,
+                text=text,
+                correct_answer=correct_answer,
+                source=source,
+                topic=topic,
+                points=points,
+                manual_grading=manual_grading,
+            )
+            if image:
+                ct.image = image
+            ct.save()
+            return redirect("admin_catalog")
+
+    return render(request, "admin/catalog_task_form.html", {
+        "exam_types": ExamType.choices,
+        "sources": TaskSource.choices,
+        "topics": TaskTopic.choices,
+        "error": error,
+        "task": None,
+    })
+
+
+@admin_required
+def catalog_edit(request, task_id):
+    """Редактировать задание каталога."""
+    ct = get_object_or_404(CatalogTask, id=task_id)
+    error = None
+    if request.method == "POST":
+        task_number_raw = request.POST.get("task_number", "").strip()
+        ct.task_number = _safe_int(task_number_raw) if task_number_raw else None
+        ct.exam_type = request.POST.get("exam_type", ct.exam_type)
+        ct.text = request.POST.get("text", "").strip()
+        ct.correct_answer = request.POST.get("correct_answer", "").strip()
+        ct.source = request.POST.get("source", ct.source)
+        ct.topic = request.POST.get("topic", ct.topic)
+        ct.points = _safe_int(request.POST.get("points", "1"), 1) or 1
+        ct.manual_grading = request.POST.get("manual_grading") == "on"
+        if request.FILES.get("image"):
+            ct.image = request.FILES["image"]
+
+        if ct.exam_type not in dict(ExamType.choices):
+            error = "Выберите тип экзамена"
+        else:
+            ct.save()
+            return redirect("admin_catalog")
+
+    return render(request, "admin/catalog_task_form.html", {
+        "exam_types": ExamType.choices,
+        "sources": TaskSource.choices,
+        "topics": TaskTopic.choices,
+        "error": error,
+        "task": ct,
+    })
+
+
+@admin_required
+@require_POST
+def catalog_delete(request, task_id):
+    ct = get_object_or_404(CatalogTask, id=task_id)
+    ct.delete()
+    return redirect("admin_catalog")
+
+
+@admin_required
+def catalog_import(request):
+    """Импорт заданий из СдамГИА (URL варианта или отдельного задания)."""
+    errors = []
+    if request.method == "POST":
+        url = request.POST.get("url", "").strip()
+        import_type = request.POST.get("import_type", "variant")
+        task_number_raw = request.POST.get("task_number", "").strip()
+
+        if not url:
+            errors.append("Введите URL")
+        elif "sdamgia.ru" not in url:
+            errors.append("Поддерживается только sdamgia.ru (Решу ОГЭ / Решу ЕГЭ)")
+
+        if not errors:
+            if import_type == "problem":
+                # Одно задание — синхронно
+                task_number = _safe_int(task_number_raw) if task_number_raw else None
+                from .parser import import_task_to_catalog
+                ct, parse_errors = import_task_to_catalog(url, task_number=task_number)
+                if parse_errors:
+                    errors.extend(parse_errors)
+                else:
+                    return redirect("admin_catalog")
+            else:
+                # Целый вариант — фоново
+                job_id = str(uuid.uuid4())
+                _catalog_import_jobs[job_id] = {"status": "running", "added": 0, "errors": []}
+                threading.Thread(
+                    target=_run_catalog_import_job, args=(job_id, url), daemon=True
+                ).start()
+                return redirect("admin_catalog_import_status", job_id=job_id)
+
+    return render(request, "admin/catalog_import.html", {"errors": errors})
+
+
+@admin_required
+def catalog_import_status(request, job_id):
+    job = _catalog_import_jobs.get(job_id, {
+        "status": "unknown", "added": 0, "errors": ["Задание не найдено"]
+    })
+    if request.GET.get("json"):
+        return JsonResponse(job)
+    return render(request, "admin/catalog_import_status.html", {
+        "job_id": job_id,
+        "job": job,
+    })
+
+
+@admin_required
+def catalog_unclassified(request):
+    """Задания без номера — учитель назначает номер."""
+    exam_type_filter = request.GET.get("exam_type", "")
+    tasks = CatalogTask.objects.filter(task_number__isnull=True)
+    if exam_type_filter:
+        tasks = tasks.filter(exam_type=exam_type_filter)
+    tasks = tasks.order_by("-created_at")
+    page = _paginate(request, tasks, per_page=20)
+    return render(request, "admin/catalog_unclassified.html", {
+        "page": page,
+        "exam_types": ExamType.choices,
+        "exam_type_filter": exam_type_filter,
+        "task_numbers": list(range(1, 26)),
+    })
+
+
+@admin_required
+@require_POST
+def catalog_assign_number(request, task_id):
+    """AJAX/form: назначить номер задания неопределённому заданию."""
+    ct = get_object_or_404(CatalogTask, id=task_id)
+    task_number_raw = request.POST.get("task_number", "").strip()
+    ct.task_number = _safe_int(task_number_raw) if task_number_raw else None
+    ct.save(update_fields=["task_number"])
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "task_number": ct.task_number})
+    return redirect("admin_catalog_unclassified")
+
+
+@admin_required
+def api_catalog_tasks(request):
+    """JSON API для модального окна: задания каталога по типу, номеру, поиску."""
+    exam_type = request.GET.get("exam_type", "")
+    task_number = request.GET.get("task_number", "")
+    search = request.GET.get("q", "").strip()
+    source = request.GET.get("source", "")
+
+    tasks = CatalogTask.objects.filter(task_number__isnull=False)
+    if exam_type:
+        tasks = tasks.filter(exam_type=exam_type)
+    if task_number:
+        tasks = tasks.filter(task_number=_safe_int(task_number))
+    if source:
+        tasks = tasks.filter(source=source)
+    if search:
+        tasks = tasks.filter(
+            Q(text__icontains=search) | Q(correct_answer__icontains=search)
+        )
+
+    tasks = tasks.order_by("-created_at")[:50]
+
+    result = []
+    for ct in tasks:
+        result.append({
+            "id": ct.id,
+            "task_number": ct.task_number,
+            "text_preview": ct.text_preview,
+            "correct_answer": ct.correct_answer,
+            "source": ct.get_source_display(),
+            "source_key": ct.source,
+            "manual_grading": ct.manual_grading,
+            "has_image": bool(ct.image),
+            "image_url": ct.image.url if ct.image else None,
+            "topic": ct.get_topic_display(),
+            "points": ct.points,
+        })
+
+    return JsonResponse({"tasks": result})
+
+
+@admin_required
+@require_POST
+def variant_from_catalog(request):
+    """Создать вариант из выбранных заданий каталога."""
+    variant_number = request.POST.get("variant_number", "").strip()
+    exam_type = request.POST.get("exam_type", "").strip()
+    selected_json = request.POST.get("selected_tasks", "{}")
+
+    try:
+        selected = json.loads(selected_json)  # {"1": catalog_id, "5": catalog_id, ...}
+    except (json.JSONDecodeError, ValueError):
+        selected = {}
+
+    errors = []
+    if not variant_number:
+        errors.append("Введите номер/название варианта")
+    if exam_type not in dict(ExamType.choices):
+        errors.append("Укажите тип экзамена")
+    if not selected:
+        errors.append("Не выбрано ни одного задания")
+    if Variant.objects.filter(number=variant_number).exists():
+        errors.append(f"Вариант '{variant_number}' уже существует")
+
+    if errors:
+        return JsonResponse({"ok": False, "errors": errors}, status=400)
+
+    try:
+        with __import__('django.db', fromlist=['transaction']).transaction.atomic():
+            variant = Variant.objects.create(number=variant_number, exam_type=exam_type)
+            for task_num_str, catalog_id in sorted(selected.items(), key=lambda x: int(x[0])):
+                ct = CatalogTask.objects.filter(id=catalog_id).first()
+                if not ct:
+                    continue
+                from django.core.files.base import ContentFile as _CF
+                task = Task(
+                    variant=variant,
+                    number=task_num_str,
+                    text=ct.text,
+                    correct_answer=ct.correct_answer,
+                    source=ct.source,
+                    topic=ct.topic,
+                    points=ct.points,
+                    manual_grading=ct.manual_grading,
+                )
+                if ct.image:
+                    try:
+                        ct.image.open()
+                        task.image.save(
+                            ct.image.name.split("/")[-1],
+                            _CF(ct.image.read()),
+                            save=False,
+                        )
+                    except Exception:
+                        pass
+                task.save()
+    except IntegrityError as e:
+        return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
+
+    from django.urls import reverse
+    return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})

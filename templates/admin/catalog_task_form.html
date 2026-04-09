@@ -1,0 +1,83 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{% if task %}Редактировать{% else %}Добавить{% endif %} задание в каталог{% endblock %}
+
+{% block content %}
+<h1>{% if task %}Редактировать задание каталога{% else %}Добавить задание в каталог{% endif %}</h1>
+
+<form method="post" enctype="multipart/form-data" class="form-card">
+    {% csrf_token %}
+    {% if error %}<div class="error-message">{{ error }}</div>{% endif %}
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="exam_type">Тип экзамена *</label>
+            <select id="exam_type" name="exam_type" required>
+                <option value="">Выберите...</option>
+                {% for value, label in exam_types %}
+                <option value="{{ value }}" {% if task.exam_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="task_number">Номер задания</label>
+            <input type="number" id="task_number" name="task_number"
+                   value="{{ task.task_number|default:'' }}" min="1" max="25"
+                   placeholder="1–25 (пусто = не определено)" style="width:180px;">
+        </div>
+        <div class="form-group">
+            <label for="source">Источник</label>
+            <select id="source" name="source">
+                {% for value, label in sources %}
+                <option value="{{ value }}" {% if task.source == value or not task and value == 'manual' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="text">Текст задания</label>
+        <textarea id="text" name="text" rows="5" placeholder="HTML или обычный текст...">{{ task.text|default:'' }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="image">Изображение</label>
+        <input type="file" id="image" name="image" accept="image/*">
+        {% if task.image %}
+        <small style="color:var(--text-muted);">Текущее: <a href="{{ task.image.url }}" target="_blank">{{ task.image.name }}</a></small>
+        {% endif %}
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="correct_answer">Правильный ответ</label>
+            <input type="text" id="correct_answer" name="correct_answer"
+                   value="{{ task.correct_answer|default:'' }}"
+                   placeholder="Оставьте пустым при ручной проверке">
+        </div>
+        <div class="form-group">
+            <label for="topic">Тема</label>
+            <select id="topic" name="topic">
+                {% for value, label in topics %}
+                <option value="{{ value }}" {% if task.topic == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="points">Баллы</label>
+            <input type="number" id="points" name="points" value="{{ task.points|default:1 }}" min="1" style="width:80px;">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="manual_grading" {% if task.manual_grading %}checked{% endif %}>
+            Ручная проверка (часть 2 / развёрнутый ответ)
+        </label>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:8px;">
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">Отмена</a>
+    </div>
+</form>
+{% endblock %}

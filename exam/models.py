@@ -203,6 +203,46 @@ class Attempt(models.Model):
         return round(self.correct_count / self.total_count * 100)
 
 
+class CatalogTask(models.Model):
+    """Задание в каталоге — независимо от конкретного варианта."""
+    task_number = models.IntegerField(
+        "Номер задания", null=True, blank=True,
+        help_text="1–25, пусто = не определено"
+    )
+    exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
+    text = models.TextField("Текст задания", blank=True)
+    image = models.ImageField("Изображение", upload_to="catalog/", blank=True, null=True)
+    correct_answer = models.CharField("Правильный ответ", max_length=255, blank=True)
+    source = models.CharField(
+        "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL
+    )
+    topic = models.CharField(
+        "Тема", max_length=30, choices=TaskTopic.choices,
+        default=TaskTopic.OTHER, blank=True,
+    )
+    points = models.PositiveIntegerField("Баллы", default=1)
+    manual_grading = models.BooleanField("Ручная проверка", default=False)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+    sdamgia_id = models.CharField(
+        "ID СдамГИА", max_length=20, blank=True, null=True, unique=True
+    )
+
+    class Meta:
+        verbose_name = "Задание каталога"
+        verbose_name_plural = "Задания каталога"
+        ordering = ["task_number", "-created_at"]
+
+    def __str__(self):
+        num = f"№{self.task_number}" if self.task_number else "Без номера"
+        return f"[Каталог] {num} ({self.get_exam_type_display()})"
+
+    @property
+    def text_preview(self):
+        import re as _re
+        plain = _re.sub(r"<[^>]+>", " ", self.text or "").strip()
+        return plain[:120] + "…" if len(plain) > 120 else plain
+
+
 class Answer(models.Model):
     attempt = models.ForeignKey(
         Attempt, on_delete=models.CASCADE, verbose_name="Попытка", related_name="answers"

@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from .models import Variant, Task, ExamType, TaskSource
+from .models import Variant, Task, ExamType, TaskSource, CatalogTask
 
 logger = logging.getLogger(__name__)
 
@@ -451,6 +451,109 @@ def _is_formula_answer(answer: str) -> bool:
     """Ответ — alt-текст формулы-картинки, ученик не сможет его ввести."""
     a = answer.lower()
     return any(kw in a for kw in _FORMULA_KEYWORDS)
+
+
+def import_task_to_catalog(url, task_number=None):
+    """Импортирует одно задание по URL /problem?id=XXX в каталог."""
+    m = re.search(r"id=(\d+)", url)
+    if not m:
+        return None, ["Не удалось определить ID задания из URL"]
+    problem_id = m.group(1)
+
+    if CatalogTask.objects.filter(sdamgia_id=problem_id).exists():
+        return None, [f"Задание с ID {problem_id} уже есть в каталоге"]
+
+    parser = SdamgiaParser()
+    base_url = parser._base_url(url)
+    if not base_url:
+        return None, ["Не удалось определить базовый URL"]
+    exam_type = parser._detect_exam_type(url)
+
+    try:
+        task_data = parser._parse_problem(problem_id, base_url, task_number=str(task_number or ""))
+    except ParserError as e:
+        return None, [str(e)]
+
+    correct_answer = task_data["correct_answer"]
+    manual = (
+        not correct_answer
+        or correct_answer.startswith("Критерии")
+        or _is_formula_answer(correct_answer)
+    )
+    if not manual and exam_type == ExamType.EGE_PROFILE and task_number:
+        try:
+            if int(str(task_number).split(".")[0]) >= 13:
+                manual = True
+        except (ValueError, TypeError):
+            pass
+
+    try:
+        ct = CatalogTask(
+            task_number=task_number,
+            exam_type=exam_type,
+            text=task_data["text"],
+            correct_answer=correct_answer,
+            source=TaskSource.PRINT_SOLVE,
+            manual_grading=manual,
+            sdamgia_id=problem_id,
+        )
+        ct.save()
+    except Exception as e:
+        return None, [f"Ошибка сохранения: {e}"]
+
+    return ct, []
+
+
+def import_variant_to_catalog(url):
+    """Парсит вариант и добавляет все задания в каталог (не создаёт вариант)."""
+    parser = SdamgiaParser()
+    try:
+        data = parser.parse_variant(url)
+    except ParserError as e:
+        return 0, [str(e)]
+
+    exam_type = data["exam_type"]
+    added = 0
+    errors = []
+
+    with transaction.atomic():
+        for td in data["tasks"]:
+            problem_id = td.get("source_id")
+            if problem_id and CatalogTask.objects.filter(sdamgia_id=problem_id).exists():
+                errors.append(f"Задание №{td['number']} (ID {problem_id}) уже в каталоге — пропущено")
+                continue
+
+            correct_answer = td["correct_answer"]
+            manual = (
+                not correct_answer
+                or correct_answer.startswith("Критерии")
+                or _is_formula_answer(correct_answer)
+            )
+            if not manual and exam_type == ExamType.EGE_PROFILE:
+                try:
+                    if int(str(td["number"]).split(".")[0]) >= 13:
+                        manual = True
+                except (ValueError, TypeError):
+                    pass
+
+            try:
+                task_num_int = int(str(td["number"]).split(".")[0])
+            except (ValueError, TypeError):
+                task_num_int = None
+
+            ct = CatalogTask(
+                task_number=task_num_int,
+                exam_type=exam_type,
+                text=td["text"],
+                correct_answer=correct_answer,
+                source=TaskSource.PRINT_SOLVE,
+                manual_grading=manual,
+                sdamgia_id=problem_id if problem_id else None,
+            )
+            ct.save()
+            added += 1
+
+    return added, errors
 
 
 def import_variant_from_sdamgia(url, variant_number=None):

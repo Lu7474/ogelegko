@@ -8,7 +8,8 @@
       "Bash(cd:*)",
       "WebFetch(domain:oge.fipi.ru)",
       "Bash(iconv:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(\"C:/Users/Махач/OneDrive/Рабочий стол/EGE/env/Scripts/python.exe\" - << 'PYEOF'\nimport paramiko\nimport os\n\nclient = paramiko.SSHClient\\(\\)\nclient.set_missing_host_key_policy\\(paramiko.AutoAddPolicy\\(\\)\\)\nclient.connect\\('maxac1yx.beget.tech', username='maxac1yx', password='4RSqaCQ5mw4L', timeout=15\\)\n\ndef run\\(cmd, show=True\\):\n    _, stdout, stderr = client.exec_command\\(cmd\\)\n    out = stdout.read\\(\\).decode\\(\\)\n    err = stderr.read\\(\\).decode\\(\\)\n    if show:\n        if out: print\\(out.rstrip\\(\\)\\)\n        if err: print\\('ERR:', err.rstrip\\(\\)\\)\n    return out, err\n\n# Создаём структуру директорий на сервере\nrun\\('mkdir -p $HOME/egeoge/public_html'\\)\nrun\\('mkdir -p $HOME/egeoge/logs'\\)\nrun\\('mkdir -p $HOME/egeoge/media'\\)\n\nprint\\(\"Создана структура директорий\"\\)\n\n# Проверим что есть\nrun\\('ls -la $HOME/egeoge/'\\)\n\nclient.close\\(\\)\nPYEOF)"
     ]
   }
 }

@@ -87,6 +87,92 @@
         <a href="{% url 'admin_variants' %}" class="btn btn-secondary">Отмена</a>
     </div>
 </form>
+
+{% if not variant %}
+<!-- Кнопка открытия каталога -->
+<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+    <p style="color:var(--text-muted);font-size:0.875rem;margin-bottom:12px;">
+        Или создайте вариант из каталога готовых заданий:
+    </p>
+    <button type="button" class="btn btn-secondary" id="openCatalogBtn" style="font-size:1rem;">
+        📚 Создать из каталога
+    </button>
+</div>
+
+<!-- Модальное окно каталога -->
+<div id="catalogModal" class="catalog-modal-overlay" style="display:none;">
+    <div class="catalog-modal">
+        <div class="catalog-modal-head">
+            <h2 style="margin:0;font-size:1.1rem;">Создать вариант из каталога</h2>
+            <button type="button" id="closeCatalogBtn" class="catalog-close-btn">✕</button>
+        </div>
+
+        <!-- Настройки варианта -->
+        <div class="catalog-settings">
+            <div class="form-row" style="margin:0;gap:12px;">
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.8rem;">Тип экзамена *</label>
+                    <select id="catalogExamType">
+                        <option value="">Выберите...</option>
+                        {% for value, label in exam_types %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0;flex:1;">
+                    <label style="font-size:0.8rem;">Название/номер варианта *</label>
+                    <input type="text" id="catalogVariantName" placeholder="Например: 092 или Контрольная №3">
+                </div>
+            </div>
+        </div>
+
+        <div class="catalog-modal-body">
+            <!-- Левая панель: числа заданий -->
+            <div class="catalog-left">
+                <div class="catalog-search-wrap">
+                    <div class="form-group" style="margin:0;">
+                        <input type="text" id="catalogSearch" placeholder="🔍 Поиск..." style="width:100%;">
+                    </div>
+                    <div class="form-group" style="margin:4px 0 0;">
+                        <select id="catalogSourceFilter" style="width:100%;font-size:0.8rem;">
+                            <option value="">Все источники</option>
+                            {% for value, label in sources %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div id="catalogNumList" class="catalog-num-list">
+                    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+                        Выберите тип экзамена
+                    </div>
+                </div>
+            </div>
+
+            <!-- Правая панель: задания -->
+            <div class="catalog-right">
+                <div id="catalogTasksWrap">
+                    <div class="catalog-placeholder">
+                        <div style="font-size:2rem;margin-bottom:8px;">←</div>
+                        Выберите номер задания слева
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Нижняя панель -->
+        <div class="catalog-modal-foot">
+            <div class="catalog-progress" id="catalogProgress">
+                Выбрано: <strong id="catalogSelectedCount">0</strong> заданий
+            </div>
+            <div id="catalogCreateError" class="error-message" style="display:none;margin:0;padding:8px 14px;"></div>
+            <button type="button" class="btn btn-primary" id="catalogCreateBtn">
+                Создать вариант
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -149,4 +235,232 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
     }
 });
 </script>
+
+{% if not variant %}
+<script>
+(function() {
+    // === Состояние ===
+    var selected = {};        // { "1": catalog_task_id, ... }
+    var currentNumber = null;
+    var currentTasks = [];
+    var searchTimer = null;
+
+    var modal = document.getElementById('catalogModal');
+    var examTypeEl = document.getElementById('catalogExamType');
+    var variantNameEl = document.getElementById('catalogVariantName');
+    var searchEl = document.getElementById('catalogSearch');
+    var sourceFilterEl = document.getElementById('catalogSourceFilter');
+    var numListEl = document.getElementById('catalogNumList');
+    var tasksWrapEl = document.getElementById('catalogTasksWrap');
+    var countEl = document.getElementById('catalogSelectedCount');
+    var errorEl = document.getElementById('catalogCreateError');
+
+    // Открыть/закрыть модал
+    document.getElementById('openCatalogBtn').addEventListener('click', function() {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    });
+    document.getElementById('closeCatalogBtn').addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+    });
+    function closeModal() {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    // При смене типа экзамена — перезагрузить список номеров
+    examTypeEl.addEventListener('change', function() {
+        selected = {};
+        currentNumber = null;
+        updateCount();
+        loadNumberList();
+        tasksWrapEl.innerHTML = '<div class="catalog-placeholder"><div style="font-size:2rem;margin-bottom:8px;">←</div>Выберите номер задания слева</div>';
+    });
+
+    // Поиск с дебаунсом
+    searchEl.addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function() {
+            if (currentNumber) loadTasks(currentNumber);
+        }, 350);
+    });
+    sourceFilterEl.addEventListener('change', function() {
+        if (currentNumber) loadTasks(currentNumber);
+    });
+
+    // Загрузить список доступных номеров из каталога
+    function loadNumberList() {
+        var examType = examTypeEl.value;
+        if (!examType) {
+            numListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Выберите тип экзамена</div>';
+            return;
+        }
+        fetch('{% url "admin_api_catalog" %}?exam_type=' + encodeURIComponent(examType) + '&_all=1')
+            .then(r => r.json())
+            .then(function(data) {
+                // Считаем количество по номерам
+                var counts = {};
+                data.tasks.forEach(function(t) {
+                    counts[t.task_number] = (counts[t.task_number] || 0) + 1;
+                });
+                var nums = Object.keys(counts).map(Number).sort((a,b) => a-b);
+                if (!nums.length) {
+                    numListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Заданий нет</div>';
+                    return;
+                }
+                numListEl.innerHTML = nums.map(function(n) {
+                    var isSelected = selected[n] !== undefined;
+                    return '<button class="catalog-num-btn ' + (isSelected ? 'has-task' : '') + ' ' + (n == currentNumber ? 'active' : '') + '" data-num="' + n + '">'
+                        + 'Задание ' + n
+                        + '<span class="catalog-num-count">' + counts[n] + '</span>'
+                        + (isSelected ? '<span class="catalog-check">✓</span>' : '')
+                        + '</button>';
+                }).join('');
+                numListEl.querySelectorAll('.catalog-num-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        currentNumber = parseInt(this.dataset.num);
+                        numListEl.querySelectorAll('.catalog-num-btn').forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        loadTasks(currentNumber);
+                    });
+                });
+            });
+    }
+
+    // Загрузить задания для выбранного номера
+    function loadTasks(num) {
+        var examType = examTypeEl.value;
+        var search = searchEl.value;
+        var source = sourceFilterEl.value;
+        tasksWrapEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Загрузка...</div>';
+        var params = new URLSearchParams({exam_type: examType, task_number: num, q: search, source: source});
+        fetch('{% url "admin_api_catalog" %}?' + params)
+            .then(r => r.json())
+            .then(function(data) {
+                currentTasks = data.tasks;
+                renderTasks();
+            });
+    }
+
+    function renderTasks() {
+        if (!currentTasks.length) {
+            tasksWrapEl.innerHTML = '<div class="catalog-placeholder">По запросу заданий не найдено</div>';
+            return;
+        }
+        tasksWrapEl.innerHTML = currentTasks.map(function(t) {
+            var isAdded = selected[t.task_number] === t.id;
+            var isOtherAdded = selected[t.task_number] !== undefined && !isAdded;
+            return '<div class="catalog-task-item ' + (isAdded ? 'is-added' : '') + '" data-id="' + t.id + '" data-num="' + t.task_number + '">'
+                + '<div class="catalog-task-item-body">'
+                + (t.has_image ? '<img src="' + (t.image_url || '') + '" class="catalog-task-thumb" alt="">' : '')
+                + '<div class="catalog-task-item-text">'
+                + '<div style="font-size:0.875rem;">' + (t.text_preview || '<em style="color:var(--text-muted)">Нет текста</em>') + '</div>'
+                + '<div class="catalog-task-item-meta">'
+                + '<span class="source-badge source-' + t.source_key + '">' + t.source + '</span>'
+                + (t.manual_grading
+                    ? '<span class="badge-manual">Ручная проверка</span>'
+                    : '<span style="color:var(--text-muted);font-size:0.78rem;">Ответ: <strong>' + t.correct_answer + '</strong></span>')
+                + '</div>'
+                + '</div>'
+                + '</div>'
+                + '<button class="btn btn-sm ' + (isAdded ? 'btn-success' : isOtherAdded ? 'btn-secondary' : 'btn-primary') + ' catalog-add-btn"'
+                + ' data-id="' + t.id + '" data-num="' + t.task_number + '">'
+                + (isAdded ? '✓ Добавлено' : isOtherAdded ? '⟳ Заменить' : 'Добавить')
+                + '</button>'
+                + '</div>';
+        }).join('');
+
+        tasksWrapEl.querySelectorAll('.catalog-add-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var id = parseInt(this.dataset.id);
+                var num = parseInt(this.dataset.num);
+                addTask(id, num);
+            });
+        });
+    }
+
+    function addTask(id, num) {
+        if (selected[num] === id) {
+            // Снять выбор
+            delete selected[num];
+        } else {
+            selected[num] = id;
+        }
+        updateCount();
+        renderTasks();
+        refreshNumList();
+    }
+
+    function refreshNumList() {
+        numListEl.querySelectorAll('.catalog-num-btn').forEach(function(btn) {
+            var n = parseInt(btn.dataset.num);
+            var isSelected = selected[n] !== undefined;
+            btn.classList.toggle('has-task', isSelected);
+            var check = btn.querySelector('.catalog-check');
+            if (isSelected && !check) {
+                btn.insertAdjacentHTML('beforeend', '<span class="catalog-check">✓</span>');
+            } else if (!isSelected && check) {
+                check.remove();
+            }
+        });
+    }
+
+    function updateCount() {
+        var count = Object.keys(selected).length;
+        countEl.textContent = count;
+    }
+
+    // Создать вариант
+    document.getElementById('catalogCreateBtn').addEventListener('click', function() {
+        errorEl.style.display = 'none';
+        var name = variantNameEl.value.trim();
+        var examType = examTypeEl.value;
+        var errors = [];
+        if (!name) errors.push('Введите название варианта');
+        if (!examType) errors.push('Выберите тип экзамена');
+        if (!Object.keys(selected).length) errors.push('Не выбрано ни одного задания');
+        if (errors.length) {
+            errorEl.textContent = errors.join('. ');
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Создание...';
+
+        fetch('{% url "admin_variant_from_catalog" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                variant_number: name,
+                exam_type: examType,
+                selected_tasks: JSON.stringify(selected),
+            }),
+        })
+        .then(r => r.json())
+        .then(function(data) {
+            if (data.ok) {
+                window.location.href = data.redirect;
+            } else {
+                errorEl.textContent = (data.errors || ['Ошибка']).join('. ');
+                errorEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Создать вариант';
+            }
+        })
+        .catch(function() {
+            errorEl.textContent = 'Ошибка сети. Попробуйте снова.';
+            errorEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Создать вариант';
+        });
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

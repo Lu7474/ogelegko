@@ -1,0 +1,101 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Неопределённые задания — Каталог{% endblock %}
+
+{% block content %}
+<div class="actions-bar" style="margin-bottom:20px;">
+    <h1 style="margin:0;">Неопределённые задания</h1>
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">← К каталогу</a>
+</div>
+<p style="color:var(--text-muted);margin-bottom:20px;">
+    Эти задания импортированы, но номер задания не определён. Нажмите на нужный номер рядом с заданием, чтобы его назначить.
+</p>
+
+<!-- Фильтр по типу экзамена -->
+<form method="get" style="margin-bottom:16px;display:flex;gap:10px;align-items:center;">
+    <select name="exam_type" onchange="this.form.submit()" style="width:auto;">
+        <option value="">Все типы</option>
+        {% for value, label in exam_types %}
+        <option value="{{ value }}" {% if exam_type_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+</form>
+
+{% if page.object_list %}
+<div style="display:flex;flex-direction:column;gap:16px;">
+    {% for task in page %}
+    <div class="card catalog-task-card" id="task-{{ task.id }}">
+        <div class="catalog-task-header">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span class="source-badge source-{{ task.source }}">{{ task.get_source_display }}</span>
+                <span style="color:var(--text-muted);font-size:0.78rem;">{{ task.get_exam_type_display }}</span>
+                {% if task.manual_grading %}<span class="badge-manual">Ручная проверка</span>{% endif %}
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <a href="{% url 'admin_catalog_edit' task.id %}" class="btn btn-sm btn-secondary">Изм.</a>
+                <form method="post" action="{% url 'admin_catalog_delete' task.id %}" style="display:inline;" onsubmit="return confirm('Удалить?')">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-danger">Удал.</button>
+                </form>
+            </div>
+        </div>
+
+        {% if task.image %}
+        <img src="{{ task.image.url }}" alt="" class="catalog-task-img">
+        {% endif %}
+        {% if task.text %}
+        <div class="catalog-task-text">{{ task.text_preview }}</div>
+        {% endif %}
+        {% if task.correct_answer %}
+        <div class="catalog-task-answer"><strong>Ответ:</strong> {{ task.correct_answer }}</div>
+        {% endif %}
+
+        <!-- Панель назначения номера -->
+        <div class="assign-panel">
+            <span style="font-size:0.8rem;color:var(--text-muted);margin-right:6px;">Назначить номер:</span>
+            {% for num in task_numbers %}
+            <button class="assign-btn" data-task-id="{{ task.id }}" data-num="{{ num }}" title="Задание {{ num }}">{{ num }}</button>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% include "includes/pagination.html" with page_obj=page %}
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">✅</div>
+    <div class="empty-title">Неопределённых заданий нет</div>
+    <div class="empty-desc">Все задания каталога имеют назначенный номер</div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.assign-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var taskId = this.dataset.taskId;
+        var num = this.dataset.num;
+        var card = document.getElementById('task-' + taskId);
+
+        fetch('/admin/catalog/' + taskId + '/assign/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'task_number=' + encodeURIComponent(num),
+        })
+        .then(r => r.json())
+        .then(function(data) {
+            if (data.ok) {
+                card.style.transition = 'opacity .3s';
+                card.style.opacity = '0';
+                setTimeout(function() { card.remove(); }, 300);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Каталог заданий{% endblock %}
+
+{% block content %}
+<div class="actions-bar" style="margin-bottom:20px;">
+    <h1 style="margin:0;">Каталог заданий</h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="{% url 'admin_catalog_add' %}" class="btn btn-primary">+ Добавить вручную</a>
+        <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary">⬇ Импорт с СдамГИА</a>
+        <a href="{% url 'admin_catalog_unclassified' %}" class="btn btn-secondary">
+            Неопределённые{% if unclassified_count %} <span class="notif-badge" style="position:static;display:inline-flex;margin-left:4px;">{{ unclassified_count }}</span>{% endif %}
+        </a>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<form method="get" class="filter-form" style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="form-group" style="margin:0;min-width:140px;">
+        <label style="font-size:0.8rem;">Тип экзамена</label>
+        <select name="exam_type" onchange="this.form.submit()">
+            <option value="">Все типы</option>
+            {% for value, label in exam_types %}
+            <option value="{{ value }}" {% if exam_type_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group" style="margin:0;min-width:100px;">
+        <label style="font-size:0.8rem;">Номер задания</label>
+        <input type="number" name="task_number" value="{{ num_filter }}" placeholder="1–25" min="1" max="25" style="width:80px;">
+    </div>
+    <div class="form-group" style="margin:0;min-width:140px;">
+        <label style="font-size:0.8rem;">Источник</label>
+        <select name="source" onchange="this.form.submit()">
+            <option value="">Все источники</option>
+            {% for value, label in sources %}
+            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group" style="margin:0;flex:1;min-width:180px;">
+        <label style="font-size:0.8rem;">Поиск по тексту</label>
+        <input type="text" name="q" value="{{ search }}" placeholder="Ключевое слово...">
+    </div>
+    <button type="submit" class="btn btn-primary" style="height:38px;">Найти</button>
+    {% if exam_type_filter or num_filter or source_filter or search %}
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary" style="height:38px;">✕ Сбросить</a>
+    {% endif %}
+</form>
+
+<!-- Левая панель с номерами и таблица -->
+<div style="display:flex;gap:20px;align-items:flex-start;">
+    <!-- Боковая навигация по номерам -->
+    <div class="card" style="min-width:160px;padding:12px 0;flex-shrink:0;">
+        <div style="padding:0 14px 8px;font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">По номеру</div>
+        {% regroup number_counts by task_number as by_number %}
+        {% for group in by_number %}
+        <a href="?task_number={{ group.grouper }}{% if exam_type_filter %}&exam_type={{ exam_type_filter }}{% endif %}"
+           class="catalog-num-link {% if num_filter == group.grouper|stringformat:'s' %}active{% endif %}">
+            Задание {{ group.grouper }}
+            <span class="catalog-num-count">{% for item in group.list %}{% if forloop.first %}{{ item.cnt }}{% endif %}{% endfor %}</span>
+        </a>
+        {% empty %}
+        <div style="padding:0 14px;color:var(--text-muted);font-size:0.85rem;">Нет заданий</div>
+        {% endfor %}
+    </div>
+
+    <!-- Таблица заданий -->
+    <div style="flex:1;min-width:0;">
+        {% if page.object_list %}
+        <div style="margin-bottom:10px;color:var(--text-muted);font-size:0.85rem;">
+            Найдено: {{ page.paginator.count }}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            {% for task in page %}
+            <div class="card catalog-task-card">
+                <div class="catalog-task-header">
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <span class="badge-num">Задание {{ task.task_number }}</span>
+                        <span class="source-badge source-{{ task.source }}">{{ task.get_source_display }}</span>
+                        {% if task.manual_grading %}<span class="badge-manual">Ручная проверка</span>{% endif %}
+                        <span style="color:var(--text-muted);font-size:0.78rem;">{{ task.get_exam_type_display }}</span>
+                    </div>
+                    <div class="row-actions" style="opacity:1;">
+                        <a href="{% url 'admin_catalog_edit' task.id %}" class="btn btn-sm btn-secondary">Изм.</a>
+                        <form method="post" action="{% url 'admin_catalog_delete' task.id %}" style="display:inline;" onsubmit="return confirm('Удалить задание?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger">Удал.</button>
+                        </form>
+                    </div>
+                </div>
+                {% if task.image %}
+                <img src="{{ task.image.url }}" alt="Изображение задания" class="catalog-task-img">
+                {% endif %}
+                {% if task.text %}
+                <div class="catalog-task-text">{{ task.text_preview }}</div>
+                {% endif %}
+                <div class="catalog-task-answer">
+                    <strong>Ответ:</strong>
+                    {% if task.manual_grading %}
+                    <em style="color:var(--text-muted);">проверяется вручную</em>
+                    {% else %}
+                    {{ task.correct_answer }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% include "includes/pagination.html" with page_obj=page %}
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <div class="empty-title">Заданий не найдено</div>
+            <div class="empty-desc">
+                {% if search or num_filter or source_filter %}
+                Попробуйте изменить фильтры
+                {% else %}
+                Добавьте задания вручную или импортируйте с СдамГИА
+                {% endif %}
+            </div>
+            <a href="{% url 'admin_catalog_add' %}" class="btn btn-primary" style="margin-top:16px;">+ Добавить задание</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
