@@ -1,8 +1,10 @@
 import os
 import dj_database_url
 from pathlib import Path
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 _secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
 if not _secret_key or "insecure" in _secret_key:

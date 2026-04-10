@@ -51,3 +51,4 @@
 2026-04-06 20:08:13,252 INFO exam.parser   20/21 (ID 99569) — ответ: 11
 2026-04-06 20:08:15,383 INFO exam.parser   21/21 (ID 510016) — ответ: 25
 2026-04-06 20:10:54,307 WARNING django.security.csrf Forbidden (CSRF token from POST incorrect.): /choose/
+2026-04-10 19:06:45,628 INFO django.utils.autoreload Watching for file changes with StatReloader

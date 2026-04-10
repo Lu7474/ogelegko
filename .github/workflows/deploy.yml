@@ -1,0 +1,47 @@
+name: Deploy to Timeweb
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASS }}
+          source: "."
+          target: /var/www/ege
+          rm: false
+          exclude: |
+            .git
+            __pycache__
+            *.pyc
+            env
+            venv
+            media
+            .env
+            staticfiles
+            db.sqlite3
+
+      - name: Run deploy commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASS }}
+          script: |
+            cd /var/www/ege
+            venv/bin/pip install -r requirements.txt -q
+            venv/bin/python manage.py migrate --noinput
+            venv/bin/python manage.py collectstatic --noinput
+            venv/bin/python manage.py create_admin
+            systemctl restart ege
+            echo "=== Deploy OK ==="
