@@ -1,6 +1,12 @@
 import re
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.contrib.auth.hashers import make_password, check_password
+
+
+def validate_image_size(image):
+    if image.size > 5 * 1024 * 1024:
+        raise ValidationError("Изображение не должно превышать 5 МБ.")
 
 
 class ExamType(models.TextChoices):
@@ -112,7 +118,7 @@ class Task(models.Model):
     )
     number = models.CharField("Номер задания", max_length=20)
     text = models.TextField("Текст задания", blank=True)
-    image = models.ImageField("Изображение", upload_to="tasks/", blank=True, null=True)
+    image = models.ImageField("Изображение", upload_to="tasks/", blank=True, null=True, validators=[validate_image_size])
     correct_answer = models.CharField("Правильный ответ", max_length=255)
     source = models.CharField(
         "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL
@@ -243,7 +249,7 @@ class CatalogTask(models.Model):
     )
     exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
     text = models.TextField("Текст задания", blank=True)
-    image = models.ImageField("Изображение", upload_to="catalog/", blank=True, null=True)
+    image = models.ImageField("Изображение", upload_to="catalog/", blank=True, null=True, validators=[validate_image_size])
     correct_answer = models.CharField("Правильный ответ", max_length=255, blank=True)
     source = models.CharField(
         "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL

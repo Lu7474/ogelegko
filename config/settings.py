@@ -4,18 +4,19 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-ig@&egkyw1vcdgow8p7w$9(l(6v-behqmmckte+r_hgetz3c==",
+_secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
+if not _secret_key or "insecure" in _secret_key:
+    # Локальная разработка: генерируем временный ключ (не годится для продакшна)
+    import secrets as _secrets
+    _secret_key = _secrets.token_hex(50)
+SECRET_KEY = _secret_key
+
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
+
+_allowed = os.environ.get("ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(",") if h.strip()] or (
+    ["localhost", "127.0.0.1"] if DEBUG else []
 )
-
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
-
-ALLOWED_HOSTS = [
-    h.strip()
-    for h in os.environ.get("ALLOWED_HOSTS", "*").split(",")
-    if h.strip()
-]
 
 INSTALLED_APPS = [
     "django.contrib.admin",

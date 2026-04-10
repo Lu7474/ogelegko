@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+from .parser import sanitize_html
 import uuid
 import time as _time
 from functools import wraps
@@ -101,8 +102,10 @@ def admin_login(request):
                 cache.delete(f"admin_login_fails:{ip}")
                 cache.delete(f"admin_login_lock:{ip}")
                 login(request, user)
+                logger.info("Успешный вход админа: %s (IP: %s)", username, ip)
                 return redirect("admin_dashboard")
             _record_admin_failed_login(request)
+            logger.warning("Неудачная попытка входа админа: %s (IP: %s)", username, _get_client_ip(request))
             error = "Неверный логин или пароль"
     return render(request, "admin/login.html", {"error": error})
 
@@ -482,7 +485,7 @@ def _save_variant_tasks(variant, request):
     """Сохраняет задания варианта из POST-данных."""
     task_index = 1
     while f"task_{task_index}_answer" in request.POST:
-        text = request.POST.get(f"task_{task_index}_text", "").strip()
+        text = sanitize_html(request.POST.get(f"task_{task_index}_text", "").strip())
         answer = request.POST.get(f"task_{task_index}_answer", "").strip()
         source = request.POST.get(f"task_{task_index}_source", "manual")
         topic = request.POST.get(f"task_{task_index}_topic", "other")
@@ -954,7 +957,7 @@ def catalog_add(request):
         task_number_raw = request.POST.get("task_number", "").strip()
         task_number = _safe_int(task_number_raw) if task_number_raw else None
         exam_type = request.POST.get("exam_type", "")
-        text = request.POST.get("text", "").strip()
+        text = sanitize_html(request.POST.get("text", "").strip())
         correct_answer = request.POST.get("correct_answer", "").strip()
         source = request.POST.get("source", TaskSource.MANUAL)
         topic = request.POST.get("topic", TaskTopic.OTHER)
@@ -1002,7 +1005,7 @@ def catalog_edit(request, task_id):
         task_number_raw = request.POST.get("task_number", "").strip()
         ct.task_number = _safe_int(task_number_raw) if task_number_raw else None
         ct.exam_type = request.POST.get("exam_type", ct.exam_type)
-        ct.text = request.POST.get("text", "").strip()
+        ct.text = sanitize_html(request.POST.get("text", "").strip())
         ct.correct_answer = request.POST.get("correct_answer", "").strip()
         ct.source = request.POST.get("source", ct.source)
         ct.topic = request.POST.get("topic", ct.topic)

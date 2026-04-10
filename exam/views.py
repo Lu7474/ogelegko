@@ -104,11 +104,13 @@ def login_view(request):
                         request.session.save()
                         student.session_key = request.session.session_key
                         student.save(update_fields=["session_key"])
+                        logger.info("Вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
                         return redirect("choose_variant")
                 except Student.DoesNotExist:
                     pass
 
             _record_failed_login(request, "student_login")
+            logger.warning("Неудачный вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
             error = "Неверное ФИО или пароль"
 
     return render(request, "exam/login.html", {"error": error})

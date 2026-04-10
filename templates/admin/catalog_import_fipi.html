@@ -43,6 +43,9 @@
         <div id="previewError" style="color:#e74c3c;font-size:0.85rem;margin-top:6px;display:none;"></div>
     </div>
 
+    <!-- Список предметов если URL без GUID -->
+    <div id="subjectLinksBox" style="display:none;margin-top:16px;padding:14px;background:#f0f7ff;border-radius:8px;border:1px solid #b3d4f5;"></div>
+
     <!-- Результат превью -->
     <div class="fipi-preview-box" id="previewBox">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -92,6 +95,7 @@ var topicsData = [];
 
 function resetPreview() {
     document.getElementById('previewBox').style.display = 'none';
+    document.getElementById('subjectLinksBox').style.display = 'none';
     document.getElementById('previewError').style.display = 'none';
     document.getElementById('projGuid').value = '';
     topicsData = [];
@@ -116,6 +120,23 @@ function doPreview() {
                 var el = document.getElementById('previewError');
                 el.textContent = data.error;
                 el.style.display = 'block';
+                return;
+            }
+
+            // Если вернулись ссылки на предметы — показываем выбор
+            if (data.subject_links && data.subject_links.length > 0) {
+                var slBox = document.getElementById('subjectLinksBox');
+                var html = '<b style="font-size:0.9rem;display:block;margin-bottom:10px;">На странице найдено несколько банков. Выберите нужный:</b>' +
+                    '<div style="display:flex;flex-direction:column;gap:6px;">';
+                data.subject_links.forEach(function(sl) {
+                    var bankUrl = 'https://oge.fipi.ru/bank/index.php?proj=' + sl.proj;
+                    html += '<button class="btn btn-secondary" style="text-align:left;" ' +
+                        'onclick="document.getElementById(\'fipiUrl\').value=\'' + bankUrl + '\';doPreview();">' +
+                        sl.name + '</button>';
+                });
+                html += '</div>';
+                slBox.innerHTML = html;
+                slBox.style.display = 'block';
                 return;
             }
 

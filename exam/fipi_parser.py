@@ -35,7 +35,19 @@ def _extract_proj_guid(url):
 
 def _get(session, url):
     time.sleep(FIPI_DELAY)
-    resp = session.get(url, headers=FIPI_HEADERS, timeout=20)
+    try:
+        resp = session.get(url, headers=FIPI_HEADERS, timeout=20)
+    except requests.exceptions.ConnectTimeout:
+        raise ParserError(
+            "Сервер не может подключиться к oge.fipi.ru (таймаут). "
+            "Сайт ФИПИ, вероятно, недоступен с IP вашего хостинга. "
+            "Попробуйте запустить импорт локально."
+        )
+    except requests.exceptions.ConnectionError:
+        raise ParserError(
+            "Не удалось подключиться к oge.fipi.ru. "
+            "Проверьте, доступен ли сайт с вашего сервера."
+        )
     resp.raise_for_status()
     return resp.content.decode("cp1251", errors="replace")
 
@@ -69,14 +81,63 @@ def _count(html):
     return int(m.group(1)) if m else 0
 
 
+def _resolve_proj_from_url(url):
+    """
+    Извлекает proj GUID из URL. Если URL — страница fipi.ru без GUID,
+    пробует получить страницу и найти ссылки на банк с proj= внутри.
+    Возвращает (proj, subject_links) где subject_links — список найденных проектов.
+    """
+    proj = _extract_proj_guid(url)
+    if proj:
+        return proj, []
+
+    # Попробуем найти ссылки на банк внутри страницы fipi.ru
+    try:
+        resp = requests.get(url, headers=FIPI_HEADERS, timeout=15)
+        html = resp.text
+    except Exception:
+        return None, []
+
+    # Ищем все proj= GUID в HTML
+    guids = re.findall(r"proj=([A-F0-9]{32})", html, re.IGNORECASE)
+    guids = list(dict.fromkeys(g.upper() for g in guids))  # уникальные, порядок сохранён
+
+    # Ищем подписи к ссылкам (текст рядом)
+    soup = BeautifulSoup(html, "html.parser")
+    subject_links = []
+    for tag in soup.find_all(href=re.compile(r"proj=", re.IGNORECASE)):
+        g = _extract_proj_guid(tag["href"])
+        if g:
+            subject_links.append({
+                "proj": g,
+                "name": tag.get_text(" ", strip=True)[:80] or tag["href"],
+            })
+    # Дедупликация по proj
+    seen = set()
+    unique_links = []
+    for sl in subject_links:
+        if sl["proj"] not in seen:
+            seen.add(sl["proj"])
+            unique_links.append(sl)
+
+    return None, unique_links
+
+
 def fipi_get_preview(url):
     """
     Анализирует URL банка ФИПИ без начала импорта.
     Возвращает: {proj, total, pages, topics: [{code, name, count}]}
+    Если URL — страница fipi.ru без GUID, возвращает {subject_links: [...]}
     """
-    proj = _extract_proj_guid(url)
+    proj, subject_links = _resolve_proj_from_url(url)
+
     if not proj:
-        raise ParserError("Не удалось найти GUID проекта в URL")
+        if subject_links:
+            return {"subject_links": subject_links}
+        raise ParserError(
+            "Не удалось найти GUID проекта в URL. "
+            "Нужна ссылка вида: https://oge.fipi.ru/bank/index.php?proj=XXXX..."
+        )
 
     sess = requests.Session()
 
