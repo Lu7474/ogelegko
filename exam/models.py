@@ -210,15 +210,9 @@ class Attempt(models.Model):
         return round(self.correct_count / self.total_count * 100)
 
 
-class ImportSource(models.TextChoices):
-    FIPI = "fipi", "ФИПИ"
-    SDAMGIA = "sdamgia", "СдамГИА"
-    MANUAL = "manual", "Вручную"
-
-
 class CatalogImportSession(models.Model):
     """История импортов в каталог."""
-    source = models.CharField("Источник", max_length=20, choices=ImportSource.choices)
+    source = models.CharField("Источник", max_length=20, choices=TaskSource.choices)
     url = models.TextField("URL", blank=True)
     proj_guid = models.CharField("GUID проекта ФИПИ", max_length=64, blank=True)
     status = models.CharField("Статус", max_length=20, default="running")
@@ -287,14 +281,13 @@ class CatalogTask(models.Model):
 
     @property
     def text_preview(self):
-        import re as _re
-        plain = _re.sub(r"<[^>]+>", " ", self.text or "").strip()
+        plain = re.sub(r"<[^>]+>", " ", self.text or "").strip()
         return plain[:120] + "…" if len(plain) > 120 else plain
 
     @staticmethod
     def compute_hash(text):
-        import hashlib, re as _re
-        plain = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", text or "")).strip().lower()
+        import hashlib
+        plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text or "")).strip().lower()
         return hashlib.md5(plain.encode("utf-8")).hexdigest() if plain else None
 
 

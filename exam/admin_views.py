@@ -1,17 +1,16 @@
 import json
 import logging
 import threading
-from .parser import sanitize_html
 import uuid
-import time as _time
 from functools import wraps
+from .parser import sanitize_html
 from django.conf import settings as django_settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.http import require_POST
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Avg
+from django.db.models import Count, Q
 from django.db import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -19,7 +18,7 @@ from datetime import timedelta
 
 from .models import (
     SchoolClass, Student, Variant, Task, Attempt, Answer,
-    ExamType, TaskSource, TaskTopic, CatalogTask, CatalogImportSession, ImportSource,
+    ExamType, TaskSource, TaskTopic, CatalogTask, CatalogImportSession,
 )
 
 logger = logging.getLogger(__name__)
@@ -1419,7 +1418,7 @@ def catalog_fipi_start(request):
         return JsonResponse({"error": "; ".join(errors)}, status=400)
 
     sess = CatalogImportSession.objects.create(
-        source=ImportSource.FIPI,
+        source=TaskSource.FIPI,
         url=request.POST.get("url", ""),
         proj_guid=proj,
         status="running",

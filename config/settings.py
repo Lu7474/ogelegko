@@ -1,10 +1,12 @@
 import os
 import dj_database_url
 from pathlib import Path
-from dotenv import load_dotenv
-
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / ".env")
+except ImportError:
+    pass
 
 _secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
 if not _secret_key or "insecure" in _secret_key:
@@ -148,17 +150,19 @@ LOGGING = {
 }
 
 # --- Безопасность (продакшен) ---
+_https = os.environ.get("HTTPS_ENABLED", "False").lower() in ("true", "1", "yes")
 if not DEBUG:
-    # Railway terminates SSL at the proxy level, so we trust X-Forwarded-Proto
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SECURE_SSL_REDIRECT = False  # Railway handles HTTPS redirect
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    CSRF_COOKIE_HTTPONLY = True
+    SECURE_SSL_REDIRECT = False
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    CSRF_COOKIE_HTTPONLY = True
+    # Включать только когда есть HTTPS
+    if _https:
+        SECURE_HSTS_SECONDS = 31536000
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
 
 # Rate-limiting
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
