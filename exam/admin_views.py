@@ -871,6 +871,113 @@ def export_results(request):
     return response
 
 
+@admin_required
+def export_results_docx(request):
+    try:
+        from docx import Document
+        from docx.shared import Pt, Cm
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+    except ImportError:
+        return HttpResponse("python-docx не установлен.", status=500)
+
+    # Фильтры
+    class_id = _safe_int(request.GET.get("class", ""))
+    variant_id = _safe_int(request.GET.get("variant", ""))
+
+    attempts = Attempt.objects.filter(is_finished=True).select_related(
+        "student", "student__school_class", "variant"
+    ).prefetch_related("answers__task").order_by("-finished_at")
+
+    if class_id:
+        attempts = attempts.filter(student__school_class_id=class_id)
+    if variant_id:
+        attempts = attempts.filter(variant_id=variant_id)
+
+    attempts = list(attempts)
+
+    # Максимальное количество заданий среди всех попыток
+    max_tasks = 0
+    for a in attempts:
+        max_tasks = max(max_tasks, a.variant.tasks.count())
+    max_tasks = max_tasks or 25
+
+    doc = Document()
+
+    # Альбомная ориентация
+    section = doc.sections[0]
+    section.orientation = 1  # WD_ORIENT.LANDSCAPE
+    section.page_width, section.page_height = section.page_height, section.page_width
+    section.left_margin = Cm(1.5)
+    section.right_margin = Cm(1.5)
+    section.top_margin = Cm(1.5)
+    section.bottom_margin = Cm(1.5)
+
+    doc.add_heading("Результаты экзаменов", level=1)
+
+    # Колонки: ФИО | Дата | Вариант | 1..N | Итого | Оценка
+    col_count = 3 + max_tasks + 2
+    table = doc.add_table(rows=1, cols=col_count)
+    table.style = "Table Grid"
+
+    # Заголовок
+    hdr = table.rows[0].cells
+    hdr[0].text = "ФИО"
+    hdr[1].text = "Дата"
+    hdr[2].text = "Вариант"
+    for i in range(max_tasks):
+        hdr[3 + i].text = str(i + 1)
+    hdr[3 + max_tasks].text = "Итого"
+    hdr[3 + max_tasks + 1].text = "Оценка"
+
+    for cell in hdr:
+        for para in cell.paragraphs:
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in para.runs:
+                run.bold = True
+                run.font.size = Pt(8)
+
+    for a in attempts:
+        # Строим карту: номер задания → is_correct
+        answers_map = {}
+        for ans in a.answers.all():
+            answers_map[ans.task.number] = ans.is_correct
+
+        # Получаем задания варианта, отсортированные по номеру
+        tasks = list(a.variant.tasks.order_by("id"))
+
+        row_cells = table.add_row().cells
+        row_cells[0].text = a.student.full_name
+        row_cells[1].text = a.finished_at.strftime("%d.%m.%Y") if a.finished_at else ""
+        row_cells[2].text = a.variant.number
+
+        for i, task in enumerate(tasks):
+            if i >= max_tasks:
+                break
+            correct = answers_map.get(task.number)
+            if correct is True:
+                row_cells[3 + i].text = "1"
+            elif correct is False:
+                row_cells[3 + i].text = "0"
+            else:
+                row_cells[3 + i].text = ""
+
+        row_cells[3 + max_tasks].text = str(a.score)
+        row_cells[3 + max_tasks + 1].text = str(a.grade)
+
+        for cell in row_cells:
+            for para in cell.paragraphs:
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in para.runs:
+                    run.font.size = Pt(8)
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    response["Content-Disposition"] = 'attachment; filename="results.docx"'
+    doc.save(response)
+    return response
+
+
 # ===== КАТАЛОГ ЗАДАНИЙ =====
 
 _catalog_import_jobs = {}  # job_id -> {status, added, errors}

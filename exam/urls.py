@@ -19,6 +19,7 @@ urlpatterns = [
     path("admin/logout/", admin_views.admin_logout, name="admin_logout"),
     path("admin/dashboard/", admin_views.dashboard, name="admin_dashboard"),
     path("admin/export/", admin_views.export_results, name="admin_export"),
+    path("admin/export/docx/", admin_views.export_results_docx, name="admin_export_docx"),
 
     # Админ — классы
     path("admin/classes/", admin_views.class_list, name="admin_classes"),
