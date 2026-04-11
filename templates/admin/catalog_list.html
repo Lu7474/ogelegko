@@ -69,44 +69,72 @@
     <!-- Таблица заданий -->
     <div style="flex:1;min-width:0;">
         {% if page.object_list %}
-        <div style="margin-bottom:10px;color:var(--text-muted);font-size:0.85rem;">
-            Найдено: {{ page.paginator.count }}
-        </div>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-            {% for task in page %}
-            <div class="card catalog-task-card">
-                <div class="catalog-task-header">
-                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                        <span class="badge-num">Задание {{ task.task_number }}</span>
-                        <span class="source-badge source-{{ task.source }}">{{ task.get_source_display }}</span>
-                        {% if task.manual_grading %}<span class="badge-manual">Ручная проверка</span>{% endif %}
-                        <span style="color:var(--text-muted);font-size:0.78rem;">{{ task.get_exam_type_display }}</span>
-                    </div>
-                    <div class="row-actions" style="opacity:1;">
-                        <a href="{% url 'admin_catalog_edit' task.id %}" class="btn btn-sm btn-secondary">Изм.</a>
-                        <form method="post" action="{% url 'admin_catalog_delete' task.id %}" style="display:inline;" onsubmit="return confirm('Удалить задание?')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-danger">Удал.</button>
-                        </form>
-                    </div>
-                </div>
-                {% if task.image %}
-                <img src="{{ task.image.url }}" alt="Изображение задания" class="catalog-task-img">
-                {% endif %}
-                {% if task.text %}
-                <div class="catalog-task-text">{{ task.text_preview }}</div>
-                {% endif %}
-                <div class="catalog-task-answer">
-                    <strong>Ответ:</strong>
-                    {% if task.manual_grading %}
-                    <em style="color:var(--text-muted);">проверяется вручную</em>
-                    {% else %}
-                    {{ task.correct_answer }}
-                    {% endif %}
+
+        <!-- Форма массового удаления -->
+        <form method="post" action="{% url 'admin_catalog_bulk_delete' %}" id="bulk-form"
+              onsubmit="return confirmBulkDelete()">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+            <!-- Панель управления выбором -->
+            <div id="bulk-bar" style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.9rem;font-weight:500;">
+                    <input type="checkbox" id="select-all" onchange="toggleAll(this)">
+                    Выбрать все на странице
+                </label>
+                <span id="selected-count" style="color:var(--text-muted);font-size:0.85rem;"></span>
+                <div style="margin-left:auto;display:flex;gap:8px;">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAll(document.getElementById('select-all'), true)" style="display:none;" id="select-all-btn">Все</button>
+                    <button type="submit" class="btn btn-sm btn-danger" id="delete-btn" disabled>Удалить выбранные</button>
                 </div>
             </div>
-            {% endfor %}
-        </div>
+
+            <div style="margin-bottom:10px;color:var(--text-muted);font-size:0.85rem;">
+                Найдено: {{ page.paginator.count }}
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                {% for task in page %}
+                <div class="card catalog-task-card" style="position:relative;">
+                    <!-- Чекбокс -->
+                    <label style="position:absolute;top:12px;left:12px;cursor:pointer;z-index:1;">
+                        <input type="checkbox" name="ids" value="{{ task.id }}"
+                               class="task-checkbox" onchange="updateBulkBar()">
+                    </label>
+
+                    <div class="catalog-task-header" style="padding-left:32px;">
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <span class="badge-num">Задание {{ task.task_number }}</span>
+                            <span class="source-badge source-{{ task.source }}">{{ task.get_source_display }}</span>
+                            {% if task.manual_grading %}<span class="badge-manual">Ручная проверка</span>{% endif %}
+                            <span style="color:var(--text-muted);font-size:0.78rem;">{{ task.get_exam_type_display }}</span>
+                        </div>
+                        <div class="row-actions" style="opacity:1;">
+                            <a href="{% url 'admin_catalog_edit' task.id %}" class="btn btn-sm btn-secondary">Изм.</a>
+                            <form method="post" action="{% url 'admin_catalog_delete' task.id %}" style="display:inline;" onsubmit="return confirm('Удалить задание?')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">Удал.</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% if task.image %}
+                    <img src="{{ task.image.url }}" alt="Изображение задания" class="catalog-task-img">
+                    {% endif %}
+                    {% if task.text %}
+                    <div class="catalog-task-text">{{ task.text_preview }}</div>
+                    {% endif %}
+                    <div class="catalog-task-answer">
+                        <strong>Ответ:</strong>
+                        {% if task.manual_grading %}
+                        <em style="color:var(--text-muted);">проверяется вручную</em>
+                        {% else %}
+                        {{ task.correct_answer }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </form>
 
         {% include "includes/pagination.html" with page_obj=page %}
         {% else %}
@@ -125,4 +153,37 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function toggleAll(master) {
+    const boxes = document.querySelectorAll('.task-checkbox');
+    boxes.forEach(b => b.checked = master.checked);
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const boxes = document.querySelectorAll('.task-checkbox');
+    const checked = document.querySelectorAll('.task-checkbox:checked');
+    const master = document.getElementById('select-all');
+    const countEl = document.getElementById('selected-count');
+    const deleteBtn = document.getElementById('delete-btn');
+
+    master.checked = checked.length === boxes.length && boxes.length > 0;
+    master.indeterminate = checked.length > 0 && checked.length < boxes.length;
+
+    if (checked.length > 0) {
+        countEl.textContent = 'Выбрано: ' + checked.length;
+        deleteBtn.disabled = false;
+    } else {
+        countEl.textContent = '';
+        deleteBtn.disabled = true;
+    }
+}
+
+function confirmBulkDelete() {
+    const count = document.querySelectorAll('.task-checkbox:checked').length;
+    if (count === 0) return false;
+    return confirm('Удалить ' + count + ' заданий? Это действие нельзя отменить.');
+}
+</script>
 {% endblock %}

@@ -52,6 +52,7 @@ urlpatterns = [
     # Админ — каталог
     path("admin/catalog/", admin_views.catalog_list, name="admin_catalog"),
     path("admin/catalog/add/", admin_views.catalog_add, name="admin_catalog_add"),
+    path("admin/catalog/bulk-delete/", admin_views.catalog_bulk_delete, name="admin_catalog_bulk_delete"),
     path("admin/catalog/import/", admin_views.catalog_import, name="admin_catalog_import"),
     path("admin/catalog/import/<str:job_id>/status/", admin_views.catalog_import_status, name="admin_catalog_import_status"),
     path("admin/catalog/import-fipi/", admin_views.catalog_fipi_import, name="admin_fipi_import"),

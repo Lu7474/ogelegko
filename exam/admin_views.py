@@ -1144,6 +1144,16 @@ def catalog_delete(request, task_id):
 
 
 @admin_required
+@require_POST
+def catalog_bulk_delete(request):
+    ids = request.POST.getlist("ids")
+    if ids:
+        deleted, _ = CatalogTask.objects.filter(id__in=ids).delete()
+        logger.info("Bulk deleted %d catalog tasks", deleted)
+    return redirect(request.POST.get("next", "admin_catalog"))
+
+
+@admin_required
 def catalog_import(request):
     """Импорт заданий из СдамГИА (URL варианта или отдельного задания)."""
     errors = []
