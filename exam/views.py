@@ -1,16 +1,17 @@
 import json
 import logging
 from functools import wraps
+
 from django.conf import settings
 from django.core.cache import cache
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
-from django.utils import timezone
-from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.db.models import Sum
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 
-from .models import Student, Variant, Task, Attempt, Answer, SchoolClass, ExamType
+from .models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
 from .utils import check_answer, get_grade, get_grade_display
 
 logger = logging.getLogger(__name__)

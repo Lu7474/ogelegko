@@ -1,5 +1,6 @@
-import exam.models
 from django.db import migrations, models
+
+import exam.models
 
 
 class Migration(migrations.Migration):

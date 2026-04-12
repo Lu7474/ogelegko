@@ -1,5 +1,5 @@
-from fractions import Fraction
 import re
+from fractions import Fraction
 
 
 def normalize_answer(answer: str) -> str:

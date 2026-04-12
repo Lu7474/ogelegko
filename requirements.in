@@ -1,0 +1,18 @@
+# Продакшен-зависимости (источник для pip-compile)
+# Обновление: pip-compile requirements.in -o requirements.txt
+Django>=5.2
+python-dotenv
+openpyxl
+pillow
+gunicorn
+whitenoise
+dj-database-url
+psycopg2-binary
+requests
+beautifulsoup4
+cloudinary
+django-cloudinary-storage
+python-docx
+PyMuPDF
+pdfplumber
+sentry-sdk[django]

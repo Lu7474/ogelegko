@@ -1,0 +1,20 @@
+repos:
+  # Ruff — линтер и форматтер Python
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Базовые проверки
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict      # блокирует коммит с маркерами конфликтов
+      - id: detect-private-key        # блокирует коммит с приватными ключами
+      - id: end-of-file-fixer         # добавляет перевод строки в конце файла
+      - id: trailing-whitespace       # убирает пробелы в конце строк
+      - id: check-yaml                # проверяет синтаксис YAML
+      - id: check-toml                # проверяет синтаксис TOML
+      - id: debug-statements          # блокирует print() и pdb.set_trace()

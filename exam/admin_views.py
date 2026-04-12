@@ -2,24 +2,34 @@ import json
 import logging
 import threading
 import uuid
+from datetime import timedelta
 from functools import wraps
-from .parser import sanitize_html
+
 from django.conf import settings as django_settings
-from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
-from django.views.decorators.http import require_POST
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
 from django.db import IntegrityError
+from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from datetime import timedelta
+from django.views.decorators.http import require_POST
 
 from .models import (
-    SchoolClass, Student, Variant, Task, Attempt, Answer,
-    ExamType, TaskSource, TaskTopic, CatalogTask, CatalogImportSession,
+    Answer,
+    Attempt,
+    CatalogImportSession,
+    CatalogTask,
+    ExamType,
+    SchoolClass,
+    Student,
+    Task,
+    TaskSource,
+    TaskTopic,
+    Variant,
 )
+from .parser import sanitize_html
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +69,8 @@ def _get_client_ip(request):
 # --- Вход / Выход ---
 
 def _check_admin_rate_limit(request):
-    max_attempts = getattr(django_settings, "LOGIN_MAX_ATTEMPTS", 5)
-    cooldown = getattr(django_settings, "LOGIN_COOLDOWN_SECONDS", 300)
     ip = _get_client_ip(request)
     lock_key = f"admin_login_lock:{ip}"
-    fail_key = f"admin_login_fails:{ip}"
 
     if cache.get(lock_key):
         return "Слишком много попыток. Попробуйте через несколько минут."
@@ -884,8 +891,8 @@ def export_results(request):
 def export_results_docx(request):
     try:
         from docx import Document
-        from docx.shared import Pt, Cm
         from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.shared import Cm, Pt
     except ImportError:
         return HttpResponse("python-docx не установлен.", status=500)
 
@@ -1398,10 +1405,11 @@ def _html_to_text(html):
 def _build_variant_docx(variant, include_answers):
     """Строит docx-документ для варианта. Возвращает BytesIO."""
     import io
-    from docx import Document
-    from docx.shared import Pt, Cm, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
     import requests as _req
+    from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Cm, Pt, RGBColor
 
     doc = Document()
 

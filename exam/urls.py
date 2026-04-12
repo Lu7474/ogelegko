@@ -1,5 +1,6 @@
 from django.urls import path
-from . import views, admin_views
+
+from . import admin_views, views
 
 urlpatterns = [
     # Ученик

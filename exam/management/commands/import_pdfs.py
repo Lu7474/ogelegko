@@ -23,13 +23,18 @@
 
 import re
 from pathlib import Path
-from django.core.management.base import BaseCommand
+
 from django.core.files.base import ContentFile
+from django.core.management.base import BaseCommand
 from django.db import transaction
+
 from exam.models import (
-    CatalogTask, CatalogImportSession,
-    Variant, Task,
-    ExamType, TaskSource,
+    CatalogImportSession,
+    CatalogTask,
+    ExamType,
+    Task,
+    TaskSource,
+    Variant,
 )
 
 # Паттерны строк-«мусора» в контексте PDF (авторы, названия, колонтитулы, заголовки блоков)
@@ -156,7 +161,7 @@ class Command(BaseCommand):
                 self.stdout.write('Заполните ответы в каталоге: /admin/catalog/')
             if do_variants and total_var_created > 0:
                 self.stdout.write(
-                    f'Создано вариантов (is_active=False). '
+                    'Создано вариантов (is_active=False). '
                     'Активируйте их после проверки: /admin/variants/'
                 )
 
@@ -170,8 +175,8 @@ class Command(BaseCommand):
 
     def _process_pdf(self, pdf_path, exam_type, dry_run,
                      do_catalog, do_variants, session=None):
-        import pdfplumber
         import fitz
+        import pdfplumber
 
         task_numbers = self._parse_task_numbers(pdf_path.name)
         pdf_stem = pdf_path.stem[:40]

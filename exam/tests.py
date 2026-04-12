@@ -1,13 +1,20 @@
 import json
-from django.test import TestCase, Client
+
 from django.contrib.auth.models import User
+from django.test import Client, TestCase
 
 from .models import (
-    SchoolClass, Student, Variant, Task, Attempt, Answer,
-    ExamType, TaskSource,
+    Answer,
+    Attempt,
+    ExamType,
+    SchoolClass,
+    Student,
+    Task,
+    TaskSource,
+    Variant,
 )
-from .utils import normalize_answer, check_answer, get_grade
 from .parser import _strip_measurement_unit
+from .utils import check_answer, get_grade, normalize_answer
 
 
 class NormalizeAnswerTests(TestCase):

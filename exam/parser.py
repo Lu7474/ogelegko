@@ -1,19 +1,20 @@
 """
 Парсер заданий с sdamgia.ru (Решу ОГЭ / Решу ЕГЭ)
 """
+import logging
 import re
+import threading
 import time
 import uuid
-import logging
-import threading
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urljoin
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-from concurrent.futures import ThreadPoolExecutor
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from .models import Variant, Task, ExamType, TaskSource, CatalogTask, CatalogImportSession
+from .models import CatalogImportSession, CatalogTask, ExamType, Task, TaskSource, Variant
 
 logger = logging.getLogger(__name__)
 

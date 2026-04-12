@@ -17,7 +17,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
 
       - name: Run tests
         env:
@@ -62,9 +65,12 @@ jobs:
           script: |
             cd /var/www/ege
             mkdir -p cache
+            mkdir -p /var/backups/egedb
             venv/bin/pip install -r requirements.txt -q
             venv/bin/python manage.py migrate --noinput
             venv/bin/python manage.py collectstatic --noinput
             venv/bin/python manage.py create_admin
+            # Настроить cron-бэкап БД (идемпотентно — добавляется только один раз)
+            (crontab -l 2>/dev/null | grep -q 'egedb_backup' || { crontab -l 2>/dev/null; echo "0 3 * * * pg_dump -U egeuser egedb | gzip > /var/backups/egedb/\$(date +\\%Y\\%m\\%d).sql.gz && find /var/backups/egedb/ -name '*.sql.gz' -mtime +30 -delete"; } | crontab -)
             systemctl restart ege
             echo "=== Deploy OK ==="

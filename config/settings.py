@@ -1,6 +1,8 @@
 import os
-import dj_database_url
 from pathlib import Path
+
+import dj_database_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 try:
     from dotenv import load_dotenv
@@ -168,3 +170,15 @@ if not DEBUG:
 # Rate-limiting
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_COOLDOWN_SECONDS = int(os.environ.get("LOGIN_COOLDOWN_SECONDS", "300"))
+
+# Sentry — мониторинг ошибок в продакшене
+# Получить DSN: https://sentry.io → New Project → Django
+_SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if _SENTRY_DSN and not DEBUG:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        send_default_pii=False,   # не отправлять личные данные пользователей
+        traces_sample_rate=0.1,   # профилировать 10% запросов
+        environment="production",
+    )

@@ -5,17 +5,18 @@
 Минцифры (не входит в стандартный certifi). Все запросы отправляются с
 verify=False — предупреждения InsecureRequestWarning подавляются.
 """
+import logging
 import re
 import time
 import uuid
-import logging
+
 import requests
 import urllib3
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 
-from .parser import sanitize_html, ParserError
-from .models import ExamType, TaskSource, CatalogTask, CatalogImportSession
+from .models import CatalogImportSession, CatalogTask, ExamType, TaskSource
+from .parser import ParserError, sanitize_html
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +243,7 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
     Обновляет CatalogImportSession напрямую.
     """
     import json
+
     from django.db import connection
 
     sess = requests.Session()
