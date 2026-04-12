@@ -25,6 +25,19 @@
             {% if answer.is_correct %}✓{% else %}✗{% endif %}
         </span>
     </h3>
+    {% if answer.task.shared_context or answer.task.shared_context_image %}
+    <details class="shared-context">
+        <summary>Общее условие (нажмите, чтобы развернуть)</summary>
+        <div class="shared-context-body">
+            {% if answer.task.shared_context_image %}
+            <img src="{{ answer.task.shared_context_image.url }}" alt="Условие" style="max-width:100%;border-radius:4px;">
+            {% endif %}
+            {% if answer.task.shared_context %}
+            <div>{{ answer.task.shared_context|safe }}</div>
+            {% endif %}
+        </div>
+    </details>
+    {% endif %}
     {% if answer.task.text %}
     <div class="task-text">{{ answer.task.text|safe }}</div>
     {% endif %}

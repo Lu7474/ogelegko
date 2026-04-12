@@ -38,12 +38,26 @@
                 <h3>Задание <span class="task-num">{{ task.number }}</span>
                     <button type="button" class="btn btn-sm btn-danger remove-task">Удалить</button>
                 </h3>
+                <details class="shared-context-editor" {% if task.shared_context or task.shared_context_image %}open{% endif %}>
+                    <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">Общее условие (для задач с общим текстом/рисунком)</summary>
+                    <div class="form-group">
+                        <label>Текст общего условия</label>
+                        <textarea name="task_{{ task.number }}_shared_context" rows="3" placeholder="Общее условие для группы задач (необязательно)">{{ task.shared_context }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Изображение общего условия</label>
+                        <input type="file" name="task_{{ task.number }}_shared_context_image" accept="image/*">
+                        {% if task.shared_context_image %}
+                        <small>Текущее: <a href="{{ task.shared_context_image.url }}" target="_blank">{{ task.shared_context_image.name }}</a></small>
+                        {% endif %}
+                    </div>
+                </details>
                 <div class="form-group">
                     <label>Текст задания</label>
                     <textarea name="task_{{ task.number }}_text" rows="3">{{ task.text }}</textarea>
                 </div>
                 <div class="form-group">
-                    <label>Изображение</label>
+                    <label>Изображение к заданию</label>
                     <input type="file" name="task_{{ task.number }}_image" accept="image/*">
                     {% if task.image %}
                     <small>Текущее: {{ task.image.name }}</small>
@@ -189,12 +203,23 @@ document.getElementById('addTask').addEventListener('click', function() {
         <h3>Задание <span class="task-num">${taskCount}</span>
             <button type="button" class="btn btn-sm btn-danger remove-task">Удалить</button>
         </h3>
+        <details class="shared-context-editor">
+            <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">Общее условие (для задач с общим текстом/рисунком)</summary>
+            <div class="form-group">
+                <label>Текст общего условия</label>
+                <textarea name="task_${taskCount}_shared_context" rows="3" placeholder="Общее условие для группы задач (необязательно)"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Изображение общего условия</label>
+                <input type="file" name="task_${taskCount}_shared_context_image" accept="image/*">
+            </div>
+        </details>
         <div class="form-group">
             <label>Текст задания</label>
             <textarea name="task_${taskCount}_text" rows="3"></textarea>
         </div>
         <div class="form-group">
-            <label>Изображение</label>
+            <label>Изображение к заданию</label>
             <input type="file" name="task_${taskCount}_image" accept="image/*">
         </div>
         <div class="form-row">

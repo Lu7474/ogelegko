@@ -107,18 +107,16 @@ class Command(BaseCommand):
             for block_idx, block in enumerate(blocks):
                 page_num = block['page_num']
                 img_data = self._render_page(fitz_doc, page_num)
+                shared_ctx = block['context'].strip() if block['context'] else ''
+                # Путь к картинке условия (сохраняем один раз, переиспользуем для всех заданий блока)
+                ctx_image_path = None
 
                 for i, task_text in enumerate(block['tasks']):
                     if not task_text.strip():
                         continue
 
                     task_number = task_numbers[i] if i < len(task_numbers) else i + 1
-
-                    # Для первого задания добавляем общий контекст блока
-                    if i == 0 and block['context']:
-                        full_text_task = block['context'].strip() + '\n\n' + task_text.strip()
-                    else:
-                        full_text_task = task_text.strip()
+                    full_text_task = task_text.strip()
 
                     text_hash = CatalogTask.compute_hash(full_text_task)
 
@@ -143,15 +141,23 @@ class Command(BaseCommand):
                         source=TaskSource.PRINT_SOLVE,
                         manual_grading=True,
                         text_hash=text_hash,
+                        shared_context=shared_ctx,
                     )
 
-                    # Картинку прикрепляем только к первому заданию блока (там план/рисунок)
                     if i == 0 and img_data:
+                        # Первое задание: сохраняем картинку условия
                         fname = f'catalog/pdf_{pdf_path.stem[:40]}_b{block_idx+1}.png'
-                        obj.image.save(fname, ContentFile(img_data), save=False)
+                        obj.shared_context_image.save(fname, ContentFile(img_data), save=False)
+                    elif ctx_image_path:
+                        # Остальные задания: ссылаемся на ту же картинку
+                        obj.__dict__['shared_context_image'] = ctx_image_path
 
                     obj.save()
                     added += 1
+
+                    # Запоминаем путь к картинке после сохранения первого задания
+                    if i == 0 and obj.shared_context_image:
+                        ctx_image_path = obj.shared_context_image.name
 
         fitz_doc.close()
         return added, skipped

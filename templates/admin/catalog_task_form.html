@@ -34,13 +34,28 @@
         </div>
     </div>
 
+    <details class="shared-context-editor" {% if task.shared_context or task.shared_context_image %}open{% endif %} style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);">
+        <summary style="cursor:pointer;font-weight:600;font-size:0.9rem;color:var(--text-muted);">Общее условие (для задач 13–19 ЕГЭ и аналогичных)</summary>
+        <div class="form-group" style="margin-top:10px;">
+            <label for="shared_context">Текст общего условия</label>
+            <textarea id="shared_context" name="shared_context" rows="4" placeholder="Общий текст/условие для группы заданий...">{{ task.shared_context|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="shared_context_image">Изображение общего условия</label>
+            <input type="file" id="shared_context_image" name="shared_context_image" accept="image/*">
+            {% if task.shared_context_image %}
+            <small style="color:var(--text-muted);">Текущее: <a href="{{ task.shared_context_image.url }}" target="_blank">{{ task.shared_context_image.name }}</a></small>
+            {% endif %}
+        </div>
+    </details>
+
     <div class="form-group">
         <label for="text">Текст задания</label>
         <textarea id="text" name="text" rows="5" placeholder="HTML или обычный текст...">{{ task.text|default:'' }}</textarea>
     </div>
 
     <div class="form-group">
-        <label for="image">Изображение</label>
+        <label for="image">Изображение к заданию</label>
         <input type="file" id="image" name="image" accept="image/*">
         {% if task.image %}
         <small style="color:var(--text-muted);">Текущее: <a href="{{ task.image.url }}" target="_blank">{{ task.image.name }}</a></small>

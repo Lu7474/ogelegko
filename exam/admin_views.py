@@ -490,6 +490,8 @@ def _save_variant_tasks(variant, request):
         topic = request.POST.get(f"task_{task_index}_topic", "other")
         points = _safe_int(request.POST.get(f"task_{task_index}_points", "1"), default=1)
         image = request.FILES.get(f"task_{task_index}_image")
+        shared_context = sanitize_html(request.POST.get(f"task_{task_index}_shared_context", "").strip())
+        shared_context_image = request.FILES.get(f"task_{task_index}_shared_context_image")
 
         if points < 1:
             points = 1
@@ -501,7 +503,7 @@ def _save_variant_tasks(variant, request):
             topic = "other"
 
         if answer:
-            Task.objects.create(
+            task = Task(
                 variant=variant,
                 number=task_index,
                 text=text,
@@ -509,8 +511,13 @@ def _save_variant_tasks(variant, request):
                 source=source,
                 topic=topic,
                 points=points,
-                image=image,
+                shared_context=shared_context,
             )
+            if image:
+                task.image = image
+            if shared_context_image:
+                task.shared_context_image = shared_context_image
+            task.save()
         task_index += 1
 
 
@@ -617,6 +624,8 @@ def variant_duplicate(request, variant_id):
             source=task.source,
             topic=task.topic,
             points=task.points,
+            shared_context=task.shared_context,
+            shared_context_image=task.shared_context_image,
         )
     return redirect("admin_variant_edit", variant_id=new_variant.id)
 
@@ -1067,6 +1076,8 @@ def catalog_add(request):
         points = _safe_int(request.POST.get("points", "1"), 1) or 1
         manual_grading = request.POST.get("manual_grading") == "on"
         image = request.FILES.get("image")
+        shared_context = sanitize_html(request.POST.get("shared_context", "").strip())
+        shared_context_image = request.FILES.get("shared_context_image")
 
         if exam_type not in dict(ExamType.choices):
             error = "Выберите тип экзамена"
@@ -1084,9 +1095,12 @@ def catalog_add(request):
                 topic=topic,
                 points=points,
                 manual_grading=manual_grading,
+                shared_context=shared_context,
             )
             if image:
                 ct.image = image
+            if shared_context_image:
+                ct.shared_context_image = shared_context_image
             ct.save()
             return redirect("admin_catalog")
 
@@ -1114,8 +1128,11 @@ def catalog_edit(request, task_id):
         ct.topic = request.POST.get("topic", ct.topic)
         ct.points = _safe_int(request.POST.get("points", "1"), 1) or 1
         ct.manual_grading = request.POST.get("manual_grading") == "on"
+        ct.shared_context = sanitize_html(request.POST.get("shared_context", "").strip())
         if request.FILES.get("image"):
             ct.image = request.FILES["image"]
+        if request.FILES.get("shared_context_image"):
+            ct.shared_context_image = request.FILES["shared_context_image"]
 
         if ct.exam_type not in dict(ExamType.choices):
             error = "Выберите тип экзамена"
@@ -1313,17 +1330,21 @@ def variant_from_catalog(request):
                     topic=ct.topic,
                     points=ct.points,
                     manual_grading=ct.manual_grading,
+                    shared_context=ct.shared_context,
                 )
                 if ct.image:
                     try:
-                        ct.image.open()
-                        task.image.save(
-                            ct.image.name.split("/")[-1],
-                            _CF(ct.image.read()),
-                            save=False,
-                        )
+                        with ct.image.open("rb") as f:
+                            task.image.save(
+                                ct.image.name.split("/")[-1],
+                                _CF(f.read()),
+                                save=False,
+                            )
                     except Exception:
                         pass
+                if ct.shared_context_image:
+                    # Переиспользуем тот же файл (не копируем)
+                    task.__dict__['shared_context_image'] = ct.shared_context_image.name
                 task.save()
     except IntegrityError as e:
         return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
@@ -1396,6 +1417,27 @@ def _build_variant_docx(variant, include_answers):
         h_run = heading.add_run(f"Задание {task.number}")
         h_run.bold = True
         h_run.font.size = Pt(12)
+
+        # Общее условие (если есть)
+        if task.shared_context or task.shared_context_image:
+            ctx_p = doc.add_paragraph()
+            ctx_p.paragraph_format.left_indent = Cm(0.5)
+            ctx_run = ctx_p.add_run("Общее условие:")
+            ctx_run.bold = True
+            ctx_run.font.size = Pt(10)
+            ctx_run.font.color.rgb = RGBColor(0x55, 0x6B, 0x82)
+            if task.shared_context_image:
+                try:
+                    with task.shared_context_image.open("rb") as f:
+                        ctx_img_data = f.read()
+                    doc.add_picture(io.BytesIO(ctx_img_data), width=Cm(14))
+                except Exception:
+                    logger.warning("Не удалось вставить картинку условия задания %s", task.number)
+            if task.shared_context:
+                ctx_text = _html_to_text(task.shared_context)
+                if ctx_text:
+                    p = doc.add_paragraph(ctx_text)
+                    p.paragraph_format.left_indent = Cm(0.5)
 
         # Текст задания
         text = _html_to_text(task.text)

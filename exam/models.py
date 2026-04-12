@@ -129,6 +129,11 @@ class Task(models.Model):
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)
+    shared_context = models.TextField("Общее условие", blank=True)
+    shared_context_image = models.ImageField(
+        "Изображение общего условия", upload_to="contexts/",
+        blank=True, null=True, validators=[validate_image_size],
+    )
 
     class Meta:
         verbose_name = "Задание"
@@ -254,6 +259,11 @@ class CatalogTask(models.Model):
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)
+    shared_context = models.TextField("Общее условие", blank=True)
+    shared_context_image = models.ImageField(
+        "Изображение общего условия", upload_to="contexts/",
+        blank=True, null=True, validators=[validate_image_size],
+    )
     created_at = models.DateTimeField("Создан", auto_now_add=True)
     sdamgia_id = models.CharField(
         "ID СдамГИА", max_length=20, blank=True, null=True, unique=True

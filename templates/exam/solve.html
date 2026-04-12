@@ -68,6 +68,19 @@
     {% for task in tasks %}
     <div class="task-block" id="task-{{ task.number }}">
         <h3>Задание {{ task.number }}</h3>
+        {% if task.shared_context or task.shared_context_image %}
+        <details class="shared-context">
+            <summary>Общее условие (нажмите, чтобы развернуть)</summary>
+            <div class="shared-context-body">
+                {% if task.shared_context_image %}
+                <img src="{{ task.shared_context_image.url }}" alt="Условие" style="max-width:100%;border-radius:4px;">
+                {% endif %}
+                {% if task.shared_context %}
+                <div>{{ task.shared_context|safe }}</div>
+                {% endif %}
+            </div>
+        </details>
+        {% endif %}
         {% if task.text %}
         <div class="task-text">{{ task.text|safe }}</div>
         {% endif %}

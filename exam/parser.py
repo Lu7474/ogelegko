@@ -17,6 +17,25 @@ from .models import Variant, Task, ExamType, TaskSource, CatalogTask, CatalogImp
 
 logger = logging.getLogger(__name__)
 
+# Единицы измерения, которые убираются из конца числового ответа
+_UNIT_SUFFIX_RE = re.compile(
+    r'^(-?[\d\s,./]+)\s*'
+    r'(?:мм²?|см²?|дм²?|км²?|м²?(?!/)|кг|г(?!е|о|р)|т(?!\.)|л(?!е|и)|мл|'
+    r'км/ч|м/с(?:ек)?|м/мин|руб\.?|коп\.?|%|°[CcСс]?|сек\.?|мин\.?|ч\.?(?=\s*$)|'
+    r'лет|раз|шт\.?)'
+    r'\s*$',
+    re.IGNORECASE | re.UNICODE,
+)
+
+
+def _strip_measurement_unit(text):
+    """Убирает единицы измерения из числового ответа: '0.4 мм' → '0.4'"""
+    m = _UNIT_SUFFIX_RE.match(text.strip())
+    if m:
+        return m.group(1).strip().rstrip(', ')
+    return text
+
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -306,7 +325,7 @@ class SdamgiaParser:
         return ""
 
     def _clean_answer(self, raw):
-        """Очищает извлечённый ответ от мусора."""
+        """Очищает извлечённый ответ от мусора и единиц измерения."""
         stop_words = ["Аналоги", "Источники", "Критерии", "Спрятать",
                       "Раздел", "Приведем", "Примечание", "Решение", "Пояснение"]
         raw = raw.replace("\u00AD", "").replace("\u202f", " ").replace("&nbsp;", " ")
@@ -316,7 +335,10 @@ class SdamgiaParser:
             idx = raw.find(stop)
             if idx > 0:
                 raw = raw[:idx]
-        return raw.rstrip(". \t\n\r").strip()
+        raw = raw.rstrip(". \t\n\r").strip()
+        # Убираем единицы измерения из числового ответа: "0.4 мм" → "0.4"
+        raw = _strip_measurement_unit(raw)
+        return raw
 
     def _extract_answer_from_block(self, block):
         """Извлекает ответ из блока задания."""
