@@ -51,7 +51,72 @@
 
     <div class="form-group">
         <label for="text">Текст задания</label>
-        <textarea id="text" name="text" rows="5" placeholder="HTML или обычный текст...">{{ task.text|default:'' }}</textarea>
+
+        <!-- Панель быстрых вставок -->
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;" id="fmt-toolbar">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtWrap('text','<sup>','</sup>')" title="Верхний индекс (степень)">x²</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtWrap('text','<sub>','</sub>')" title="Нижний индекс">x₁</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtInsert('text','<span class=&quot;math-frac&quot;><span>числитель</span><span>знаменатель</span></span>')" title="Дробь">a/b</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtInsert('text','&radic;(')" title="Корень">√</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtWrap('text','<b>','</b>')" title="Жирный"><b>Ж</b></button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtWrap('text','<i>','</i>')" title="Курсив"><i>К</i></button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtInsert('text','<br>')" title="Перенос строки">↵</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="fmtWrap('text','<p>','</p>')" title="Абзац">¶</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;">
+            <textarea id="text" name="text" rows="8" placeholder="HTML или обычный текст..."
+                      style="resize:vertical;font-family:monospace;font-size:0.82rem;">{{ task.text|default:'' }}</textarea>
+            <div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);min-height:120px;display:flex;flex-direction:column;">
+                <div style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:0.75rem;color:var(--text-muted);font-weight:600;letter-spacing:.03em;">КАК ВИДИТ УЧЕНИК</div>
+                <div id="text-preview" class="task-text" style="padding:10px 12px;flex:1;"></div>
+            </div>
+        </div>
+
+        <!-- Справка по форматированию -->
+        <details style="margin-top:8px;">
+            <summary style="cursor:pointer;font-size:0.82rem;color:var(--text-muted);user-select:none;">Справка по форматированию HTML</summary>
+            <div style="margin-top:8px;font-size:0.82rem;display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;">
+                <div>
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--border);">
+                                <th style="text-align:left;padding:4px 6px;color:var(--text-muted);">Что ввести</th>
+                                <th style="text-align:left;padding:4px 6px;color:var(--text-muted);">Результат</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">x&lt;sup&gt;2&lt;/sup&gt;</td><td style="padding:4px 6px;">x<sup>2</sup></td></tr>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">a&lt;sub&gt;1&lt;/sub&gt;</td><td style="padding:4px 6px;">a<sub>1</sub></td></tr>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">&lt;span class="math-frac"&gt;&lt;span&gt;a&lt;/span&gt;&lt;span&gt;b&lt;/span&gt;&lt;/span&gt;</td><td style="padding:4px 6px;"><span class="math-frac"><span>a</span><span>b</span></span></td></tr>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">&radic;(x+1)</td><td style="padding:4px 6px;">√(x+1)</td></tr>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">&lt;b&gt;текст&lt;/b&gt;</td><td style="padding:4px 6px;"><b>текст</b></td></tr>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">&lt;i&gt;текст&lt;/i&gt;</td><td style="padding:4px 6px;"><i>текст</i></td></tr>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">&lt;br&gt;</td><td style="padding:4px 6px;color:var(--text-muted);">перенос строки</td></tr>
+                            <tr><td style="padding:4px 6px;font-family:monospace;">&lt;p&gt;текст&lt;/p&gt;</td><td style="padding:4px 6px;color:var(--text-muted);">новый абзац</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="background:var(--bg-secondary,#f8f9fa);border-radius:6px;padding:10px;border:1px solid var(--border);">
+                    <div style="font-weight:600;margin-bottom:6px;">Примеры сложных формул:</div>
+                    <div style="margin-bottom:6px;">
+                        <span style="color:var(--text-muted);">Дробь со степенью:</span><br>
+                        <code style="font-size:0.78rem;">&lt;span class="math-frac"&gt;&lt;span&gt;x&lt;sup&gt;2&lt;/sup&gt;+1&lt;/span&gt;&lt;span&gt;2x-3&lt;/span&gt;&lt;/span&gt;</code><br>
+                        → <span class="math-frac"><span>x<sup>2</sup>+1</span><span>2x-3</span></span>
+                    </div>
+                    <div style="margin-bottom:6px;">
+                        <span style="color:var(--text-muted);">Корень из дроби:</span><br>
+                        <code style="font-size:0.78rem;">&radic;(&lt;span class="math-frac"&gt;&lt;span&gt;a&lt;/span&gt;&lt;span&gt;b&lt;/span&gt;&lt;/span&gt;)</code><br>
+                        → √(<span class="math-frac"><span>a</span><span>b</span></span>)
+                    </div>
+                    <div>
+                        <span style="color:var(--text-muted);">Несколько верных ответов (поле «Правильный ответ»):</span><br>
+                        <code style="font-size:0.78rem;">234|243|324</code>
+                        <span style="font-size:0.78rem;color:var(--text-muted);"> — любой из вариантов засчитается</span>
+                    </div>
+                </div>
+            </div>
+        </details>
     </div>
 
     <div class="form-group">
@@ -95,4 +160,49 @@
         <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">Отмена</a>
     </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Живой предпросмотр
+(function () {
+    var textarea = document.getElementById('text');
+    var preview  = document.getElementById('text-preview');
+    if (!textarea || !preview) return;
+
+    function update() {
+        var val = textarea.value.trim();
+        preview.innerHTML = val ||
+            '<span style="color:var(--text-muted);font-size:0.85rem;font-style:italic;">Введите текст слева\u2026</span>';
+    }
+
+    textarea.addEventListener('input', update);
+    update();
+})();
+
+// Вставка/оборачивание текста в textarea по id
+function fmtInsert(id, html) {
+    var ta = document.getElementById(id);
+    if (!ta) return;
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    var val = ta.value;
+    ta.value = val.slice(0, start) + html + val.slice(end);
+    var pos = start + html.length;
+    ta.setSelectionRange(pos, pos);
+    ta.focus();
+    ta.dispatchEvent(new Event('input'));
+}
+
+function fmtWrap(id, before, after) {
+    var ta = document.getElementById(id);
+    if (!ta) return;
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    var selected = ta.value.slice(start, end) || 'текст';
+    var inserted = before + selected + after;
+    ta.value = ta.value.slice(0, start) + inserted + ta.value.slice(end);
+    ta.setSelectionRange(start + before.length, start + before.length + selected.length);
+    ta.focus();
+    ta.dispatchEvent(new Event('input'));
+}
+</script>
 {% endblock %}

@@ -215,9 +215,9 @@ def _mathml_to_html(tag):
     if local in ("annotation", "annotation-xml"):
         return ""
 
-    # Простые токены — берём текст
+    # Простые токены — берём текст, нормализуем минус
     if local in ("mi", "mn", "mo", "mtext"):
-        return tag.get_text()
+        return tag.get_text().replace("\u2212", "-").replace("\u2013", "-")
 
     # Пробел
     if local == "mspace":
@@ -252,19 +252,13 @@ def _mathml_to_html(tag):
             )
         return tag.get_text()
 
-    # Дробь: (a/b) или ((x+1)/(x-2))
+    # Дробь: визуальный стек через CSS-класс math-frac
     if local == "mfrac":
         kids = [c for c in tag.children if getattr(c, "name", None)]
         if len(kids) >= 2:
-
-            def _frac_part(child):
-                """Оборачивает в скобки если child — mrow с несколькими дочерними тегами."""
-                child_local = child.name.split(":")[-1].lower() if ":" in child.name else child.name.lower()
-                if child_local == "mrow" and sum(1 for c in child.children if getattr(c, "name", None)) > 1:
-                    return f"({_mathml_to_html(child)})"
-                return _mathml_to_html(child)
-
-            return f"({_frac_part(kids[0])}/{_frac_part(kids[1])})"
+            num = _mathml_to_html(kids[0])
+            den = _mathml_to_html(kids[1])
+            return f'<span class="math-frac"><span>{num}</span><span>{den}</span></span>'
         return tag.get_text()
 
     # Квадратный корень
@@ -315,6 +309,17 @@ def _process_cell_html(raw_html):
     if re.search(r"<p\b", result, re.IGNORECASE):
         result = re.sub(r"^\s*[^<]+(?=\s*<)", "", result.lstrip())
 
+    # Делаем относительные <img src="/..."> абсолютными → картинки грузятся с ФИПИ
+    result = re.sub(
+        r'(<img[^>]+\bsrc=")(/[^"]+)',
+        r"\g<1>" + FIPI_BASE + r"\2",
+        result,
+        flags=re.IGNORECASE,
+    )
+
+    # Нормализуем математический минус (U+2212) в тексте → ASCII дефис
+    result = result.replace("\u2212", "-")
+
     return result.strip()
 
 
@@ -343,9 +348,13 @@ def _parse_page(sess, proj, page, theme=""):
                 s.decompose()
             raw_html = cell.decode_contents().strip()
 
-        # URL картинок
+        # URL картинок: из ShowPictureQ (всплывающие) + <img> в тексте задания
         pics = re.findall(r"ShowPictureQ\w*\('([^']+)'", str(block))
-        image_urls = [f"{FIPI_BASE}/{p.lstrip('/')}" for p in pics]
+        show_pic_urls = [f"{FIPI_BASE}/{p.lstrip('/')}" for p in pics]
+        inline_srcs = re.findall(r'<img[^>]+\bsrc=["\']?(/[^"\'>\s]+)', raw_html, re.IGNORECASE)
+        inline_urls = [f"{FIPI_BASE}{s}" for s in inline_srcs]
+        # inline первые (они важнее — видны в тексте), потом ShowPictureQ
+        image_urls = list(dict.fromkeys(inline_urls + show_pic_urls))
 
         # Тема из info-панели (следующий div id="i{task_id}")
         info_div = block.find_next_sibling("div", id=f"i{task_id}")

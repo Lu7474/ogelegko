@@ -1,6 +1,7 @@
 """
 Парсер заданий с sdamgia.ru (Решу ОГЭ / Решу ЕГЭ)
 """
+
 import logging
 import re
 import threading
@@ -20,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 # Единицы измерения, которые убираются из конца числового ответа
 _UNIT_SUFFIX_RE = re.compile(
-    r'^(-?[\d\s,./]+)\s*'
-    r'(?:мм²?|см²?|дм²?|км²?|м²?(?!/)|кг|г(?!е|о|р)|т(?!\.)|л(?!е|и)|мл|'
-    r'км/ч|м/с(?:ек)?|м/мин|руб\.?|коп\.?|%|°[CcСс]?|сек\.?|мин\.?|ч\.?(?=\s*$)|'
-    r'лет|раз|шт\.?)'
-    r'\s*$',
+    r"^(-?[\d\s,./]+)\s*"
+    r"(?:мм²?|см²?|дм²?|км²?|м²?(?!/)|кг|г(?!е|о|р)|т(?!\.)|л(?!е|и)|мл|"
+    r"км/ч|м/с(?:ек)?|м/мин|руб\.?|коп\.?|%|°[CcСс]?|сек\.?|мин\.?|ч\.?(?=\s*$)|"
+    r"лет|раз|шт\.?)"
+    r"\s*$",
     re.IGNORECASE | re.UNICODE,
 )
 
@@ -33,13 +34,13 @@ def _strip_measurement_unit(text):
     """Убирает единицы измерения из числового ответа: '0.4 мм' → '0.4'"""
     m = _UNIT_SUFFIX_RE.match(text.strip())
     if m:
-        return m.group(1).strip().rstrip(', ')
+        return m.group(1).strip().rstrip(", ")
     return text
 
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
 }
@@ -55,21 +56,27 @@ def sanitize_html(html):
     """Удаляет опасные теги и атрибуты из HTML (XSS-защита)."""
     # Удаляем опасные теги целиком (с содержимым)
     html = re.sub(
-        r'<\s*(?:script|style|iframe|object|embed|form|link|meta)\b[^>]*>.*?'
-        r'</\s*(?:script|style|iframe|object|embed|form|link|meta)\s*>',
-        '', html, flags=re.IGNORECASE | re.DOTALL,
+        r"<\s*(?:script|style|iframe|object|embed|form|link|meta)\b[^>]*>.*?"
+        r"</\s*(?:script|style|iframe|object|embed|form|link|meta)\s*>",
+        "",
+        html,
+        flags=re.IGNORECASE | re.DOTALL,
     )
     # Удаляем самозакрывающиеся опасные теги
     html = re.sub(
-        r'<\s*(?:script|style|iframe|object|embed|form|link|meta)\b[^>]*/?\s*>',
-        '', html, flags=re.IGNORECASE,
+        r"<\s*(?:script|style|iframe|object|embed|form|link|meta)\b[^>]*/?\s*>",
+        "",
+        html,
+        flags=re.IGNORECASE,
     )
     # Удаляем все обработчики событий (onclick, onerror, onload, etc.)
-    html = re.sub(r'\s+on\w+\s*=\s*"[^"]*"', '', html, flags=re.IGNORECASE)
-    html = re.sub(r"\s+on\w+\s*=\s*'[^']*'", '', html, flags=re.IGNORECASE)
-    html = re.sub(r'\s+on\w+\s*=\s*[^\s>]+', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'\s+on\w+\s*=\s*"[^"]*"', "", html, flags=re.IGNORECASE)
+    html = re.sub(r"\s+on\w+\s*=\s*'[^']*'", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"\s+on\w+\s*=\s*[^\s>]+", "", html, flags=re.IGNORECASE)
     # Удаляем javascript: в href/src
-    html = re.sub(r'(href|src)\s*=\s*["\']?\s*javascript\s*:', r'\1="#" data-removed="', html, flags=re.IGNORECASE)
+    html = re.sub(
+        r'(href|src)\s*=\s*["\']?\s*javascript\s*:', r'\1="#" data-removed="', html, flags=re.IGNORECASE
+    )
     # Удаляем data: в src (кроме data:image)
     html = re.sub(r'src\s*=\s*["\']?\s*data\s*:(?!image/)', 'src="data:removed', html, flags=re.IGNORECASE)
     return html
@@ -110,7 +117,9 @@ class SdamgiaParser:
 
     def _clean_html(self, html):
         """Убирает мягкие переносы и лишние пробелы/переносы."""
-        html = html.replace("\u00AD", "")
+        html = html.replace("\u00ad", "")
+        # Нормализуем математический минус (U+2212) → ASCII дефис
+        html = html.replace("\u2212", "-")
         html = re.sub(r"(<br\s*/?>){3,}", "<br><br>", html)
         html = re.sub(r"\n{3,}", "\n\n", html)
         html = re.sub(r" {2,}", " ", html)
@@ -137,7 +146,7 @@ class SdamgiaParser:
         # Оставляем только ��онтент внутри pbody
         inner = pb.decode_contents()
         # Убираем мя��кие переносы
-        inner = inner.replace("\u00AD", "")
+        inner = inner.replace("\u00ad", "")
         return inner.strip()
 
     # ---- Шаг 1: получить problem_ids со страницы варианта ----
@@ -156,7 +165,7 @@ class SdamgiaParser:
 
         for span in soup.find_all("span", class_="prob_nums"):
             text = span.get_text(" ", strip=True)
-            type_m = re.search(r'Тип\s+(\d+)', text)
+            type_m = re.search(r"Тип\s+(\d+)", text)
             type_str = type_m.group(1) if type_m else None
 
             link = span.find("a", href=re.compile(r"/problem\?id=\d+"))
@@ -178,6 +187,7 @@ class SdamgiaParser:
 
         # Считаем сколько раз каждый тип встречается
         from collections import Counter
+
         type_count = Counter(t for t, _ in raw if t is not None)
 
         # Генерируем display_number
@@ -202,7 +212,7 @@ class SdamgiaParser:
         skip_prefixes = ["Решение", "Критерии", "Спрятать"]
         result = []
         for pb in block.find_all("div", class_="pbody"):
-            clean = pb.get_text(strip=True).replace("\u00AD", "")
+            clean = pb.get_text(strip=True).replace("\u00ad", "")
             # Пропускаем решения (с мягкими переносами: Ре­ше­ние)
             if clean.startswith("Ре") and "Решение" in clean[:15]:
                 continue
@@ -262,21 +272,17 @@ class SdamgiaParser:
                     question_pbodies = our_pbodies[intro_count:]
 
             # Собираем HTML
-            question_html = "<br><br>".join(
-                self._pbody_to_html(pb, base_url) for pb in question_pbodies
-            )
+            question_html = "<br><br>".join(self._pbody_to_html(pb, base_url) for pb in question_pbodies)
 
             if intro_pbodies:
                 # Общее условие — в сворачиваемый блок для всех заданий группы
-                intro_html = "<br>".join(
-                    self._pbody_to_html(pb, base_url) for pb in intro_pbodies
-                )
+                intro_html = "<br>".join(self._pbody_to_html(pb, base_url) for pb in intro_pbodies)
                 text = (
                     '<details class="shared-context">'
-                    '<summary>Общее условие (нажмите, чтобы развернуть)</summary>'
+                    "<summary>Общее условие (нажмите, чтобы развернуть)</summary>"
                     f'<div class="shared-context-body">{intro_html}</div>'
-                    '</details>'
-                    f'<br>{question_html}'
+                    "</details>"
+                    f"<br>{question_html}"
                 )
             else:
                 text = question_html
@@ -313,24 +319,35 @@ class SdamgiaParser:
         """Извлекает текст критериев проверки (для заданий части 2)."""
         # Сначала ищем pbody, начинающийся с "Критерии"
         for pb in block.find_all("div", class_="pbody"):
-            text = pb.get_text(" ", strip=True).replace("\u00AD", "")
+            text = pb.get_text(" ", strip=True).replace("\u00ad", "")
             if text.startswith("Критерии"):
                 return text[:500]
         # Запасной: любой элемент с текстом "Критерии"
-        for tag in block.find_all(string=re.compile(r'Критерии')):
+        for tag in block.find_all(string=re.compile(r"Критерии")):
             parent = tag.parent
             if parent:
-                text = parent.get_text(" ", strip=True).replace("\u00AD", "")
+                text = parent.get_text(" ", strip=True).replace("\u00ad", "")
                 if "Критерии" in text:
                     return text[:500]
         return ""
 
     def _clean_answer(self, raw):
         """Очищает извлечённый ответ от мусора и единиц измерения."""
-        stop_words = ["Аналоги", "Источники", "Критерии", "Спрятать",
-                      "Раздел", "Приведем", "Примечание", "Решение", "Пояснение"]
-        raw = raw.replace("\u00AD", "").replace("\u202f", " ").replace("&nbsp;", " ")
+        stop_words = [
+            "Аналоги",
+            "Источники",
+            "Критерии",
+            "Спрятать",
+            "Раздел",
+            "Приведем",
+            "Примечание",
+            "Решение",
+            "Пояснение",
+        ]
+        raw = raw.replace("\u00ad", "").replace("\u202f", " ").replace("&nbsp;", " ")
         raw = raw.replace("&#8239;", " ")
+        # Нормализуем знаки минуса: U+2212 (математический), U+2013 (en-dash) → ASCII
+        raw = raw.replace("\u2212", "-").replace("\u2013", "-")
         raw = raw.strip()
         for stop in stop_words:
             idx = raw.find(stop)
@@ -346,14 +363,14 @@ class SdamgiaParser:
 
         # 1. BS4: ищем "Ответ:" и идём вверх по родителям, чтобы захватить
         #    соседние span/b с самим значением ответа.
-        for tag in block.find_all(string=re.compile(r'Ответ\s*:', re.IGNORECASE)):
+        for tag in block.find_all(string=re.compile(r"Ответ\s*:", re.IGNORECASE)):
             node = tag.parent
             # Поднимаемся до 3 уровней вверх, пока не найдём текст с ответом
             for _ in range(3):
                 if node is None:
                     break
-                full = node.get_text(" ", strip=True).replace("\u00AD", "")
-                m = re.search(r'Ответ\s*:\s*(.+)', full, re.DOTALL)
+                full = node.get_text(" ", strip=True).replace("\u00ad", "")
+                m = re.search(r"Ответ\s*:\s*(.+)", full, re.DOTALL)
                 if m:
                     answer = self._clean_answer(m.group(1))
                     if answer and len(answer) < 200:
@@ -363,8 +380,8 @@ class SdamgiaParser:
         # 2. Ищем ответ в соседней ячейке таблицы (некоторые задания на СдамГИА
         #    помещают «Ответ:» в одну <td>, а само значение — в следующую).
         for td in block.find_all("td"):
-            text = td.get_text(" ", strip=True).replace("\u00AD", "")
-            if re.match(r'^Ответ\s*:?\s*$', text, re.IGNORECASE):
+            text = td.get_text(" ", strip=True).replace("\u00ad", "")
+            if re.match(r"^Ответ\s*:?\s*$", text, re.IGNORECASE):
                 sib = td.find_next_sibling("td")
                 if sib:
                     answer = self._clean_answer(sib.get_text(" ", strip=True))
@@ -375,9 +392,9 @@ class SdamgiaParser:
         html = str(block)
         patterns = [
             # Ответ: <span>…</span> или Ответ: <b>…</b>
-            r'Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<!--|\.\s*<(?:div|p\b|br|tr|td))',
-            r'Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<div|<p\b|<br|<tr|<a\s)',
-            r'Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<)',
+            r"Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<!--|\.\s*<(?:div|p\b|br|tr|td))",
+            r"Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<div|<p\b|<br|<tr|<a\s)",
+            r"Ответ\s*(?:</?\w+[^>]*)?\s*:\s*(?:<[^>]+>)?\s*(.+?)(?:<)",
         ]
         for pattern in patterns:
             m = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
@@ -389,7 +406,7 @@ class SdamgiaParser:
                     answer = self._clean_answer(img_m.group(1))
                     if answer:
                         return answer
-                answer = self._clean_answer(re.sub(r'<[^>]+>', '', raw))
+                answer = self._clean_answer(re.sub(r"<[^>]+>", "", raw))
                 if answer:
                     return answer
         return ""
@@ -402,11 +419,11 @@ class SdamgiaParser:
         только числовое значение, игнорируя остальной текст критериев.
         """
         for pb in block.find_all("div", class_="pbody"):
-            text = pb.get_text(" ", strip=True).replace("\u00AD", "")
+            text = pb.get_text(" ", strip=True).replace("\u00ad", "")
             if not text.startswith("Критерии"):
                 continue
             # Ищем «Ответ:» в тексте критериев
-            m = re.search(r'Ответ\s*:\s*([^\n.]{1,80})', text)
+            m = re.search(r"Ответ\s*:\s*([^\n.]{1,80})", text)
             if m:
                 answer = self._clean_answer(m.group(1))
                 if answer:
@@ -478,8 +495,14 @@ class SdamgiaParser:
             i, display_number, pid = args
             try:
                 task = self._parse_problem(pid, base_url, task_number=display_number)
-                logger.info("  %d/%d №%s (ID %s) — ответ: %s",
-                            i, total, display_number, pid, task["correct_answer"] or "НЕТ")
+                logger.info(
+                    "  %d/%d №%s (ID %s) — ответ: %s",
+                    i,
+                    total,
+                    display_number,
+                    pid,
+                    task["correct_answer"] or "НЕТ",
+                )
                 return task
             except ParserError as e:
                 logger.warning("  %d/%d (ID %s) ОШИБКА: %s", i, total, pid, e)
@@ -503,9 +526,21 @@ class SdamgiaParser:
 
 
 _FORMULA_KEYWORDS = [
-    "дробь", "числитель", "знаменатель", "корень из", "квадратный корень",
-    "фигурная скобка", "принадлежит", "степень", "логарифм",
-    "синус", "косинус", "тангенс", "котангенс", "арксинус", "арккосинус",
+    "дробь",
+    "числитель",
+    "знаменатель",
+    "корень из",
+    "квадратный корень",
+    "фигурная скобка",
+    "принадлежит",
+    "степень",
+    "логарифм",
+    "синус",
+    "косинус",
+    "тангенс",
+    "котангенс",
+    "арксинус",
+    "арккосинус",
 ]
 
 
@@ -537,11 +572,7 @@ def import_task_to_catalog(url, task_number=None):
         return None, [str(e)]
 
     correct_answer = task_data["correct_answer"]
-    manual = (
-        not correct_answer
-        or correct_answer.startswith("Критерии")
-        or _is_formula_answer(correct_answer)
-    )
+    manual = not correct_answer or correct_answer.startswith("Критерии") or _is_formula_answer(correct_answer)
     if not manual and exam_type == ExamType.EGE_PROFILE and task_number:
         try:
             if int(str(task_number).split(".")[0]) >= 13:
@@ -687,6 +718,8 @@ def import_variant_from_sdamgia(url, variant_number=None):
         return None, [f"Ошибка сохранения: {e}"]
 
     if no_answer:
-        errors.append(f"Задания с ручной проверкой: {', '.join(map(str, no_answer))}. Учитель проверяет вручную.")
+        errors.append(
+            f"Задания с ручной проверкой: {', '.join(map(str, no_answer))}. Учитель проверяет вручную."
+        )
 
     return variant, errors

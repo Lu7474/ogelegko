@@ -36,6 +36,21 @@ class NormalizeAnswerTests(TestCase):
     def test_text(self):
         self.assertEqual(normalize_answer("abc"), "abc")
 
+    def test_unicode_minus(self):
+        # U+2212 математический минус (из MathML/ФИПИ) → ASCII дефис
+        self.assertEqual(normalize_answer("\u2212" + "5"), "-5")
+
+    def test_endash_minus(self):
+        # En-dash как минус → ASCII дефис
+        self.assertEqual(normalize_answer("\u2013" + "3"), "-3")
+
+    def test_unicode_minus_in_answer_match(self):
+        # Ответ с U+2212 совпадает с тем, что студент ввёл через ASCII -
+        from .utils import check_answer
+
+        self.assertTrue(check_answer("-5", "\u2212" + "5"))
+        self.assertTrue(check_answer("\u2212" + "5", "-5"))
+
 
 class CheckAnswerTests(TestCase):
     def test_exact(self):
@@ -110,9 +125,7 @@ class GradeTests(TestCase):
 class AuthTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.school_class = SchoolClass.objects.create(
-            name="9А", exam_type=ExamType.OGE
-        )
+        self.school_class = SchoolClass.objects.create(name="9А", exam_type=ExamType.OGE)
         self.student = Student(
             full_name="Тестов Тест Тестович",
             school_class=self.school_class,
@@ -121,18 +134,24 @@ class AuthTests(TestCase):
         self.student.save()
 
     def test_login_success(self):
-        resp = self.client.post("/login/", {
-            "full_name": "Тестов Тест Тестович",
-            "password": "test123",
-        })
+        resp = self.client.post(
+            "/login/",
+            {
+                "full_name": "Тестов Тест Тестович",
+                "password": "test123",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         self.assertIn("student_id", self.client.session)
 
     def test_login_wrong_password(self):
-        resp = self.client.post("/login/", {
-            "full_name": "Тестов Тест Тестович",
-            "password": "wrong",
-        })
+        resp = self.client.post(
+            "/login/",
+            {
+                "full_name": "Тестов Тест Тестович",
+                "password": "wrong",
+            },
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("student_id", self.client.session)
 
@@ -141,10 +160,13 @@ class AuthTests(TestCase):
         self.assertEqual(resp.status_code, 405)
 
     def test_logout_post(self):
-        self.client.post("/login/", {
-            "full_name": "Тестов Тест Тестович",
-            "password": "test123",
-        })
+        self.client.post(
+            "/login/",
+            {
+                "full_name": "Тестов Тест Тестович",
+                "password": "test123",
+            },
+        )
         resp = self.client.post("/logout/")
         self.assertEqual(resp.status_code, 302)
 
@@ -157,9 +179,7 @@ class AuthTests(TestCase):
 class ExamFlowTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.school_class = SchoolClass.objects.create(
-            name="9Б", exam_type=ExamType.OGE
-        )
+        self.school_class = SchoolClass.objects.create(name="9Б", exam_type=ExamType.OGE)
         self.student = Student(
             full_name="Экзаменов Экзамен",
             school_class=self.school_class,
@@ -168,21 +188,32 @@ class ExamFlowTests(TestCase):
         self.student.save()
 
         self.variant = Variant.objects.create(
-            number="test001", exam_type=ExamType.OGE, max_attempts=2,
+            number="test001",
+            exam_type=ExamType.OGE,
+            max_attempts=2,
         )
         self.task1 = Task.objects.create(
-            variant=self.variant, number=1, text="2+2=?",
-            correct_answer="4", points=1,
+            variant=self.variant,
+            number=1,
+            text="2+2=?",
+            correct_answer="4",
+            points=1,
         )
         self.task2 = Task.objects.create(
-            variant=self.variant, number=2, text="3+3=?",
-            correct_answer="6", points=1,
+            variant=self.variant,
+            number=2,
+            text="3+3=?",
+            correct_answer="6",
+            points=1,
         )
 
-        self.client.post("/login/", {
-            "full_name": "Экзаменов Экзамен",
-            "password": "pass",
-        })
+        self.client.post(
+            "/login/",
+            {
+                "full_name": "Экзаменов Экзамен",
+                "password": "pass",
+            },
+        )
 
     def test_start_exam_creates_attempt(self):
         resp = self.client.get(f"/exam/{self.variant.id}/")
@@ -233,26 +264,27 @@ class ExamFlowTests(TestCase):
         # Третья попытка — лимит (max_attempts=2)
         resp = self.client.get(f"/exam/{self.variant.id}/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(
-            Attempt.objects.filter(student=self.student, is_finished=True).count(), 2
-        )
-        self.assertEqual(
-            Attempt.objects.filter(student=self.student, is_finished=False).count(), 0
-        )
+        self.assertEqual(Attempt.objects.filter(student=self.student, is_finished=True).count(), 2)
+        self.assertEqual(Attempt.objects.filter(student=self.student, is_finished=False).count(), 0)
 
 
 class AdminTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.admin = User.objects.create_user(
-            "admin", password="admin123", is_staff=True,
+            "admin",
+            password="admin123",
+            is_staff=True,
         )
 
     def test_admin_login(self):
-        resp = self.client.post("/admin/", {
-            "username": "admin",
-            "password": "admin123",
-        })
+        resp = self.client.post(
+            "/admin/",
+            {
+                "username": "admin",
+                "password": "admin123",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
 
     def test_admin_logout_requires_post(self):
