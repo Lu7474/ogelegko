@@ -91,8 +91,19 @@ def _qs_post_data(proj, page=0, theme=""):
 
 
 def _count(html):
+    # Основной паттерн: JavaScript-вызов setQCount(45)
     m = re.search(r"setQCount\((\d+)", html)
-    return int(m.group(1)) if m else 0
+    if m:
+        return int(m.group(1))
+    # Резервный: «Всего: 45» или «Результатов: 45»
+    m = re.search(r"(?:Всего|Результатов|всего)[:\s]+(\d+)", html)
+    if m:
+        return int(m.group(1))
+    # Резервный: JSON-поле "total":45
+    m = re.search(r'"total"\s*:\s*(\d+)', html)
+    if m:
+        return int(m.group(1))
+    return 0
 
 
 def _resolve_proj_from_url(url):
@@ -169,32 +180,34 @@ def fipi_get_preview(url):
         idx_html,
     )
     topics = []
-    for code, name in raw_topics:
+    for code, raw_name in raw_topics:
         code = code.strip()
-        name = name.strip().rstrip("</")
+        raw_name = raw_name.strip().rstrip("</").strip()
         if "." not in code:
             continue  # пропускаем заголовки-разделы (value="1", "2" …)
-        topics.append({"code": code, "name": name, "count": 0})
+        # Пробуем вытащить кол-во из конца метки: "Название (45)"
+        count = None
+        m_cnt = re.search(r"\((\d+)\)\s*$", raw_name)
+        if m_cnt:
+            count = int(m_cnt.group(1))
+            raw_name = raw_name[: m_cnt.start()].strip()
+        topics.append({"code": code, "name": raw_name, "count": count})
 
-    # Кол-во заданий по каждой теме
+    # Кол-во заданий по каждой теме — только для тех, где не нашли в метке
     for topic in topics:
+        if topic["count"] is not None:
+            continue
         try:
-            h = _post(
-                sess, f"{FIPI_BASE}/bank/questions.php", _qs_post_data(proj, page=0, theme=topic["code"])
-            )
-            # pagesize=1 для скорости
             h = _post(
                 sess,
                 f"{FIPI_BASE}/bank/questions.php",
-                {
-                    **_qs_post_data(proj, page=0, theme=topic["code"]),
-                    "pagesize": "1",
-                },
+                {**_qs_post_data(proj, page=0, theme=topic["code"]), "pagesize": "1"},
             )
-            topic["count"] = _count(h)
+            c = _count(h)
+            topic["count"] = c if c else None
             time.sleep(0.25)
         except Exception:
-            topic["count"] = 0
+            topic["count"] = None
 
     return {"proj": proj, "total": total, "pages": pages, "topics": topics}
 
@@ -206,8 +219,9 @@ def _mathml_to_html(tag):
     """
     name = getattr(tag, "name", None)
     if name is None:
-        # Текстовый узел — возвращаем как есть
-        return str(tag)
+        # Текстовый узел — пропускаем чисто-пробельные (отступы XML)
+        text = str(tag).strip()
+        return text
 
     local = name.split(":")[-1].lower() if ":" in name else name.lower()
 
@@ -215,9 +229,9 @@ def _mathml_to_html(tag):
     if local in ("annotation", "annotation-xml"):
         return ""
 
-    # Простые токены — берём текст, нормализуем минус
+    # Простые токены — берём текст, убираем краевые пробелы, нормализуем минус
     if local in ("mi", "mn", "mo", "mtext"):
-        return tag.get_text().replace("\u2212", "-").replace("\u2013", "-")
+        return tag.get_text().strip().replace("\u2212", "-").replace("\u2013", "-")
 
     # Пробел
     if local == "mspace":
@@ -319,6 +333,9 @@ def _process_cell_html(raw_html):
 
     # Нормализуем математический минус (U+2212) в тексте → ASCII дефис
     result = result.replace("\u2212", "-")
+
+    # Схлопываем множественные пробелы внутри тегов (артефакты MathML)
+    result = re.sub(r" {2,}", " ", result)
 
     return result.strip()
 

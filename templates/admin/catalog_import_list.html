@@ -15,6 +15,7 @@
 .url-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 0.8rem; }
 .del-dropdown { position: relative; display: inline-block; }
 .del-dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.12); z-index: 100; min-width: 220px; overflow: hidden; }
+.del-dropdown-menu.open-up { top: auto; bottom: 100%; }
 .del-dropdown-menu.open { display: block; }
 .del-dropdown-menu form { margin: 0; }
 .del-dropdown-menu button { width: 100%; text-align: left; padding: 10px 14px; border: none; background: none; cursor: pointer; font-size: 0.875rem; display: block; }
@@ -106,12 +107,23 @@ function toggleDd(id) {
     var menu = document.getElementById('ddm' + id);
     var isOpen = menu.classList.contains('open');
     // Закрыть все
-    document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){ m.classList.remove('open'); });
-    if (!isOpen) menu.classList.add('open');
+    document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){
+        m.classList.remove('open', 'open-up');
+    });
+    if (!isOpen) {
+        menu.classList.add('open');
+        // Проверяем, уходит ли меню за нижний край экрана
+        var rect = menu.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight) {
+            menu.classList.add('open-up');
+        }
+    }
 }
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.del-dropdown')) {
-        document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){ m.classList.remove('open'); });
+        document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){
+            m.classList.remove('open', 'open-up');
+        });
     }
 });
 </script>

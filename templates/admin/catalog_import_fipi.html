@@ -151,7 +151,7 @@ function doPreview() {
                     return '<div class="fipi-topic-item">' +
                         '<input type="checkbox" id="t' + i + '" value="' + t.code + '" checked>' +
                         '<label for="t' + i + '">' + t.name + '</label>' +
-                        '<span class="topic-cnt">' + (t.count || '?') + '</span>' +
+                        '<span class="topic-cnt">' + (t.count !== null && t.count !== undefined ? t.count : '?') + '</span>' +
                         '</div>';
                 }).join('');
                 document.getElementById('topicsSection').style.display = 'block';
