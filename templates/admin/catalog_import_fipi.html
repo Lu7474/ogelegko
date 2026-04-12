@@ -184,13 +184,10 @@ function startImport() {
     // Собрать выбранные темы
     var checked = Array.from(document.querySelectorAll('#topicsList input[type=checkbox]:checked'));
     var themeFilter = '';
-    // Если все галки стоят — импортируем без фильтра по теме
+    // Если отмечены не все — передаём коды выбранных через запятую
     var allChecked = checked.length === topicsData.length;
-    if (!allChecked && checked.length === 1) {
-        themeFilter = checked[0].value;
-    } else if (!allChecked && checked.length > 1) {
-        // Несколько тем — пока передаём первую (упрощение)
-        themeFilter = checked[0].value;
+    if (!allChecked && checked.length > 0) {
+        themeFilter = checked.map(function(cb) { return cb.value; }).join(',');
     }
 
     var errEl = document.getElementById('startError');

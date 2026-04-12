@@ -5,6 +5,7 @@
 Минцифры (не входит в стандартный certifi). Все запросы отправляются с
 verify=False — предупреждения InsecureRequestWarning подавляются.
 """
+
 import logging
 import re
 import time
@@ -30,7 +31,7 @@ FIPI_IMG_DELAY = 0.3
 
 FIPI_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "ru-RU,ru;q=0.9",
     "Referer": f"{FIPI_BASE}/bank/",
@@ -53,8 +54,7 @@ def _get(session, url):
         )
     except requests.exceptions.ConnectionError:
         raise ParserError(
-            "Не удалось подключиться к oge.fipi.ru. "
-            "Проверьте доступность сайта с вашего сервера."
+            "Не удалось подключиться к oge.fipi.ru. Проверьте доступность сайта с вашего сервера."
         )
     resp.raise_for_status()
     return resp.content.decode("cp1251", errors="replace")
@@ -77,9 +77,15 @@ def _qs_post_data(proj, page=0, theme=""):
         "pagesize": str(FIPI_PAGESIZE),
         "proj": proj,
         "theme": theme,
-        "qlevel": "", "qkind": "", "qsstruct": "",
-        "qpos": "", "qid": "", "zid": "",
-        "solved": "", "favorite": "", "blind": "",
+        "qlevel": "",
+        "qkind": "",
+        "qsstruct": "",
+        "qpos": "",
+        "qid": "",
+        "zid": "",
+        "solved": "",
+        "favorite": "",
+        "blind": "",
         "page": str(page),
     }
 
@@ -116,10 +122,12 @@ def _resolve_proj_from_url(url):
     for tag in soup.find_all(href=re.compile(r"proj=", re.IGNORECASE)):
         g = _extract_proj_guid(tag["href"])
         if g:
-            subject_links.append({
-                "proj": g,
-                "name": tag.get_text(" ", strip=True)[:80] or tag["href"],
-            })
+            subject_links.append(
+                {
+                    "proj": g,
+                    "name": tag.get_text(" ", strip=True)[:80] or tag["href"],
+                }
+            )
     # Дедупликация по proj
     seen = set()
     unique_links = []
@@ -171,13 +179,18 @@ def fipi_get_preview(url):
     # Кол-во заданий по каждой теме
     for topic in topics:
         try:
-            h = _post(sess, f"{FIPI_BASE}/bank/questions.php",
-                      _qs_post_data(proj, page=0, theme=topic["code"]))
+            h = _post(
+                sess, f"{FIPI_BASE}/bank/questions.php", _qs_post_data(proj, page=0, theme=topic["code"])
+            )
             # pagesize=1 для скорости
-            h = _post(sess, f"{FIPI_BASE}/bank/questions.php", {
-                **_qs_post_data(proj, page=0, theme=topic["code"]),
-                "pagesize": "1",
-            })
+            h = _post(
+                sess,
+                f"{FIPI_BASE}/bank/questions.php",
+                {
+                    **_qs_post_data(proj, page=0, theme=topic["code"]),
+                    "pagesize": "1",
+                },
+            )
             topic["count"] = _count(h)
             time.sleep(0.25)
         except Exception:
@@ -186,11 +199,129 @@ def fipi_get_preview(url):
     return {"proj": proj, "total": total, "pages": pages, "topics": topics}
 
 
+def _mathml_to_html(tag):
+    """
+    Рекурсивно конвертирует MathML-тег в читаемый HTML.
+    msup/msub → <sup>/<sub>, mfrac → (a/b), msqrt → √(…).
+    """
+    name = getattr(tag, "name", None)
+    if name is None:
+        # Текстовый узел — возвращаем как есть
+        return str(tag)
+
+    local = name.split(":")[-1].lower() if ":" in name else name.lower()
+
+    # Аннотации содержат LaTeX/MathML дубль — пропускаем
+    if local in ("annotation", "annotation-xml"):
+        return ""
+
+    # Простые токены — берём текст
+    if local in ("mi", "mn", "mo", "mtext"):
+        return tag.get_text()
+
+    # Пробел
+    if local == "mspace":
+        return " "
+
+    # Прозрачные контейнеры
+    if local in ("math", "mrow", "semantics", "mstyle", "mpadded", "mphantom", "merror"):
+        return "".join(_mathml_to_html(c) for c in tag.children)
+
+    # Степень: x² → x<sup>2</sup>
+    if local == "msup":
+        kids = [c for c in tag.children if getattr(c, "name", None)]
+        if len(kids) >= 2:
+            return f"{_mathml_to_html(kids[0])}<sup>{_mathml_to_html(kids[1])}</sup>"
+        return tag.get_text()
+
+    # Нижний индекс
+    if local == "msub":
+        kids = [c for c in tag.children if getattr(c, "name", None)]
+        if len(kids) >= 2:
+            return f"{_mathml_to_html(kids[0])}<sub>{_mathml_to_html(kids[1])}</sub>"
+        return tag.get_text()
+
+    # Нижний + верхний индексы
+    if local == "msubsup":
+        kids = [c for c in tag.children if getattr(c, "name", None)]
+        if len(kids) >= 3:
+            return (
+                f"{_mathml_to_html(kids[0])}"
+                f"<sub>{_mathml_to_html(kids[1])}</sub>"
+                f"<sup>{_mathml_to_html(kids[2])}</sup>"
+            )
+        return tag.get_text()
+
+    # Дробь: (a/b) или ((x+1)/(x-2))
+    if local == "mfrac":
+        kids = [c for c in tag.children if getattr(c, "name", None)]
+        if len(kids) >= 2:
+
+            def _frac_part(child):
+                """Оборачивает в скобки если child — mrow с несколькими дочерними тегами."""
+                child_local = child.name.split(":")[-1].lower() if ":" in child.name else child.name.lower()
+                if child_local == "mrow" and sum(1 for c in child.children if getattr(c, "name", None)) > 1:
+                    return f"({_mathml_to_html(child)})"
+                return _mathml_to_html(child)
+
+            return f"({_frac_part(kids[0])}/{_frac_part(kids[1])})"
+        return tag.get_text()
+
+    # Квадратный корень
+    if local == "msqrt":
+        inner = "".join(_mathml_to_html(c) for c in tag.children)
+        return f"√({inner})"
+
+    # Корень n-й степени
+    if local == "mroot":
+        kids = [c for c in tag.children if getattr(c, "name", None)]
+        if len(kids) >= 2:
+            return f"<sup>{_mathml_to_html(kids[1])}</sup>√({_mathml_to_html(kids[0])})"
+        return tag.get_text()
+
+    # Сумма/интеграл с пределами
+    if local in ("munder", "mover", "munderover"):
+        return "".join(_mathml_to_html(c) for c in tag.children if getattr(c, "name", None))
+
+    # Всё остальное — берём текст потомков
+    return "".join(_mathml_to_html(c) for c in tag.children)
+
+
+def _process_cell_html(raw_html):
+    """
+    1. Заменяет все <m:math>…</m:math> блоки на HTML (sup/sub).
+    2. Удаляет дублирующийся голый текст перед <p>-тегами.
+    """
+
+    def _replace_math(m):
+        block_soup = BeautifulSoup(m.group(0), "html.parser")
+        math_tag = block_soup.find(re.compile(r"^m:math$", re.IGNORECASE))
+        if math_tag is None:
+            return m.group(0)
+        return _mathml_to_html(math_tag)
+
+    # Конвертируем MathML-блоки
+    result = re.sub(
+        r"<m:math\b[^>]*>.*?</m:math\s*>",
+        _replace_math,
+        raw_html,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+    # На всякий случай убираем оставшиеся MathML-теги (без <m:math>)
+    result = re.sub(r"</?m:[a-z:]+[^>]*>", "", result, flags=re.IGNORECASE)
+
+    # Если в тексте есть <p>-теги, убираем голый дублирующийся текст перед ними
+    if re.search(r"<p\b", result, re.IGNORECASE):
+        result = re.sub(r"^\s*[^<]+(?=\s*<)", "", result.lstrip())
+
+    return result.strip()
+
+
 def _parse_page(sess, proj, page, theme=""):
     """Парсит одну страницу заданий, возвращает список dict."""
     if theme:
-        html = _post(sess, f"{FIPI_BASE}/bank/questions.php",
-                     _qs_post_data(proj, page=page, theme=theme))
+        html = _post(sess, f"{FIPI_BASE}/bank/questions.php", _qs_post_data(proj, page=page, theme=theme))
     else:
         html = _get(sess, _qs_url(proj, page))
 
@@ -226,25 +357,27 @@ def _parse_page(sess, proj, page, theme=""):
                     theme_text = tds[1].get_text(" ", strip=True)
                     break
 
-        tasks.append({
-            "task_id": task_id,
-            "guid": guid,
-            "html": sanitize_html(raw_html),
-            "image_urls": image_urls,
-            "theme": theme_text,
-        })
+        tasks.append(
+            {
+                "task_id": task_id,
+                "guid": guid,
+                "html": sanitize_html(_process_cell_html(raw_html)),
+                "image_urls": image_urls,
+                "theme": theme_text,
+            }
+        )
 
     return tasks
 
 
 def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
     """
-    Фоновый импорт ФИПИ в каталог.
-    Обновляет CatalogImportSession напрямую.
+    Импортирует одну тему ФИПИ в каталог.
+    Счётчики накапливаются поверх уже существующих в CatalogImportSession
+    (для последовательного многотемного импорта).
+    Не вызывает connection.close() — это делает вызывающий поток.
     """
     import json
-
-    from django.db import connection
 
     sess = requests.Session()
     import_session = CatalogImportSession.objects.get(id=session_id)
@@ -252,8 +385,11 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
     # Сколько страниц
     try:
         if theme_filter:
-            html0 = _post(sess, f"{FIPI_BASE}/bank/questions.php",
-                          {**_qs_post_data(proj, page=0, theme=theme_filter), "pagesize": "1"})
+            html0 = _post(
+                sess,
+                f"{FIPI_BASE}/bank/questions.php",
+                {**_qs_post_data(proj, page=0, theme=theme_filter), "pagesize": "1"},
+            )
         else:
             html0 = _get(sess, f"{FIPI_BASE}/bank/questions.php?proj={proj}&page=0&pagesize=1")
         total_tasks = _count(html0)
@@ -261,11 +397,13 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
         import_session.status = "error"
         import_session.notes = str(e)
         import_session.save()
-        connection.close()
-        return
+        raise
 
     total_pages = (total_tasks + FIPI_PAGESIZE - 1) // FIPI_PAGESIZE
-    added = skipped = duplicate = 0
+    # Начинаем с уже накопленных значений (при многотемном импорте)
+    added = import_session.tasks_added
+    skipped = import_session.tasks_skipped
+    duplicate = import_session.tasks_duplicate
     duplicate_pairs = []
 
     for page in range(total_pages):
@@ -293,15 +431,17 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
             if existing:
                 duplicate += 1
                 if len(duplicate_pairs) < 50:
-                    duplicate_pairs.append({
-                        "guid": guid,
-                        "html": text[:300],
-                        "image_urls": td["image_urls"],
-                        "theme": td["theme"],
-                        "existing_id": existing.id,
-                        "existing_preview": existing.text_preview,
-                        "existing_source": existing.get_source_display(),
-                    })
+                    duplicate_pairs.append(
+                        {
+                            "guid": guid,
+                            "html": text[:300],
+                            "image_urls": td["image_urls"],
+                            "theme": td["theme"],
+                            "existing_id": existing.id,
+                            "existing_preview": existing.text_preview,
+                            "existing_source": existing.get_source_display(),
+                        }
+                    )
                 continue
 
             # 3. Скачиваем картинку
@@ -343,6 +483,4 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
 
     import_session.status = "done"
     import_session.notes = json.dumps(duplicate_pairs, ensure_ascii=False, default=str)
-    import_session.save(update_fields=["status", "notes",
-                                        "tasks_added", "tasks_skipped", "tasks_duplicate"])
-    connection.close()
+    import_session.save(update_fields=["status", "notes", "tasks_added", "tasks_skipped", "tasks_duplicate"])

@@ -1664,11 +1664,20 @@ def variant_print_docx(request, variant_id, mode):
 
 
 def _run_fipi_import_job(job_id, proj, exam_type, theme_filter, session_id):
-    """Фоновый поток: импортирует задания ФИПИ в каталог."""
+    """
+    Фоновый поток: импортирует задания ФИПИ в каталог.
+    theme_filter — строка из кодов тем через запятую, либо пустая (все задания).
+    """
+    from django.db import connection
+
     try:
         from .fipi_parser import import_fipi_to_catalog
 
-        import_fipi_to_catalog(proj, exam_type, theme_filter, session_id)
+        # Разбиваем темы; пустой список → один проход без фильтра
+        themes = [t.strip() for t in theme_filter.split(",") if t.strip()] or [""]
+        for theme in themes:
+            import_fipi_to_catalog(proj, exam_type, theme, session_id)
+
         sess = CatalogImportSession.objects.get(id=session_id)
         cache.set(
             f"fjob:{job_id}",
@@ -1701,8 +1710,6 @@ def _run_fipi_import_job(job_id, proj, exam_type, theme_filter, session_id):
         except Exception:
             pass
     finally:
-        from django.db import connection
-
         connection.close()
 
 
