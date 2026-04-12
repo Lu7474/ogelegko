@@ -1,11 +1,16 @@
 """
 Парсер заданий с oge.fipi.ru (банк заданий ФИПИ).
+
+Примечание: oge.fipi.ru использует SSL-сертификат, выданный российским УЦ
+Минцифры (не входит в стандартный certifi). Все запросы отправляются с
+verify=False — предупреждения InsecureRequestWarning подавляются.
 """
 import re
 import time
 import uuid
 import logging
 import requests
+import urllib3
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 
@@ -13,6 +18,9 @@ from .parser import sanitize_html, ParserError
 from .models import ExamType, TaskSource, CatalogTask, CatalogImportSession
 
 logger = logging.getLogger(__name__)
+
+# Сертификат ФИПИ выдан российским УЦ, не признаётся стандартным certifi
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 FIPI_BASE = "https://oge.fipi.ru"
 FIPI_PAGESIZE = 100
@@ -36,17 +44,16 @@ def _extract_proj_guid(url):
 def _get(session, url):
     time.sleep(FIPI_DELAY)
     try:
-        resp = session.get(url, headers=FIPI_HEADERS, timeout=20)
+        resp = session.get(url, headers=FIPI_HEADERS, timeout=20, verify=False)
     except requests.exceptions.ConnectTimeout:
         raise ParserError(
             "Сервер не может подключиться к oge.fipi.ru (таймаут). "
-            "Сайт ФИПИ, вероятно, недоступен с IP вашего хостинга. "
-            "Попробуйте запустить импорт локально."
+            "Сайт ФИПИ, вероятно, недоступен с IP вашего хостинга."
         )
     except requests.exceptions.ConnectionError:
         raise ParserError(
             "Не удалось подключиться к oge.fipi.ru. "
-            "Проверьте, доступен ли сайт с вашего сервера."
+            "Проверьте доступность сайта с вашего сервера."
         )
     resp.raise_for_status()
     return resp.content.decode("cp1251", errors="replace")
@@ -54,7 +61,7 @@ def _get(session, url):
 
 def _post(session, url, data):
     time.sleep(FIPI_DELAY)
-    resp = session.post(url, data=data, headers=FIPI_HEADERS, timeout=20)
+    resp = session.post(url, data=data, headers=FIPI_HEADERS, timeout=20, verify=False)
     resp.raise_for_status()
     return resp.content.decode("cp1251", errors="replace")
 
@@ -93,7 +100,7 @@ def _resolve_proj_from_url(url):
 
     # Попробуем найти ссылки на банк внутри страницы fipi.ru
     try:
-        resp = requests.get(url, headers=FIPI_HEADERS, timeout=15)
+        resp = requests.get(url, headers=FIPI_HEADERS, timeout=15, verify=False)
         html = resp.text
     except Exception:
         return None, []
@@ -301,7 +308,7 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
             if td["image_urls"]:
                 try:
                     time.sleep(FIPI_IMG_DELAY)
-                    img_resp = sess.get(td["image_urls"][0], headers=FIPI_HEADERS, timeout=15)
+                    img_resp = sess.get(td["image_urls"][0], headers=FIPI_HEADERS, timeout=15, verify=False)
                     if img_resp.status_code == 200:
                         ct_header = img_resp.headers.get("Content-Type", "")
                         ext = ".png" if "png" in ct_header else ".jpg"
