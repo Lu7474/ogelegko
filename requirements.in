@@ -15,4 +15,3 @@ django-cloudinary-storage
 python-docx
 PyMuPDF
 pdfplumber
-sentry-sdk[django]

@@ -171,14 +171,16 @@ if not DEBUG:
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_COOLDOWN_SECONDS = int(os.environ.get("LOGIN_COOLDOWN_SECONDS", "300"))
 
-# Sentry — мониторинг ошибок в продакшене
-# Получить DSN: https://sentry.io → New Project → Django
-_SENTRY_DSN = os.environ.get("SENTRY_DSN")
-if _SENTRY_DSN and not DEBUG:
-    import sentry_sdk
-    sentry_sdk.init(
-        dsn=_SENTRY_DSN,
-        send_default_pii=False,   # не отправлять личные данные пользователей
-        traces_sample_rate=0.1,   # профилировать 10% запросов
-        environment="production",
-    )
+# Уведомления об ошибках на email (встроено в Django, бесплатно)
+# Настройка: задать EMAIL_HOST_USER, EMAIL_HOST_PASSWORD и ADMIN_EMAIL в .env
+_admin_email = os.environ.get("ADMIN_EMAIL")
+if _admin_email and not DEBUG:
+    ADMINS = [("Admin", _admin_email)]
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+    DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+    SERVER_EMAIL = EMAIL_HOST_USER
