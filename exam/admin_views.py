@@ -1428,7 +1428,7 @@ def api_catalog_tasks(request):
             {
                 "id": ct.id,
                 "task_number": ct.task_number,
-                "text_preview": ct.text_preview,
+                "text_preview": ct.text or "",
                 "correct_answer": ct.correct_answer,
                 "source": ct.get_source_display(),
                 "source_key": ct.source,

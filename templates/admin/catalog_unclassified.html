@@ -79,7 +79,7 @@
         <img src="{{ task.image.url }}" alt="" class="catalog-task-img">
         {% endif %}
         {% if task.text %}
-        <div class="catalog-task-text">{{ task.text_preview }}</div>
+        <div class="catalog-task-text">{{ task.text|safe }}</div>
         {% endif %}
         {% if task.correct_answer %}
         <div class="catalog-task-answer"><strong>Ответ:</strong> {{ task.correct_answer }}</div>

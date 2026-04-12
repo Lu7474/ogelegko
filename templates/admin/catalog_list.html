@@ -121,7 +121,7 @@
                     <img src="{{ task.image.url }}" alt="Изображение задания" class="catalog-task-img">
                     {% endif %}
                     {% if task.text %}
-                    <div class="catalog-task-text">{{ task.text_preview }}</div>
+                    <div class="catalog-task-text">{{ task.text|safe }}</div>
                     {% endif %}
                     <div class="catalog-task-answer">
                         <strong>Ответ:</strong>
