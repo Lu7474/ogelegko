@@ -7,6 +7,7 @@ from .models import (
     ExamType, TaskSource,
 )
 from .utils import normalize_answer, check_answer, get_grade
+from .parser import _strip_measurement_unit
 
 
 class NormalizeAnswerTests(TestCase):
@@ -41,6 +42,48 @@ class CheckAnswerTests(TestCase):
 
     def test_fraction_match(self):
         self.assertTrue(check_answer("1/4", "0.25"))
+
+    def test_empty_answer_is_wrong(self):
+        self.assertFalse(check_answer("", "42"))
+
+    def test_pipe_alternatives_first(self):
+        # Ответ — первый из вариантов через |
+        self.assertTrue(check_answer("234", "234|243|324"))
+
+    def test_pipe_alternatives_last(self):
+        # Ответ — последний из вариантов
+        self.assertTrue(check_answer("324", "234|243|324"))
+
+    def test_pipe_alternatives_wrong(self):
+        # Ответа нет ни в одном варианте
+        self.assertFalse(check_answer("999", "234|243|324"))
+
+
+class StripUnitTests(TestCase):
+    """Тесты удаления единиц измерения из ответов."""
+
+    def test_mm(self):
+        self.assertEqual(_strip_measurement_unit("0.4 мм"), "0.4")
+
+    def test_km_h(self):
+        self.assertEqual(_strip_measurement_unit("60 км/ч"), "60")
+
+    def test_percent(self):
+        self.assertEqual(_strip_measurement_unit("15%"), "15")
+
+    def test_rub(self):
+        self.assertEqual(_strip_measurement_unit("1200 руб"), "1200")
+
+    def test_no_unit(self):
+        # Без единицы — возвращается без изменений
+        self.assertEqual(_strip_measurement_unit("42"), "42")
+
+    def test_text_answer(self):
+        # Текст не трогается
+        self.assertEqual(_strip_measurement_unit("нет"), "нет")
+
+    def test_decimal_with_unit(self):
+        self.assertEqual(_strip_measurement_unit("3,5 кг"), "3,5")
 
 
 class GradeTests(TestCase):
