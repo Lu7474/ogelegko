@@ -65,8 +65,9 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Правильный ответ *</label>
-                        <input type="text" name="task_{{ task.number }}_answer" value="{{ task.correct_answer }}" required>
+                        <label>Правильный ответ</label>
+                        <input type="text" name="task_{{ task.number }}_answer" value="{{ task.correct_answer }}"
+                               {% if not task.manual_grading %}required{% endif %}>
                     </div>
                     <div class="form-group">
                         <label>Источник</label>
@@ -87,6 +88,13 @@
                     <div class="form-group">
                         <label>Баллы</label>
                         <input type="number" name="task_{{ task.number }}_points" value="{{ task.points }}" min="1" style="width:80px;">
+                    </div>
+                    <div class="form-group" style="justify-content:flex-end;">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal;">
+                            <input type="checkbox" name="task_{{ task.number }}_manual_grading"
+                                   {% if task.manual_grading %}checked{% endif %}>
+                            Ручная проверка
+                        </label>
                     </div>
                 </div>
             </div>
@@ -194,7 +202,10 @@
 const sourcesHtml = `{% for value, label in sources %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
 const topicsHtml = `{% for value, label in topics %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
 
-let taskCount = document.querySelectorAll('.task-form-block').length;
+// Используем максимальный существующий номер задания (не количество),
+// чтобы избежать коллизий с нумерацией из каталога (5, 12, 18…)
+let taskCount = Math.max(0, ...Array.from(document.querySelectorAll('.task-form-block'))
+    .map(b => parseInt(b.dataset.index) || 0));
 
 document.getElementById('addTask').addEventListener('click', function() {
     taskCount++;
@@ -224,8 +235,8 @@ document.getElementById('addTask').addEventListener('click', function() {
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>Правильный ответ *</label>
-                <input type="text" name="task_${taskCount}_answer" required>
+                <label>Правильный ответ</label>
+                <input type="text" name="task_${taskCount}_answer">
             </div>
             <div class="form-group">
                 <label>Источник</label>
@@ -238,6 +249,12 @@ document.getElementById('addTask').addEventListener('click', function() {
             <div class="form-group">
                 <label>Баллы</label>
                 <input type="number" name="task_${taskCount}_points" value="1" min="1" style="width:80px;">
+            </div>
+            <div class="form-group" style="justify-content:flex-end;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal;">
+                    <input type="checkbox" name="task_${taskCount}_manual_grading">
+                    Ручная проверка
+                </label>
             </div>
         </div>
     </div>`;

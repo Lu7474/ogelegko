@@ -544,28 +544,35 @@ def variant_list(request):
 
 
 def _save_variant_tasks(variant, request):
-    """Сохраняет задания варианта из POST-данных."""
-    task_index = 1
-    while f"task_{task_index}_answer" in request.POST:
+    """Сохраняет задания варианта из POST-данных.
+    Индексы заданий берём из ключей POST — они могут быть не последовательными
+    (например, при создании из каталога номера 5, 12, 18).
+    """
+    import re as _re
+
+    indices = sorted(
+        {int(m.group(1)) for key in request.POST for m in [_re.match(r"^task_(\d+)_answer$", key)] if m}
+    )
+    for task_index in indices:
         text = sanitize_html(request.POST.get(f"task_{task_index}_text", "").strip())
         answer = request.POST.get(f"task_{task_index}_answer", "").strip()
         source = request.POST.get(f"task_{task_index}_source", "manual")
         topic = request.POST.get(f"task_{task_index}_topic", "other")
         points = _safe_int(request.POST.get(f"task_{task_index}_points", "1"), default=1)
+        manual_grading = bool(request.POST.get(f"task_{task_index}_manual_grading"))
         image = request.FILES.get(f"task_{task_index}_image")
         shared_context = sanitize_html(request.POST.get(f"task_{task_index}_shared_context", "").strip())
         shared_context_image = request.FILES.get(f"task_{task_index}_shared_context_image")
 
         if points < 1:
             points = 1
-
         if source not in dict(TaskSource.choices):
             source = "manual"
-
         if topic not in dict(TaskTopic.choices):
             topic = "other"
 
-        if answer:
+        # Сохраняем если есть ответ ИЛИ ручная проверка
+        if answer or manual_grading:
             task = Task(
                 variant=variant,
                 number=task_index,
@@ -574,6 +581,7 @@ def _save_variant_tasks(variant, request):
                 source=source,
                 topic=topic,
                 points=points,
+                manual_grading=manual_grading,
                 shared_context=shared_context,
             )
             if image:
@@ -581,7 +589,6 @@ def _save_variant_tasks(variant, request):
             if shared_context_image:
                 task.shared_context_image = shared_context_image
             task.save()
-        task_index += 1
 
 
 @admin_required
