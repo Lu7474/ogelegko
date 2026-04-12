@@ -10,3 +10,5 @@ staticfiles/
 logs/
 *.log
 cache/
+.claude/
+commits_history.txt
