@@ -111,12 +111,15 @@ function toggleDd(id) {
         m.classList.remove('open', 'open-up');
     });
     if (!isOpen) {
-        menu.classList.add('open');
-        // Проверяем, уходит ли меню за нижний край экрана
-        var rect = menu.getBoundingClientRect();
-        if (rect.bottom > window.innerHeight) {
+        // Определяем направление по позиции кнопки-триггера (до открытия)
+        var btn = menu.previousElementSibling;
+        var btnRect = btn.getBoundingClientRect();
+        var menuHeight = 110; // приблизительная высота двух пунктов
+        var spaceBelow = window.innerHeight - btnRect.bottom;
+        if (spaceBelow < menuHeight) {
             menu.classList.add('open-up');
         }
+        menu.classList.add('open');
     }
 }
 document.addEventListener('click', function(e) {
