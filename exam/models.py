@@ -176,6 +176,8 @@ class Task(models.Model):
             return "Десятичная дробь (через запятую)"
         if re.match(r"^[\d;]+$", a) and ";" in a:
             return "Последовательность чисел через ;"
+        if "π" in a:
+            return "Введите число без π (например, вместо 27π пишите 27)"
         return ""
 
 

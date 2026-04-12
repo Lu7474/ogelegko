@@ -7,6 +7,8 @@ def normalize_answer(answer: str) -> str:
     answer = answer.strip()
     # Нормализуем знаки минуса: U+2212 (математический), U+2013 (en-dash) → ASCII дефис
     answer = answer.replace("\u2212", "-").replace("\u2013", "-")
+    # Нормализуем π: "pi" после цифры ("27pi") или отдельно ("pi") → символ π
+    answer = re.sub(r"(?i)(?<=\d)pi|^pi$", "π", answer)
     answer = answer.replace(",", ".").replace(" ", "")
     if not answer:
         return ""
@@ -36,12 +38,22 @@ def normalize_answer(answer: str) -> str:
 def check_answer(student_answer: str, correct_answer: str) -> bool:
     """Проверяет правильность ответа с нормализацией.
     Правильный ответ может содержать несколько вариантов через | (например, 234|243|324).
+    Если правильный ответ вида Nπ — принимается и ответ без π (ученик не может набрать символ).
     """
     if not student_answer or not student_answer.strip():
         return False
     norm_student = normalize_answer(student_answer)
     alternatives = [normalize_answer(a) for a in correct_answer.split("|")]
-    return norm_student in alternatives
+    if norm_student in alternatives:
+        return True
+    # Для ответов вида "Nπ": принимаем коэффициент без π
+    # "27π" → принять "27" или "27pi"; "π" (без коэффициента) — не упрощаем
+    for alt in alternatives:
+        if alt.endswith("π") and len(alt) > 1:
+            coeff = normalize_answer(alt[:-1])
+            if coeff and norm_student == coeff:
+                return True
+    return False
 
 
 # Таблицы перевода баллов (2025/2026)

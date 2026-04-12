@@ -80,6 +80,26 @@ class CheckAnswerTests(TestCase):
         # Ответа нет ни в одном варианте
         self.assertFalse(check_answer("999", "234|243|324"))
 
+    def test_pi_without_symbol(self):
+        # Ученик пишет 27 вместо 27π — принимается
+        self.assertTrue(check_answer("27", "27π"))
+
+    def test_pi_with_symbol(self):
+        # Ученик пишет 27π — тоже принимается
+        self.assertTrue(check_answer("27π", "27π"))
+
+    def test_pi_keyword(self):
+        # Ученик пишет "27pi" — принимается (pi → π)
+        self.assertTrue(check_answer("27pi", "27π"))
+
+    def test_pi_alone_not_simplified(self):
+        # Ответ "π" (без коэффициента) — "1" не принимается
+        self.assertFalse(check_answer("1", "π"))
+
+    def test_pi_wrong_coeff(self):
+        # Неверный коэффициент
+        self.assertFalse(check_answer("28", "27π"))
+
 
 class StripUnitTests(TestCase):
     """Тесты удаления единиц измерения из ответов."""
