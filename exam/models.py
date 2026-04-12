@@ -8,6 +8,14 @@ from django.db import models
 def validate_image_size(image):
     if image.size > 5 * 1024 * 1024:
         raise ValidationError("Изображение не должно превышать 5 МБ.")
+    try:
+        from PIL import Image
+
+        img = Image.open(image)
+        img.verify()
+        image.seek(0)
+    except Exception:
+        raise ValidationError("Загруженный файл не является изображением.")
 
 
 class ExamType(models.TextChoices):
@@ -17,9 +25,9 @@ class ExamType(models.TextChoices):
 
 
 EXAM_DURATION = {
-    ExamType.OGE: 235,           # 3ч 55мин
-    ExamType.EGE_PROFILE: 235,   # 3ч 55мин
-    ExamType.EGE_BASE: 180,      # 3ч
+    ExamType.OGE: 235,  # 3ч 55мин
+    ExamType.EGE_PROFILE: 235,  # 3ч 55мин
+    ExamType.EGE_BASE: 180,  # 3ч
 }
 
 EXAM_TASK_COUNT = {
@@ -95,7 +103,8 @@ class Variant(models.Model):
     exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
     is_active = models.BooleanField("Активен", default=True)
     max_attempts = models.PositiveIntegerField(
-        "Макс. попыток", default=3,
+        "Макс. попыток",
+        default=3,
         help_text="0 = без ограничений",
     )
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -119,21 +128,29 @@ class Task(models.Model):
     )
     number = models.CharField("Номер задания", max_length=20)
     text = models.TextField("Текст задания", blank=True)
-    image = models.ImageField("Изображение", upload_to="tasks/", blank=True, null=True, validators=[validate_image_size])
+    image = models.ImageField(
+        "Изображение", upload_to="tasks/", blank=True, null=True, validators=[validate_image_size]
+    )
     correct_answer = models.CharField("Правильный ответ", max_length=255)
     source = models.CharField(
         "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL
     )
     topic = models.CharField(
-        "Тема", max_length=30, choices=TaskTopic.choices,
-        default=TaskTopic.OTHER, blank=True,
+        "Тема",
+        max_length=30,
+        choices=TaskTopic.choices,
+        default=TaskTopic.OTHER,
+        blank=True,
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)
     shared_context = models.TextField("Общее условие", blank=True)
     shared_context_image = models.ImageField(
-        "Изображение общего условия", upload_to="contexts/",
-        blank=True, null=True, validators=[validate_image_size],
+        "Изображение общего условия",
+        upload_to="contexts/",
+        blank=True,
+        null=True,
+        validators=[validate_image_size],
     )
 
     class Meta:
@@ -153,11 +170,11 @@ class Task(models.Model):
         a = self.correct_answer.strip()
         if not a or a.startswith("Критерии"):
             return ""
-        if re.match(r'^-?\d+$', a):
+        if re.match(r"^-?\d+$", a):
             return "Целое число"
-        if re.match(r'^-?\d+[.,]\d+$', a):
+        if re.match(r"^-?\d+[.,]\d+$", a):
             return "Десятичная дробь (через запятую)"
-        if re.match(r'^[\d;]+$', a) and ';' in a:
+        if re.match(r"^[\d;]+$", a) and ";" in a:
             return "Последовательность чисел через ;"
         return ""
 
@@ -218,6 +235,7 @@ class Attempt(models.Model):
 
 class CatalogImportSession(models.Model):
     """История импортов в каталог."""
+
     source = models.CharField("Источник", max_length=20, choices=TaskSource.choices)
     url = models.TextField("URL", blank=True)
     proj_guid = models.CharField("GUID проекта ФИПИ", max_length=64, blank=True)
@@ -243,41 +261,46 @@ class CatalogImportSession(models.Model):
 
 class CatalogTask(models.Model):
     """Задание в каталоге — независимо от конкретного варианта."""
+
     task_number = models.IntegerField(
-        "Номер задания", null=True, blank=True,
-        help_text="1–25, пусто = не определено"
+        "Номер задания", null=True, blank=True, help_text="1–25, пусто = не определено"
     )
     exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
     text = models.TextField("Текст задания", blank=True)
-    image = models.ImageField("Изображение", upload_to="catalog/", blank=True, null=True, validators=[validate_image_size])
+    image = models.ImageField(
+        "Изображение", upload_to="catalog/", blank=True, null=True, validators=[validate_image_size]
+    )
     correct_answer = models.CharField("Правильный ответ", max_length=255, blank=True)
     source = models.CharField(
         "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL
     )
     topic = models.CharField(
-        "Тема", max_length=30, choices=TaskTopic.choices,
-        default=TaskTopic.OTHER, blank=True,
+        "Тема",
+        max_length=30,
+        choices=TaskTopic.choices,
+        default=TaskTopic.OTHER,
+        blank=True,
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)
     shared_context = models.TextField("Общее условие", blank=True)
     shared_context_image = models.ImageField(
-        "Изображение общего условия", upload_to="contexts/",
-        blank=True, null=True, validators=[validate_image_size],
+        "Изображение общего условия",
+        upload_to="contexts/",
+        blank=True,
+        null=True,
+        validators=[validate_image_size],
     )
     created_at = models.DateTimeField("Создан", auto_now_add=True)
-    sdamgia_id = models.CharField(
-        "ID СдамГИА", max_length=20, blank=True, null=True, unique=True
-    )
-    fipi_guid = models.CharField(
-        "GUID ФИПИ", max_length=64, blank=True, null=True, unique=True
-    )
-    text_hash = models.CharField(
-        "Хэш текста", max_length=32, blank=True, null=True, db_index=True
-    )
+    sdamgia_id = models.CharField("ID СдамГИА", max_length=20, blank=True, null=True, unique=True)
+    fipi_guid = models.CharField("GUID ФИПИ", max_length=64, blank=True, null=True, unique=True)
+    text_hash = models.CharField("Хэш текста", max_length=32, blank=True, null=True, db_index=True)
     import_session = models.ForeignKey(
-        CatalogImportSession, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="tasks",
+        CatalogImportSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasks",
         verbose_name="Сессия импорта",
     )
 
@@ -298,6 +321,7 @@ class CatalogTask(models.Model):
     @staticmethod
     def compute_hash(text):
         import hashlib
+
         plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text or "")).strip().lower()
         return hashlib.md5(plain.encode("utf-8")).hexdigest() if plain else None
 
@@ -306,9 +330,7 @@ class Answer(models.Model):
     attempt = models.ForeignKey(
         Attempt, on_delete=models.CASCADE, verbose_name="Попытка", related_name="answers"
     )
-    task = models.ForeignKey(
-        Task, on_delete=models.CASCADE, verbose_name="Задание", related_name="answers"
-    )
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, verbose_name="Задание", related_name="answers")
     student_answer = models.TextField("Ответ ученика", blank=True)
     is_correct = models.BooleanField("Правильно", default=False, null=True, blank=True)
 

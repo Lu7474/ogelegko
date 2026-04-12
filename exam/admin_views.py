@@ -9,7 +9,7 @@ from django.conf import settings as django_settings
 from django.contrib.auth import authenticate, login, logout
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -36,11 +36,13 @@ logger = logging.getLogger(__name__)
 
 def admin_required(view_func):
     """Декоратор: требует авторизованного админа (Django User с is_staff)."""
+
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated or not request.user.is_staff:
             return redirect("admin_login")
         return view_func(request, *args, **kwargs)
+
     return wrapper
 
 
@@ -67,6 +69,7 @@ def _get_client_ip(request):
 
 
 # --- Вход / Выход ---
+
 
 def _check_admin_rate_limit(request):
     ip = _get_client_ip(request)
@@ -124,6 +127,7 @@ def admin_logout(request):
 
 # --- Дашборд ---
 
+
 @admin_required
 def dashboard(request):
     stats = {
@@ -132,44 +136,47 @@ def dashboard(request):
         "attempts_count": Attempt.objects.filter(is_finished=True).count(),
         "classes_count": SchoolClass.objects.count(),
     }
-    recent_attempts = Attempt.objects.filter(
-        is_finished=True
-    ).select_related("student", "variant", "student__school_class").order_by("-finished_at")[:10]
+    recent_attempts = (
+        Attempt.objects.filter(is_finished=True)
+        .select_related("student", "variant", "student__school_class")
+        .order_by("-finished_at")[:10]
+    )
 
-    pending_grading = Attempt.objects.filter(
-        is_finished=True, answers__is_correct=None
-    ).distinct().count()
+    pending_grading = Attempt.objects.filter(is_finished=True, answers__is_correct=None).distinct().count()
 
     # Статистика по классам
-    classes = SchoolClass.objects.filter(is_active=True).annotate(
-        student_count=Count("students")
-    )
+    classes = SchoolClass.objects.filter(is_active=True).annotate(student_count=Count("students"))
     class_stats_list = []
     for sc in classes:
-        attempts_qs = Attempt.objects.filter(
-            student__school_class=sc, is_finished=True
-        )
+        attempts_qs = Attempt.objects.filter(student__school_class=sc, is_finished=True)
         attempts_count = attempts_qs.count()
         if attempts_count > 0:
             percentages = [a.percentage for a in attempts_qs]
             avg_pct = round(sum(percentages) / len(percentages))
         else:
             avg_pct = None
-        class_stats_list.append({
-            "school_class": sc,
-            "attempts_count": attempts_count,
-            "avg_percentage": avg_pct,
-        })
+        class_stats_list.append(
+            {
+                "school_class": sc,
+                "attempts_count": attempts_count,
+                "avg_percentage": avg_pct,
+            }
+        )
 
-    return render(request, "admin/dashboard.html", {
-        "stats": stats,
-        "recent_attempts": recent_attempts,
-        "class_stats": class_stats_list,
-        "pending_grading": pending_grading,
-    })
+    return render(
+        request,
+        "admin/dashboard.html",
+        {
+            "stats": stats,
+            "recent_attempts": recent_attempts,
+            "class_stats": class_stats_list,
+            "pending_grading": pending_grading,
+        },
+    )
 
 
 # --- Классы ---
+
 
 @admin_required
 def class_list(request):
@@ -194,10 +201,14 @@ def class_add(request):
             except IntegrityError:
                 error = f"Класс '{name}' уже существует"
 
-    return render(request, "admin/class_form.html", {
-        "exam_types": ExamType.choices,
-        "error": error,
-    })
+    return render(
+        request,
+        "admin/class_form.html",
+        {
+            "exam_types": ExamType.choices,
+            "error": error,
+        },
+    )
 
 
 @admin_required
@@ -220,11 +231,15 @@ def class_edit(request, class_id):
             except IntegrityError:
                 error = f"Класс '{name}' уже существует"
 
-    return render(request, "admin/class_form.html", {
-        "school_class": school_class,
-        "exam_types": ExamType.choices,
-        "error": error,
-    })
+    return render(
+        request,
+        "admin/class_form.html",
+        {
+            "school_class": school_class,
+            "exam_types": ExamType.choices,
+            "error": error,
+        },
+    )
 
 
 @admin_required
@@ -254,9 +269,11 @@ def class_stats(request, class_id):
     all_percentages = []
 
     for student in students:
-        attempts = Attempt.objects.filter(
-            student=student, is_finished=True
-        ).select_related("variant").order_by("-finished_at")
+        attempts = (
+            Attempt.objects.filter(student=student, is_finished=True)
+            .select_related("variant")
+            .order_by("-finished_at")
+        )
         count = attempts.count()
         total_attempts += count
 
@@ -269,24 +286,31 @@ def class_stats(request, class_id):
             avg_pct = None
             last_attempt = None
 
-        student_stats_list.append({
-            "student": student,
-            "attempts_count": count,
-            "avg_percentage": avg_pct,
-            "last_attempt": last_attempt,
-        })
+        student_stats_list.append(
+            {
+                "student": student,
+                "attempts_count": count,
+                "avg_percentage": avg_pct,
+                "last_attempt": last_attempt,
+            }
+        )
 
     class_avg = round(sum(all_percentages) / len(all_percentages)) if all_percentages else None
 
-    return render(request, "admin/class_stats.html", {
-        "school_class": school_class,
-        "student_stats": student_stats_list,
-        "total_attempts": total_attempts,
-        "class_avg": class_avg,
-    })
+    return render(
+        request,
+        "admin/class_stats.html",
+        {
+            "school_class": school_class,
+            "student_stats": student_stats_list,
+            "total_attempts": total_attempts,
+            "class_avg": class_avg,
+        },
+    )
 
 
 # --- Ученики ---
+
 
 @admin_required
 def student_list(request):
@@ -300,11 +324,15 @@ def student_list(request):
             students = students.filter(school_class_id=filter_id)
 
     classes = SchoolClass.objects.all()
-    return render(request, "admin/students.html", {
-        "students": students,
-        "classes": classes,
-        "class_filter": class_filter,
-    })
+    return render(
+        request,
+        "admin/students.html",
+        {
+            "students": students,
+            "classes": classes,
+            "class_filter": class_filter,
+        },
+    )
 
 
 @admin_required
@@ -365,11 +393,15 @@ def student_edit(request, student_id):
                 error = f"Ученик '{full_name}' уже существует"
 
     classes = SchoolClass.objects.all()
-    return render(request, "admin/student_form.html", {
-        "student": student,
-        "classes": classes,
-        "error": error,
-    })
+    return render(
+        request,
+        "admin/student_form.html",
+        {
+            "student": student,
+            "classes": classes,
+            "error": error,
+        },
+    )
 
 
 @admin_required
@@ -391,9 +423,14 @@ def student_import(request):
             import openpyxl
         except ImportError:
             errors.append("Библиотека openpyxl не установлена. Выполните: pip install openpyxl")
-            return render(request, "admin/student_import.html", {
-                "errors": errors, "success_count": success_count,
-            })
+            return render(
+                request,
+                "admin/student_import.html",
+                {
+                    "errors": errors,
+                    "success_count": success_count,
+                },
+            )
 
         uploaded_file = request.FILES["file"]
         if not uploaded_file.name.endswith(".xlsx"):
@@ -410,7 +447,9 @@ def student_import(request):
                         continue
                     try:
                         if len(row) < 3 or not row[1] or not row[2]:
-                            errors.append(f"Строка {row_num}: не все поля заполнены (нужно: ФИО, пароль, класс)")
+                            errors.append(
+                                f"Строка {row_num}: не все поля заполнены (нужно: ФИО, пароль, класс)"
+                            )
                             continue
 
                         full_name = str(row[0]).strip()
@@ -432,18 +471,24 @@ def student_import(request):
                 logger.exception("Ошибка чтения Excel файла")
                 errors.append(f"Ошибка чтения файла: {str(e)}")
 
-    return render(request, "admin/student_import.html", {
-        "errors": errors,
-        "success_count": success_count,
-    })
+    return render(
+        request,
+        "admin/student_import.html",
+        {
+            "errors": errors,
+            "success_count": success_count,
+        },
+    )
 
 
 @admin_required
 def student_stats(request, student_id):
     student = get_object_or_404(Student.objects.select_related("school_class"), id=student_id)
-    attempts = Attempt.objects.filter(
-        student=student, is_finished=True
-    ).select_related("variant").order_by("-finished_at")
+    attempts = (
+        Attempt.objects.filter(student=student, is_finished=True)
+        .select_related("variant")
+        .order_by("-finished_at")
+    )
 
     avg_percentage = None
     if attempts.exists():
@@ -452,23 +497,30 @@ def student_stats(request, student_id):
 
     chart_data = []
     for a in reversed(list(attempts)):
-        chart_data.append({
-            "date": a.finished_at.strftime("%d.%m.%Y"),
-            "variant": a.variant.number,
-            "score": a.score,
-            "max_score": a.max_score,
-            "percentage": a.percentage,
-        })
+        chart_data.append(
+            {
+                "date": a.finished_at.strftime("%d.%m.%Y"),
+                "variant": a.variant.number,
+                "score": a.score,
+                "max_score": a.max_score,
+                "percentage": a.percentage,
+            }
+        )
 
-    return render(request, "admin/student_stats.html", {
-        "student": student,
-        "attempts": attempts,
-        "avg_percentage": avg_percentage,
-        "chart_data": json.dumps(chart_data),
-    })
+    return render(
+        request,
+        "admin/student_stats.html",
+        {
+            "student": student,
+            "attempts": attempts,
+            "avg_percentage": avg_percentage,
+            "chart_data": json.dumps(chart_data),
+        },
+    )
 
 
 # --- Варианты ---
+
 
 @admin_required
 def variant_list(request):
@@ -480,11 +532,15 @@ def variant_list(request):
     if exam_filter and exam_filter in dict(ExamType.choices):
         variants = variants.filter(exam_type=exam_filter)
 
-    return render(request, "admin/variants.html", {
-        "variants": variants,
-        "exam_types": ExamType.choices,
-        "exam_filter": exam_filter,
-    })
+    return render(
+        request,
+        "admin/variants.html",
+        {
+            "variants": variants,
+            "exam_types": ExamType.choices,
+            "exam_filter": exam_filter,
+        },
+    )
 
 
 def _save_variant_tasks(variant, request):
@@ -551,12 +607,16 @@ def variant_add(request):
             except IntegrityError:
                 error = f"Вариант с номером '{number}' уже существует"
 
-    return render(request, "admin/variant_form.html", {
-        "exam_types": ExamType.choices,
-        "sources": TaskSource.choices,
-        "topics": TaskTopic.choices,
-        "error": error,
-    })
+    return render(
+        request,
+        "admin/variant_form.html",
+        {
+            "exam_types": ExamType.choices,
+            "sources": TaskSource.choices,
+            "topics": TaskTopic.choices,
+            "error": error,
+        },
+    )
 
 
 @admin_required
@@ -586,14 +646,18 @@ def variant_edit(request, variant_id):
             except IntegrityError:
                 error = f"Вариант с номером '{number}' уже существует"
 
-    return render(request, "admin/variant_form.html", {
-        "variant": variant,
-        "tasks": tasks,
-        "exam_types": ExamType.choices,
-        "sources": TaskSource.choices,
-        "topics": TaskTopic.choices,
-        "error": error,
-    })
+    return render(
+        request,
+        "admin/variant_form.html",
+        {
+            "variant": variant,
+            "tasks": tasks,
+            "exam_types": ExamType.choices,
+            "sources": TaskSource.choices,
+            "topics": TaskTopic.choices,
+            "error": error,
+        },
+    )
 
 
 @admin_required
@@ -652,23 +716,31 @@ def _run_import_job(job_id, url, variant_number):
     """Фоновый поток для импорта варианта."""
     try:
         from .parser import import_variant_from_sdamgia
-        variant, parse_errors = import_variant_from_sdamgia(
-            url, variant_number=variant_number or None
+
+        variant, parse_errors = import_variant_from_sdamgia(url, variant_number=variant_number or None)
+        cache.set(
+            f"vjob:{job_id}",
+            {
+                "status": "done",
+                "variant_id": variant.id if variant else None,
+                "errors": parse_errors,
+            },
+            _JOB_TTL,
         )
-        cache.set(f"vjob:{job_id}", {
-            "status": "done",
-            "variant_id": variant.id if variant else None,
-            "errors": parse_errors,
-        }, _JOB_TTL)
     except Exception as e:
         logger.exception("Ошибка импорта варианта")
-        cache.set(f"vjob:{job_id}", {
-            "status": "error",
-            "variant_id": None,
-            "errors": [str(e)],
-        }, _JOB_TTL)
+        cache.set(
+            f"vjob:{job_id}",
+            {
+                "status": "error",
+                "variant_id": None,
+                "errors": [str(e)],
+            },
+            _JOB_TTL,
+        )
     finally:
         from django.db import connection
+
         connection.close()
 
 
@@ -690,9 +762,7 @@ def variant_import(request):
 
         job_id = str(uuid.uuid4())
         cache.set(f"vjob:{job_id}", {"status": "running", "variant_id": None, "errors": []}, _JOB_TTL)
-        threading.Thread(
-            target=_run_import_job, args=(job_id, url, variant_number), daemon=True
-        ).start()
+        threading.Thread(target=_run_import_job, args=(job_id, url, variant_number), daemon=True).start()
         return redirect("admin_variant_import_status", job_id=job_id)
 
     return render(request, "admin/variant_import.html", {"errors": []})
@@ -701,7 +771,11 @@ def variant_import(request):
 @admin_required
 def variant_import_status(request, job_id):
     """Страница/API опроса статуса импорта."""
-    job = cache.get(f"vjob:{job_id}") or {"status": "unknown", "variant_id": None, "errors": ["Задание не найдено"]}
+    job = cache.get(f"vjob:{job_id}") or {
+        "status": "unknown",
+        "variant_id": None,
+        "errors": ["Задание не найдено"],
+    }
 
     if request.GET.get("json"):
         return JsonResponse(job)
@@ -710,21 +784,28 @@ def variant_import_status(request, job_id):
     if job["status"] == "done" and job.get("variant_id"):
         variant = Variant.objects.filter(id=job["variant_id"]).first()
 
-    return render(request, "admin/variant_import_status.html", {
-        "job_id": job_id,
-        "job": job,
-        "variant": variant,
-    })
+    return render(
+        request,
+        "admin/variant_import_status.html",
+        {
+            "job_id": job_id,
+            "job": job,
+            "variant": variant,
+        },
+    )
 
 
 # --- Статистика варианта ---
 
+
 @admin_required
 def variant_stats(request, variant_id):
     variant = get_object_or_404(Variant, id=variant_id)
-    attempts = Attempt.objects.filter(
-        variant=variant, is_finished=True
-    ).select_related("student", "student__school_class").order_by("-finished_at")
+    attempts = (
+        Attempt.objects.filter(variant=variant, is_finished=True)
+        .select_related("student", "student__school_class")
+        .order_by("-finished_at")
+    )
 
     avg_percentage = None
     if attempts.exists():
@@ -734,46 +815,54 @@ def variant_stats(request, variant_id):
     # Статистика по заданиям
     task_stats = []
     for task in variant.tasks.order_by("id"):
-        total = Answer.objects.filter(
-            task=task, attempt__is_finished=True
-        ).count()
-        correct = Answer.objects.filter(
-            task=task, attempt__is_finished=True, is_correct=True
-        ).count()
+        total = Answer.objects.filter(task=task, attempt__is_finished=True).count()
+        correct = Answer.objects.filter(task=task, attempt__is_finished=True, is_correct=True).count()
         pct = round(correct / total * 100) if total > 0 else 0
-        task_stats.append({
-            "task": task,
-            "correct": correct,
-            "total": total,
-            "percentage": pct,
-        })
+        task_stats.append(
+            {
+                "task": task,
+                "correct": correct,
+                "total": total,
+                "percentage": pct,
+            }
+        )
 
-    return render(request, "admin/variant_stats.html", {
-        "variant": variant,
-        "attempts": attempts,
-        "avg_percentage": avg_percentage,
-        "task_stats": task_stats,
-    })
+    return render(
+        request,
+        "admin/variant_stats.html",
+        {
+            "variant": variant,
+            "attempts": attempts,
+            "avg_percentage": avg_percentage,
+            "task_stats": task_stats,
+        },
+    )
 
 
 # --- Просмотр и ручная проверка попытки ---
+
 
 @admin_required
 def attempt_detail(request, attempt_id):
     attempt = get_object_or_404(Attempt, id=attempt_id, is_finished=True)
     answers = attempt.answers.select_related("task").order_by("task__id")
     has_pending = answers.filter(is_correct=None).exists()
-    return render(request, "admin/attempt_detail.html", {
-        "attempt": attempt,
-        "answers": answers,
-        "has_pending": has_pending,
-    })
+    return render(
+        request,
+        "admin/attempt_detail.html",
+        {
+            "attempt": attempt,
+            "answers": answers,
+            "has_pending": has_pending,
+        },
+    )
 
 
 @admin_required
 @require_POST
 def attempt_grade_answer(request, answer_id):
     from .views import _recalculate_attempt_score
+
     answer = get_object_or_404(Answer, id=answer_id, task__manual_grading=True)
     value = request.POST.get("is_correct")
     if value == "true":
@@ -789,12 +878,14 @@ def attempt_grade_answer(request, answer_id):
 
 # --- API: уведомления о новых попытках ---
 
+
 @admin_required
 def api_new_attempts(request):
     """JSON: попытки завершённые после переданного ISO-timestamp (или за последние 24ч)."""
     since_str = request.GET.get("since", "")
     try:
         from datetime import datetime
+
         since_dt = datetime.fromisoformat(since_str.replace("Z", "+00:00"))
         if timezone.is_naive(since_dt):
             since_dt = timezone.make_aware(since_dt)
@@ -802,13 +893,13 @@ def api_new_attempts(request):
         since_dt = timezone.now() - timedelta(hours=24)
 
     attempts = (
-        Attempt.objects
-        .filter(is_finished=True, finished_at__gt=since_dt)
+        Attempt.objects.filter(is_finished=True, finished_at__gt=since_dt)
         .select_related("student", "variant", "student__school_class")
         .order_by("-finished_at")[:20]
     )
 
     from django.urls import reverse
+
     data = {
         "count": attempts.count(),
         "attempts": [
@@ -828,6 +919,7 @@ def api_new_attempts(request):
 
 # --- Удаление попытки ---
 
+
 @admin_required
 @require_POST
 def attempt_delete(request, attempt_id):
@@ -838,6 +930,7 @@ def attempt_delete(request, attempt_id):
 
 
 # --- Экспорт результатов ---
+
 
 @admin_required
 def export_results(request):
@@ -857,9 +950,11 @@ def export_results(request):
     class_id = _safe_int(request.GET.get("class", ""))
     variant_id = _safe_int(request.GET.get("variant", ""))
 
-    attempts = Attempt.objects.filter(is_finished=True).select_related(
-        "student", "student__school_class", "variant"
-    ).order_by("-finished_at")
+    attempts = (
+        Attempt.objects.filter(is_finished=True)
+        .select_related("student", "student__school_class", "variant")
+        .order_by("-finished_at")
+    )
 
     if class_id:
         attempts = attempts.filter(student__school_class_id=class_id)
@@ -867,21 +962,21 @@ def export_results(request):
         attempts = attempts.filter(variant_id=variant_id)
 
     for a in attempts:
-        ws.append([
-            a.student.full_name,
-            a.student.school_class.name,
-            a.student.school_class.get_exam_type_display(),
-            a.variant.number,
-            a.finished_at.strftime("%d.%m.%Y %H:%M") if a.finished_at else "",
-            a.score,
-            a.max_score,
-            a.grade,
-            a.duration_display,
-        ])
+        ws.append(
+            [
+                a.student.full_name,
+                a.student.school_class.name,
+                a.student.school_class.get_exam_type_display(),
+                a.variant.number,
+                a.finished_at.strftime("%d.%m.%Y %H:%M") if a.finished_at else "",
+                a.score,
+                a.max_score,
+                a.grade,
+                a.duration_display,
+            ]
+        )
 
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = 'attachment; filename="results.xlsx"'
     wb.save(response)
     return response
@@ -900,9 +995,12 @@ def export_results_docx(request):
     class_id = _safe_int(request.GET.get("class", ""))
     variant_id = _safe_int(request.GET.get("variant", ""))
 
-    attempts = Attempt.objects.filter(is_finished=True).select_related(
-        "student", "student__school_class", "variant"
-    ).prefetch_related("answers__task").order_by("-finished_at")
+    attempts = (
+        Attempt.objects.filter(is_finished=True)
+        .select_related("student", "student__school_class", "variant")
+        .prefetch_related("answers__task")
+        .order_by("-finished_at")
+    )
 
     if class_id:
         attempts = attempts.filter(student__school_class_id=class_id)
@@ -996,10 +1094,12 @@ def export_results_docx(request):
 
 # ===== КАТАЛОГ ЗАДАНИЙ =====
 
+
 def _run_catalog_import_job(job_id, url):
     """Фоновый поток: парсит вариант и добавляет все задания в каталог."""
     try:
         from .parser import import_variant_to_catalog
+
         sess = CatalogImportSession.objects.create(
             source=TaskSource.SDAMGIA,
             url=url,
@@ -1010,21 +1110,30 @@ def _run_catalog_import_job(job_id, url):
             sess.status = "error"
             sess.notes = "\n".join(errors)
             sess.save(update_fields=["status", "notes"])
-        cache.set(f"cjob:{job_id}", {
-            "status": "done",
-            "added": added,
-            "errors": errors,
-            "session_id": sess.id,
-        }, _JOB_TTL)
+        cache.set(
+            f"cjob:{job_id}",
+            {
+                "status": "done",
+                "added": added,
+                "errors": errors,
+                "session_id": sess.id,
+            },
+            _JOB_TTL,
+        )
     except Exception as e:
         logger.exception("Ошибка импорта в каталог")
-        cache.set(f"cjob:{job_id}", {
-            "status": "error",
-            "added": 0,
-            "errors": [str(e)],
-        }, _JOB_TTL)
+        cache.set(
+            f"cjob:{job_id}",
+            {
+                "status": "error",
+                "added": 0,
+                "errors": [str(e)],
+            },
+            _JOB_TTL,
+        )
     finally:
         from django.db import connection
+
         connection.close()
 
 
@@ -1045,17 +1154,15 @@ def catalog_list(request):
     if source_filter:
         tasks = tasks.filter(source=source_filter)
     if search:
-        tasks = tasks.filter(
-            Q(text__icontains=search) | Q(correct_answer__icontains=search)
-        )
+        tasks = tasks.filter(Q(text__icontains=search) | Q(correct_answer__icontains=search))
 
     tasks = tasks.order_by("task_number", "-created_at")
 
     # Подсчёт по номерам (для левой панели)
     from django.db.models import Count as _Count
+
     number_counts = (
-        CatalogTask.objects
-        .filter(task_number__isnull=False)
+        CatalogTask.objects.filter(task_number__isnull=False)
         .values("task_number", "exam_type")
         .annotate(cnt=_Count("id"))
         .order_by("task_number")
@@ -1067,17 +1174,21 @@ def catalog_list(request):
 
     page = _paginate(request, tasks, per_page=30)
 
-    return render(request, "admin/catalog_list.html", {
-        "page": page,
-        "exam_types": ExamType.choices,
-        "sources": TaskSource.choices,
-        "exam_type_filter": exam_type_filter,
-        "num_filter": num_filter,
-        "source_filter": source_filter,
-        "search": search,
-        "number_counts": list(number_counts),
-        "unclassified_count": unclassified_count,
-    })
+    return render(
+        request,
+        "admin/catalog_list.html",
+        {
+            "page": page,
+            "exam_types": ExamType.choices,
+            "sources": TaskSource.choices,
+            "exam_type_filter": exam_type_filter,
+            "num_filter": num_filter,
+            "source_filter": source_filter,
+            "search": search,
+            "number_counts": list(number_counts),
+            "unclassified_count": unclassified_count,
+        },
+    )
 
 
 @admin_required
@@ -1123,13 +1234,17 @@ def catalog_add(request):
             ct.save()
             return redirect("admin_catalog")
 
-    return render(request, "admin/catalog_task_form.html", {
-        "exam_types": ExamType.choices,
-        "sources": TaskSource.choices,
-        "topics": TaskTopic.choices,
-        "error": error,
-        "task": None,
-    })
+    return render(
+        request,
+        "admin/catalog_task_form.html",
+        {
+            "exam_types": ExamType.choices,
+            "sources": TaskSource.choices,
+            "topics": TaskTopic.choices,
+            "error": error,
+            "task": None,
+        },
+    )
 
 
 @admin_required
@@ -1159,13 +1274,17 @@ def catalog_edit(request, task_id):
             ct.save()
             return redirect("admin_catalog")
 
-    return render(request, "admin/catalog_task_form.html", {
-        "exam_types": ExamType.choices,
-        "sources": TaskSource.choices,
-        "topics": TaskTopic.choices,
-        "error": error,
-        "task": ct,
-    })
+    return render(
+        request,
+        "admin/catalog_task_form.html",
+        {
+            "exam_types": ExamType.choices,
+            "sources": TaskSource.choices,
+            "topics": TaskTopic.choices,
+            "error": error,
+            "task": ct,
+        },
+    )
 
 
 @admin_required
@@ -1183,7 +1302,10 @@ def catalog_bulk_delete(request):
     if ids:
         deleted, _ = CatalogTask.objects.filter(id__in=ids).delete()
         logger.info("Bulk deleted %d catalog tasks", deleted)
-    return redirect(request.POST.get("next", "admin_catalog"))
+    # Только именованные URL-маршруты, чтобы исключить открытый редирект
+    _allowed = {"admin_catalog", "admin_catalog_unclassified"}
+    next_url = request.POST.get("next", "admin_catalog")
+    return redirect(next_url if next_url in _allowed else "admin_catalog")
 
 
 @admin_required
@@ -1205,6 +1327,7 @@ def catalog_import(request):
                 # Одно задание — синхронно
                 task_number = _safe_int(task_number_raw) if task_number_raw else None
                 from .parser import import_task_to_catalog
+
                 ct, parse_errors = import_task_to_catalog(url, task_number=task_number)
                 if parse_errors:
                     errors.extend(parse_errors)
@@ -1214,9 +1337,7 @@ def catalog_import(request):
                 # Целый вариант — фоново
                 job_id = str(uuid.uuid4())
                 cache.set(f"cjob:{job_id}", {"status": "running", "added": 0, "errors": []}, _JOB_TTL)
-                threading.Thread(
-                    target=_run_catalog_import_job, args=(job_id, url), daemon=True
-                ).start()
+                threading.Thread(target=_run_catalog_import_job, args=(job_id, url), daemon=True).start()
                 return redirect("admin_catalog_import_status", job_id=job_id)
 
     return render(request, "admin/catalog_import.html", {"errors": errors})
@@ -1224,15 +1345,17 @@ def catalog_import(request):
 
 @admin_required
 def catalog_import_status(request, job_id):
-    job = cache.get(f"cjob:{job_id}") or {
-        "status": "unknown", "added": 0, "errors": ["Задание не найдено"]
-    }
+    job = cache.get(f"cjob:{job_id}") or {"status": "unknown", "added": 0, "errors": ["Задание не найдено"]}
     if request.GET.get("json"):
         return JsonResponse(job)
-    return render(request, "admin/catalog_import_status.html", {
-        "job_id": job_id,
-        "job": job,
-    })
+    return render(
+        request,
+        "admin/catalog_import_status.html",
+        {
+            "job_id": job_id,
+            "job": job,
+        },
+    )
 
 
 @admin_required
@@ -1251,15 +1374,19 @@ def catalog_unclassified(request):
     page = _paginate(request, tasks, per_page=20)
     no_number_count = CatalogTask.objects.filter(task_number__isnull=True).count()
     no_answer_count = CatalogTask.objects.filter(correct_answer="", manual_grading=False).count()
-    return render(request, "admin/catalog_unclassified.html", {
-        "page": page,
-        "exam_types": ExamType.choices,
-        "exam_type_filter": exam_type_filter,
-        "task_numbers": list(range(1, 26)),
-        "tab": tab,
-        "no_number_count": no_number_count,
-        "no_answer_count": no_answer_count,
-    })
+    return render(
+        request,
+        "admin/catalog_unclassified.html",
+        {
+            "page": page,
+            "exam_types": ExamType.choices,
+            "exam_type_filter": exam_type_filter,
+            "task_numbers": list(range(1, 26)),
+            "tab": tab,
+            "no_number_count": no_number_count,
+            "no_answer_count": no_answer_count,
+        },
+    )
 
 
 @admin_required
@@ -1291,27 +1418,27 @@ def api_catalog_tasks(request):
     if source:
         tasks = tasks.filter(source=source)
     if search:
-        tasks = tasks.filter(
-            Q(text__icontains=search) | Q(correct_answer__icontains=search)
-        )
+        tasks = tasks.filter(Q(text__icontains=search) | Q(correct_answer__icontains=search))
 
     tasks = tasks.order_by("-created_at")[:200]
 
     result = []
     for ct in tasks:
-        result.append({
-            "id": ct.id,
-            "task_number": ct.task_number,
-            "text_preview": ct.text_preview,
-            "correct_answer": ct.correct_answer,
-            "source": ct.get_source_display(),
-            "source_key": ct.source,
-            "manual_grading": ct.manual_grading,
-            "has_image": bool(ct.image),
-            "image_url": ct.image.url if ct.image else None,
-            "topic": ct.get_topic_display(),
-            "points": ct.points,
-        })
+        result.append(
+            {
+                "id": ct.id,
+                "task_number": ct.task_number,
+                "text_preview": ct.text_preview,
+                "correct_answer": ct.correct_answer,
+                "source": ct.get_source_display(),
+                "source_key": ct.source,
+                "manual_grading": ct.manual_grading,
+                "has_image": bool(ct.image),
+                "image_url": ct.image.url if ct.image else None,
+                "topic": ct.get_topic_display(),
+                "points": ct.points,
+            }
+        )
 
     return JsonResponse({"tasks": result})
 
@@ -1343,13 +1470,14 @@ def variant_from_catalog(request):
         return JsonResponse({"ok": False, "errors": errors}, status=400)
 
     try:
-        with __import__('django.db', fromlist=['transaction']).transaction.atomic():
+        with transaction.atomic():
             variant = Variant.objects.create(number=variant_number, exam_type=exam_type)
             for task_num_str, catalog_id in sorted(selected.items(), key=lambda x: int(x[0])):
                 ct = CatalogTask.objects.filter(id=catalog_id).first()
                 if not ct:
                     continue
                 from django.core.files.base import ContentFile as _CF
+
                 task = Task(
                     variant=variant,
                     number=task_num_str,
@@ -1373,21 +1501,24 @@ def variant_from_catalog(request):
                         pass
                 if ct.shared_context_image:
                     # Переиспользуем тот же файл (не копируем)
-                    task.__dict__['shared_context_image'] = ct.shared_context_image.name
+                    task.__dict__["shared_context_image"] = ct.shared_context_image.name
                 task.save()
     except IntegrityError as e:
         return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
 
     from django.urls import reverse
+
     return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})
 
 
 # ===== ПЕЧАТЬ ВАРИАНТА (DOCX) =====
 
+
 def _html_to_text(html):
     """Конвертирует HTML в plain text, сохраняя переносы строк.
     Разворачивает <details> (общее условие), убирая текст <summary>."""
     from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(html or "", "html.parser")
     # Убираем <summary> (там текст типа "Общее условие (нажмите, чтобы развернуть)")
     for summary in soup.find_all("summary"):
@@ -1493,9 +1624,7 @@ def _build_variant_docx(variant, include_answers):
         if include_answers:
             ans_p = doc.add_paragraph()
             ans_p.paragraph_format.left_indent = Cm(0.5)
-            ans_run = ans_p.add_run(
-                "Ответ: " + (task.correct_answer or "(ручная проверка)")
-            )
+            ans_run = ans_p.add_run("Ответ: " + (task.correct_answer or "(ручная проверка)"))
             ans_run.bold = True
             ans_run.font.color.rgb = RGBColor(0x27, 0xAE, 0x60)
         else:
@@ -1518,7 +1647,7 @@ def variant_print_docx(request, variant_id, mode):
 
     variant = get_object_or_404(Variant, id=variant_id)
     safe_name = variant.number.replace(" ", "_").replace("/", "-")
-    include_answers = (mode == "teacher")
+    include_answers = mode == "teacher"
     suffix = "с_ответами" if include_answers else "задания"
 
     buf = _build_variant_docx(variant, include_answers=include_answers)
@@ -1527,55 +1656,66 @@ def variant_print_docx(request, variant_id, mode):
         buf,
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
-    response["Content-Disposition"] = (
-        f'attachment; filename="variant_{safe_name}_{suffix}.docx"'
-    )
+    response["Content-Disposition"] = f'attachment; filename="variant_{safe_name}_{suffix}.docx"'
     return response
 
 
 # ===== ФИПИ ИМПОРТ =====
 
+
 def _run_fipi_import_job(job_id, proj, exam_type, theme_filter, session_id):
     """Фоновый поток: импортирует задания ФИПИ в каталог."""
     try:
         from .fipi_parser import import_fipi_to_catalog
+
         import_fipi_to_catalog(proj, exam_type, theme_filter, session_id)
         sess = CatalogImportSession.objects.get(id=session_id)
-        cache.set(f"fjob:{job_id}", {
-            "status": "done",
-            "session_id": session_id,
-            "added": sess.tasks_added,
-            "skipped": sess.tasks_skipped,
-            "duplicate": sess.tasks_duplicate,
-            "errors": [],
-        }, _JOB_TTL)
+        cache.set(
+            f"fjob:{job_id}",
+            {
+                "status": "done",
+                "session_id": session_id,
+                "added": sess.tasks_added,
+                "skipped": sess.tasks_skipped,
+                "duplicate": sess.tasks_duplicate,
+                "errors": [],
+            },
+            _JOB_TTL,
+        )
     except Exception as e:
         logger.exception("Ошибка ФИПИ импорта")
-        cache.set(f"fjob:{job_id}", {
-            "status": "error",
-            "session_id": session_id,
-            "added": 0,
-            "skipped": 0,
-            "duplicate": 0,
-            "errors": [str(e)],
-        }, _JOB_TTL)
+        cache.set(
+            f"fjob:{job_id}",
+            {
+                "status": "error",
+                "session_id": session_id,
+                "added": 0,
+                "skipped": 0,
+                "duplicate": 0,
+                "errors": [str(e)],
+            },
+            _JOB_TTL,
+        )
         try:
-            CatalogImportSession.objects.filter(id=session_id).update(
-                status="error", notes=str(e)
-            )
+            CatalogImportSession.objects.filter(id=session_id).update(status="error", notes=str(e))
         except Exception:
             pass
     finally:
         from django.db import connection
+
         connection.close()
 
 
 @admin_required
 def catalog_fipi_import(request):
     """Страница импорта из ФИПИ: превью + запуск."""
-    return render(request, "admin/catalog_import_fipi.html", {
-        "exam_types": ExamType.choices,
-    })
+    return render(
+        request,
+        "admin/catalog_import_fipi.html",
+        {
+            "exam_types": ExamType.choices,
+        },
+    )
 
 
 @admin_required
@@ -1586,6 +1726,7 @@ def catalog_fipi_preview(request):
         return JsonResponse({"error": "Введите URL"}, status=400)
     try:
         from .fipi_parser import fipi_get_preview
+
         data = fipi_get_preview(url)
         return JsonResponse(data)
     except Exception as e:
@@ -1615,40 +1756,52 @@ def catalog_fipi_start(request):
         status="running",
     )
     job_id = str(uuid.uuid4())
-    cache.set(f"fjob:{job_id}", {
-        "status": "running",
-        "session_id": sess.id,
-        "added": 0,
-        "skipped": 0,
-        "duplicate": 0,
-        "errors": [],
-    }, _JOB_TTL)
+    cache.set(
+        f"fjob:{job_id}",
+        {
+            "status": "running",
+            "session_id": sess.id,
+            "added": 0,
+            "skipped": 0,
+            "duplicate": 0,
+            "errors": [],
+        },
+        _JOB_TTL,
+    )
     threading.Thread(
         target=_run_fipi_import_job,
         args=(job_id, proj, exam_type, theme_filter, sess.id),
         daemon=True,
     ).start()
     from django.urls import reverse
-    return JsonResponse({
-        "ok": True,
-        "job_id": job_id,
-        "redirect": reverse("admin_fipi_import_status", args=[job_id]),
-    })
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "job_id": job_id,
+            "redirect": reverse("admin_fipi_import_status", args=[job_id]),
+        }
+    )
 
 
 @admin_required
 def catalog_fipi_status(request, job_id):
     """Страница/API статуса импорта ФИПИ."""
     job = cache.get(f"fjob:{job_id}") or {
-        "status": "unknown", "session_id": None,
-        "added": 0, "skipped": 0, "duplicate": 0, "errors": ["Задание не найдено"],
+        "status": "unknown",
+        "session_id": None,
+        "added": 0,
+        "skipped": 0,
+        "duplicate": 0,
+        "errors": ["Задание не найдено"],
     }
 
     # Дополнить из БД если есть session_id
     if job.get("session_id") and job["status"] == "running":
         try:
             sess = CatalogImportSession.objects.get(id=job["session_id"])
-            job = dict(job,
+            job = dict(
+                job,
                 added=sess.tasks_added,
                 skipped=sess.tasks_skipped,
                 duplicate=sess.tasks_duplicate,
@@ -1664,20 +1817,28 @@ def catalog_fipi_status(request, job_id):
     if job.get("session_id"):
         session_obj = CatalogImportSession.objects.filter(id=job["session_id"]).first()
 
-    return render(request, "admin/catalog_import_fipi_status.html", {
-        "job_id": job_id,
-        "job": job,
-        "session": session_obj,
-    })
+    return render(
+        request,
+        "admin/catalog_import_fipi_status.html",
+        {
+            "job_id": job_id,
+            "job": job,
+            "session": session_obj,
+        },
+    )
 
 
 @admin_required
 def catalog_import_list(request):
     """Список всех сессий импорта."""
     sessions = CatalogImportSession.objects.order_by("-created_at")
-    return render(request, "admin/catalog_import_list.html", {
-        "sessions": sessions,
-    })
+    return render(
+        request,
+        "admin/catalog_import_list.html",
+        {
+            "sessions": sessions,
+        },
+    )
 
 
 @admin_required
