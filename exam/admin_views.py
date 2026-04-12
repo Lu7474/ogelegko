@@ -629,7 +629,7 @@ def variant_delete(request, variant_id):
     return redirect("admin_variants")
 
 
-_import_jobs = {}  # job_id -> {status, variant_id, errors}
+_JOB_TTL = 7200  # 2 часа
 
 
 def _run_import_job(job_id, url, variant_number):
@@ -639,18 +639,18 @@ def _run_import_job(job_id, url, variant_number):
         variant, parse_errors = import_variant_from_sdamgia(
             url, variant_number=variant_number or None
         )
-        _import_jobs[job_id] = {
+        cache.set(f"vjob:{job_id}", {
             "status": "done",
             "variant_id": variant.id if variant else None,
             "errors": parse_errors,
-        }
+        }, _JOB_TTL)
     except Exception as e:
         logger.exception("Ошибка импорта варианта")
-        _import_jobs[job_id] = {
+        cache.set(f"vjob:{job_id}", {
             "status": "error",
             "variant_id": None,
             "errors": [str(e)],
-        }
+        }, _JOB_TTL)
     finally:
         from django.db import connection
         connection.close()
@@ -673,7 +673,7 @@ def variant_import(request):
             return render(request, "admin/variant_import.html", {"errors": errors})
 
         job_id = str(uuid.uuid4())
-        _import_jobs[job_id] = {"status": "running", "variant_id": None, "errors": []}
+        cache.set(f"vjob:{job_id}", {"status": "running", "variant_id": None, "errors": []}, _JOB_TTL)
         threading.Thread(
             target=_run_import_job, args=(job_id, url, variant_number), daemon=True
         ).start()
@@ -685,7 +685,7 @@ def variant_import(request):
 @admin_required
 def variant_import_status(request, job_id):
     """Страница/API опроса статуса импорта."""
-    job = _import_jobs.get(job_id, {"status": "unknown", "variant_id": None, "errors": ["Задание не найдено"]})
+    job = cache.get(f"vjob:{job_id}") or {"status": "unknown", "variant_id": None, "errors": ["Задание не найдено"]}
 
     if request.GET.get("json"):
         return JsonResponse(job)
@@ -980,26 +980,23 @@ def export_results_docx(request):
 
 # ===== КАТАЛОГ ЗАДАНИЙ =====
 
-_catalog_import_jobs = {}  # job_id -> {status, added, errors}
-
-
 def _run_catalog_import_job(job_id, url):
     """Фоновый поток: парсит вариант и добавляет все задания в каталог."""
     try:
         from .parser import import_variant_to_catalog
         added, errors = import_variant_to_catalog(url)
-        _catalog_import_jobs[job_id] = {
+        cache.set(f"cjob:{job_id}", {
             "status": "done",
             "added": added,
             "errors": errors,
-        }
+        }, _JOB_TTL)
     except Exception as e:
         logger.exception("Ошибка импорта в каталог")
-        _catalog_import_jobs[job_id] = {
+        cache.set(f"cjob:{job_id}", {
             "status": "error",
             "added": 0,
             "errors": [str(e)],
-        }
+        }, _JOB_TTL)
     finally:
         from django.db import connection
         connection.close()
@@ -1180,7 +1177,7 @@ def catalog_import(request):
             else:
                 # Целый вариант — фоново
                 job_id = str(uuid.uuid4())
-                _catalog_import_jobs[job_id] = {"status": "running", "added": 0, "errors": []}
+                cache.set(f"cjob:{job_id}", {"status": "running", "added": 0, "errors": []}, _JOB_TTL)
                 threading.Thread(
                     target=_run_catalog_import_job, args=(job_id, url), daemon=True
                 ).start()
@@ -1191,9 +1188,9 @@ def catalog_import(request):
 
 @admin_required
 def catalog_import_status(request, job_id):
-    job = _catalog_import_jobs.get(job_id, {
+    job = cache.get(f"cjob:{job_id}") or {
         "status": "unknown", "added": 0, "errors": ["Задание не найдено"]
-    })
+    }
     if request.GET.get("json"):
         return JsonResponse(job)
     return render(request, "admin/catalog_import_status.html", {
@@ -1338,9 +1335,16 @@ def variant_from_catalog(request):
 # ===== ПЕЧАТЬ ВАРИАНТА (DOCX) =====
 
 def _html_to_text(html):
-    """Конвертирует HTML в plain text, сохраняя переносы строк."""
+    """Конвертирует HTML в plain text, сохраняя переносы строк.
+    Разворачивает <details> (общее условие), убирая текст <summary>."""
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html or "", "html.parser")
+    # Убираем <summary> (там текст типа "Общее условие (нажмите, чтобы развернуть)")
+    for summary in soup.find_all("summary"):
+        summary.decompose()
+    # Содержимое <details> оставляем, сам тег убираем
+    for details in soup.find_all("details"):
+        details.unwrap()
     for br in soup.find_all("br"):
         br.replace_with("\n")
     for p in soup.find_all(["p", "div", "tr"]):
@@ -1406,11 +1410,12 @@ def _build_variant_docx(variant, include_answers):
                 if img_url.startswith("http"):
                     img_data = _req.get(img_url, timeout=10).content
                 else:
-                    img_data = task.image.read()
+                    with task.image.open("rb") as img_file:
+                        img_data = img_file.read()
                 img_io = io.BytesIO(img_data)
                 doc.add_picture(img_io, width=Cm(14))
             except Exception:
-                pass
+                logger.warning("Не удалось вставить картинку задания %s", task.number)
 
         # Ответ (только для учительского варианта)
         if include_answers:
@@ -1458,33 +1463,30 @@ def variant_print_docx(request, variant_id, mode):
 
 # ===== ФИПИ ИМПОРТ =====
 
-_fipi_import_jobs = {}  # job_id -> {status, session_id, added, skipped, duplicate, errors}
-
-
 def _run_fipi_import_job(job_id, proj, exam_type, theme_filter, session_id):
     """Фоновый поток: импортирует задания ФИПИ в каталог."""
     try:
         from .fipi_parser import import_fipi_to_catalog
         import_fipi_to_catalog(proj, exam_type, theme_filter, session_id)
         sess = CatalogImportSession.objects.get(id=session_id)
-        _fipi_import_jobs[job_id] = {
+        cache.set(f"fjob:{job_id}", {
             "status": "done",
             "session_id": session_id,
             "added": sess.tasks_added,
             "skipped": sess.tasks_skipped,
             "duplicate": sess.tasks_duplicate,
             "errors": [],
-        }
+        }, _JOB_TTL)
     except Exception as e:
         logger.exception("Ошибка ФИПИ импорта")
-        _fipi_import_jobs[job_id] = {
+        cache.set(f"fjob:{job_id}", {
             "status": "error",
             "session_id": session_id,
             "added": 0,
             "skipped": 0,
             "duplicate": 0,
             "errors": [str(e)],
-        }
+        }, _JOB_TTL)
         try:
             CatalogImportSession.objects.filter(id=session_id).update(
                 status="error", notes=str(e)
@@ -1541,14 +1543,14 @@ def catalog_fipi_start(request):
         status="running",
     )
     job_id = str(uuid.uuid4())
-    _fipi_import_jobs[job_id] = {
+    cache.set(f"fjob:{job_id}", {
         "status": "running",
         "session_id": sess.id,
         "added": 0,
         "skipped": 0,
         "duplicate": 0,
         "errors": [],
-    }
+    }, _JOB_TTL)
     threading.Thread(
         target=_run_fipi_import_job,
         args=(job_id, proj, exam_type, theme_filter, sess.id),
@@ -1565,10 +1567,10 @@ def catalog_fipi_start(request):
 @admin_required
 def catalog_fipi_status(request, job_id):
     """Страница/API статуса импорта ФИПИ."""
-    job = _fipi_import_jobs.get(job_id, {
+    job = cache.get(f"fjob:{job_id}") or {
         "status": "unknown", "session_id": None,
         "added": 0, "skipped": 0, "duplicate": 0, "errors": ["Задание не найдено"],
-    })
+    }
 
     # Дополнить из БД если есть session_id
     if job.get("session_id") and job["status"] == "running":
