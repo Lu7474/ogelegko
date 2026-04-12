@@ -37,77 +37,80 @@ from exam.models import (
     Variant,
 )
 
-# Паттерны строк-«мусора» в контексте PDF (авторы, названия, колонтитулы, заголовки блоков)
+# Паттерны строк-«мусора» в тексте PDF (авторы, названия, колонтитулы, заголовки блоков)
 _CONTEXT_BAD_RE = re.compile(
-    r'(?:'
-    r'[А-ЯЁA-Z]\.[А-ЯЁA-Z]\.\s*[А-ЯЁA-Z][а-яёa-z]+'   # Инициалы + Фамилия
-    r'|задачник|сборник|симулятор|simulator'
-    r'|учебн|пособие|издание|издательство'
-    r'|ОГЭ\s*20\d\d|ЕГЭ\s*20\d\d'
-    r'|^\d{1,3}$'                                          # Номер страницы
-    r'|^(?:стр|с)\.\s*\d'                                  # "стр. N"
-    r'|^(?:Задание|Вариант|Блок)\s+\d+\.?\s*$'            # Заголовок блока ("Задание 1.")
-    r')',
+    r"(?:"
+    r"[А-ЯЁA-Z]\.[А-ЯЁA-Z]\.\s*[А-ЯЁA-Z][а-яёa-z]+"  # Инициалы + Фамилия
+    r"|задачник|сборник|тренажер|симулятор|simulator"
+    r"|учебн|пособие|издание|издательство"
+    r"|ОГЭ\s*20\d\d|ЕГЭ\s*20\d\d"
+    r"|^\d{1,3}$"  # Номер страницы
+    r"|^(?:стр|с)\.\s*\d"  # "стр. N"
+    r"|^(?:Задание|Вариант|Блок)\s+\d+\.?\s*$"  # Заголовок блока ("Задание 1.")
+    r")",
     re.IGNORECASE | re.MULTILINE,
 )
 
 
 class Command(BaseCommand):
-    help = 'Импорт заданий из PDF (Распечатай и реши) — в каталог или как варианты'
+    help = "Импорт заданий из PDF (Распечатай и реши) — в каталог или как варианты"
 
     def add_arguments(self, parser):
-        parser.add_argument('folder', help='Путь к папке с PDF файлами (рекурсивно)')
+        parser.add_argument("folder", help="Путь к папке с PDF файлами (рекурсивно)")
         parser.add_argument(
-            '--exam-type', default='oge',
-            choices=['oge', 'ege_profile', 'ege_base'],
-            help='Тип экзамена (по умолчанию: oge)',
+            "--exam-type",
+            default="oge",
+            choices=["oge", "ege_profile", "ege_base"],
+            help="Тип экзамена (по умолчанию: oge)",
         )
         parser.add_argument(
-            '--mode', default='catalog',
-            choices=['catalog', 'variants', 'both'],
+            "--mode",
+            default="catalog",
+            choices=["catalog", "variants", "both"],
             help=(
-                'catalog  — добавить в каталог (по умолчанию)\n'
-                'variants — создать Вариант для каждого блока PDF\n'
-                'both     — и каталог, и варианты'
+                "catalog  — добавить в каталог (по умолчанию)\n"
+                "variants — создать Вариант для каждого блока PDF\n"
+                "both     — и каталог, и варианты"
             ),
         )
         parser.add_argument(
-            '--dry-run', action='store_true',
-            help='Показать что будет импортировано, не сохранять в БД',
+            "--dry-run",
+            action="store_true",
+            help="Показать что будет импортировано, не сохранять в БД",
         )
 
     def handle(self, *args, **options):
         try:
             import pdfplumber
         except ImportError:
-            self.stderr.write(self.style.ERROR('Установите pdfplumber: pip install pdfplumber'))
+            self.stderr.write(self.style.ERROR("Установите pdfplumber: pip install pdfplumber"))
             return
 
         try:
             import fitz  # PyMuPDF
         except ImportError:
-            self.stderr.write(self.style.ERROR('Установите PyMuPDF: pip install PyMuPDF'))
+            self.stderr.write(self.style.ERROR("Установите PyMuPDF: pip install PyMuPDF"))
             return
 
-        folder = Path(options['folder'])
+        folder = Path(options["folder"])
         if not folder.exists():
-            self.stderr.write(self.style.ERROR(f'Папка не найдена: {folder}'))
+            self.stderr.write(self.style.ERROR(f"Папка не найдена: {folder}"))
             return
 
-        exam_type = options['exam_type']
-        dry_run = options['dry_run']
-        mode = options['mode']
+        exam_type = options["exam_type"]
+        dry_run = options["dry_run"]
+        mode = options["mode"]
 
-        do_catalog = mode in ('catalog', 'both')
-        do_variants = mode in ('variants', 'both')
+        do_catalog = mode in ("catalog", "both")
+        do_variants = mode in ("variants", "both")
 
         if dry_run:
-            self.stdout.write(self.style.WARNING('=== РЕЖИМ ПРОСМОТРА (dry-run) — ничего не сохраняется ==='))
+            self.stdout.write(self.style.WARNING("=== РЕЖИМ ПРОСМОТРА (dry-run) — ничего не сохраняется ==="))
 
-        self.stdout.write(f'Режим: {mode} | Тип экзамена: {exam_type}')
+        self.stdout.write(f"Режим: {mode} | Тип экзамена: {exam_type}")
 
-        pdf_files = sorted(folder.rglob('*.pdf'))
-        self.stdout.write(f'Найдено PDF файлов: {len(pdf_files)}')
+        pdf_files = sorted(folder.rglob("*.pdf"))
+        self.stdout.write(f"Найдено PDF файлов: {len(pdf_files)}")
 
         total_cat_added = total_cat_skipped = 0
         total_var_created = total_var_skipped = 0
@@ -119,50 +122,54 @@ class Command(BaseCommand):
             session = CatalogImportSession.objects.create(
                 source=TaskSource.PRINT_SOLVE,
                 url=str(folder),
-                status='running',
+                status="running",
             )
 
         for pdf_path in pdf_files:
-            self.stdout.write(f'\n[PDF] {pdf_path.name}')
+            self.stdout.write(f"\n[PDF] {pdf_path.name}")
             try:
                 cat_added, cat_skipped, var_created, var_skipped = self._process_pdf(
-                    pdf_path, exam_type, dry_run, do_catalog, do_variants, session,
+                    pdf_path,
+                    exam_type,
+                    dry_run,
+                    do_catalog,
+                    do_variants,
+                    session,
                 )
                 total_cat_added += cat_added
                 total_cat_skipped += cat_skipped
                 total_var_created += var_created
                 total_var_skipped += var_skipped
                 if do_catalog:
-                    self.stdout.write(f'   Каталог: добавлено {cat_added}, дублей {cat_skipped}')
+                    self.stdout.write(f"   Каталог: добавлено {cat_added}, дублей {cat_skipped}")
                 if do_variants:
-                    self.stdout.write(f'   Варианты: создано {var_created}, пропущено {var_skipped}')
+                    self.stdout.write(f"   Варианты: создано {var_created}, пропущено {var_skipped}")
             except Exception as e:
-                self.stderr.write(self.style.ERROR(f'   Ошибка: {e}'))
+                self.stderr.write(self.style.ERROR(f"   Ошибка: {e}"))
                 total_errors += 1
 
         if session is not None:
             session.tasks_added = total_cat_added
             session.tasks_duplicate = total_cat_skipped
-            session.status = 'done' if total_errors == 0 else 'error'
+            session.status = "done" if total_errors == 0 else "error"
             if total_errors:
-                session.notes = f'Ошибок при обработке PDF: {total_errors}'
-            session.save(update_fields=['tasks_added', 'tasks_duplicate', 'status', 'notes'])
+                session.notes = f"Ошибок при обработке PDF: {total_errors}"
+            session.save(update_fields=["tasks_added", "tasks_duplicate", "status", "notes"])
 
-        self.stdout.write(self.style.SUCCESS('\n=== ИТОГО ==='))
+        self.stdout.write(self.style.SUCCESS("\n=== ИТОГО ==="))
         if do_catalog:
-            self.stdout.write(f'Каталог: добавлено {total_cat_added}, дублей {total_cat_skipped}')
+            self.stdout.write(f"Каталог: добавлено {total_cat_added}, дублей {total_cat_skipped}")
         if do_variants:
-            self.stdout.write(f'Варианты: создано {total_var_created}, пропущено {total_var_skipped}')
+            self.stdout.write(f"Варианты: создано {total_var_created}, пропущено {total_var_skipped}")
         if total_errors:
-            self.stdout.write(self.style.ERROR(f'Ошибок: {total_errors}'))
+            self.stdout.write(self.style.ERROR(f"Ошибок: {total_errors}"))
 
         if not dry_run:
             if do_catalog and total_cat_added > 0:
-                self.stdout.write('Заполните ответы в каталоге: /admin/catalog/')
+                self.stdout.write("Заполните ответы в каталоге: /admin/catalog/")
             if do_variants and total_var_created > 0:
                 self.stdout.write(
-                    'Создано вариантов (is_active=False). '
-                    'Активируйте их после проверки: /admin/variants/'
+                    "Создано вариантов (is_active=False). Активируйте их после проверки: /admin/variants/"
                 )
 
     # ------------------------------------------------------------------
@@ -171,10 +178,9 @@ class Command(BaseCommand):
         """Убирает строки-мусор из контекста: авторов, названия, заголовки блоков, номера страниц."""
         lines = text.splitlines()
         clean = [ln for ln in lines if ln.strip() and not _CONTEXT_BAD_RE.search(ln.strip())]
-        return '\n'.join(clean).strip()
+        return "\n".join(clean).strip()
 
-    def _process_pdf(self, pdf_path, exam_type, dry_run,
-                     do_catalog, do_variants, session=None):
+    def _process_pdf(self, pdf_path, exam_type, dry_run, do_catalog, do_variants, session=None):
         import fitz
         import pdfplumber
 
@@ -187,22 +193,53 @@ class Command(BaseCommand):
         fitz_doc = fitz.open(str(pdf_path))
 
         with pdfplumber.open(str(pdf_path)) as pdf:
-            pages_text = [(i, page.extract_text() or '') for i, page in enumerate(pdf.pages)]
-            full_text = '\n'.join(t for _, t in pages_text)
+            # Собираем текст по страницам: исправляем переносы и добавляем HTML таблиц
+            pages_text = []
+            for i, page in enumerate(pdf.pages):
+                raw = page.extract_text() or ""
+                # Склеиваем перенесённые слова: "мар-\nкировку" → "маркировку"
+                raw = re.sub(r"([а-яёА-ЯЁ])-\s*\n\s*([а-яёА-ЯЁ])", r"\1\2", raw)
+                table_html = self._extract_tables_html(page)
+                if table_html:
+                    raw = raw + "\n" + table_html
+                pages_text.append((i, raw))
+
+            full_text = "\n".join(t for _, t in pages_text)
+
+            # Извлекаем встроенные изображения по страницам (через PyMuPDF)
+            page_images = {}
+            for page_num in range(len(fitz_doc)):
+                page_images[page_num] = self._extract_embedded_images(fitz_doc, page_num)
 
             blocks = self._parse_blocks(full_text, pages_text)
-            self.stdout.write(f'   Блоков (вариантов): {len(blocks)}')
+            self.stdout.write(f"   Блоков (вариантов): {len(blocks)}")
 
             for block_idx, block in enumerate(blocks):
-                page_num = block['page_num']
-                img_data = self._render_page(fitz_doc, page_num)
-                shared_ctx = self._clean_context(block['context']) if block['context'] else ''
-                variant_num = f'{pdf_stem} В{block_idx + 1}'
+                page_num = block["page_num"]
+                shared_ctx = self._clean_context(block["context"]) if block["context"] else ""
+                variant_num = f"{pdf_stem} В{block_idx + 1}"
+
+                # Картинки блока: встроенные изображения или рендер всей страницы как запасной вариант
+                embedded = page_images.get(page_num, [])
+                if embedded:
+                    # Первое изображение → shared_context_image, остальные → по задаче
+                    ctx_img_bytes = embedded[0][1]
+                    ctx_img_ext = embedded[0][2]
+                    # Дополнительные изображения: map task_index(0-based) → (bytes, ext)
+                    extra_task_imgs = {
+                        i: (img_bytes, img_ext) for i, (_, img_bytes, img_ext) in enumerate(embedded[1:])
+                    }
+                else:
+                    # Запасной вариант: рендер всей страницы
+                    page_render = self._render_page(fitz_doc, page_num)
+                    ctx_img_bytes = page_render
+                    ctx_img_ext = "png"
+                    extra_task_imgs = {}
 
                 # --- Режим: каталог ---
                 if do_catalog:
                     ctx_image_path = None
-                    for i, task_text in enumerate(block['tasks']):
+                    for i, task_text in enumerate(block["tasks"]):
                         if not task_text.strip():
                             continue
 
@@ -217,10 +254,8 @@ class Command(BaseCommand):
                             continue
 
                         if dry_run:
-                            preview = full_text_task[:70].replace('\n', ' ')
-                            self.stdout.write(
-                                f'   [В{block_idx+1} зад.{task_number}] {preview}…'
-                            )
+                            preview = full_text_task[:70].replace("\n", " ")
+                            self.stdout.write(f"   [В{block_idx + 1} зад.{task_number}] {preview}…")
                             cat_added += 1
                             continue
 
@@ -228,18 +263,26 @@ class Command(BaseCommand):
                             task_number=task_number,
                             exam_type=exam_type,
                             text=full_text_task,
-                            correct_answer='',
+                            correct_answer="",
                             source=TaskSource.PRINT_SOLVE,
                             manual_grading=True,
                             text_hash=text_hash,
                             shared_context=shared_ctx,
                             import_session=session,
                         )
-                        if i == 0 and img_data:
-                            fname = f'catalog/pdf_{pdf_stem}_b{block_idx+1}.png'
-                            obj.shared_context_image.save(fname, ContentFile(img_data), save=False)
+                        if i == 0 and ctx_img_bytes:
+                            fname = f"catalog/pdf_{pdf_stem}_b{block_idx + 1}.{ctx_img_ext}"
+                            obj.shared_context_image.save(fname, ContentFile(ctx_img_bytes), save=False)
                         elif ctx_image_path:
-                            obj.__dict__['shared_context_image'] = ctx_image_path
+                            obj.__dict__["shared_context_image"] = ctx_image_path
+
+                        if i in extra_task_imgs:
+                            t_bytes, t_ext = extra_task_imgs[i]
+                            obj.image.save(
+                                f"catalog/pdf_{pdf_stem}_b{block_idx + 1}_t{i + 1}.{t_ext}",
+                                ContentFile(t_bytes),
+                                save=False,
+                            )
 
                         obj.save()
                         cat_added += 1
@@ -250,33 +293,30 @@ class Command(BaseCommand):
                 # --- Режим: варианты ---
                 if do_variants:
                     if dry_run:
-                        tasks_in_block = [t for t in block['tasks'] if t.strip()]
-                        self.stdout.write(
-                            f'   [Вариант] {variant_num} → {len(tasks_in_block)} заданий'
-                        )
+                        tasks_in_block = [t for t in block["tasks"] if t.strip()]
+                        self.stdout.write(f"   [Вариант] {variant_num} → {len(tasks_in_block)} заданий")
                         var_created += 1
                         continue
 
-                    # Проверяем, не создан ли уже такой вариант
                     if Variant.objects.filter(number=variant_num).exists():
-                        self.stdout.write(f'   [Вариант] {variant_num} — уже существует, пропуск')
+                        self.stdout.write(f"   [Вариант] {variant_num} — уже существует, пропуск")
                         var_skipped += 1
                         continue
 
-                    # Сохраняем картинку условия один раз
-                    ctx_img_content = img_data
-                    ctx_img_fname = f'contexts/pdf_{pdf_stem}_b{block_idx+1}.png' if img_data else None
+                    ctx_img_fname = (
+                        f"contexts/pdf_{pdf_stem}_b{block_idx + 1}.{ctx_img_ext}" if ctx_img_bytes else None
+                    )
                     ctx_img_saved = False
 
                     with transaction.atomic():
                         variant = Variant.objects.create(
                             number=variant_num,
                             exam_type=exam_type,
-                            is_active=False,  # активирует учитель после проверки
+                            is_active=False,
                             max_attempts=3,
                         )
 
-                        for i, task_text in enumerate(block['tasks']):
+                        for i, task_text in enumerate(block["tasks"]):
                             if not task_text.strip():
                                 continue
                             task_number = task_numbers[i] if i < len(task_numbers) else i + 1
@@ -284,35 +324,111 @@ class Command(BaseCommand):
                                 variant=variant,
                                 number=str(task_number),
                                 text=task_text.strip(),
-                                correct_answer='',
+                                correct_answer="",
                                 source=TaskSource.PRINT_SOLVE,
                                 manual_grading=True,
                                 shared_context=shared_ctx,
                             )
-                            if i == 0 and ctx_img_content and ctx_img_fname:
+                            if i == 0 and ctx_img_bytes and ctx_img_fname:
                                 task.shared_context_image.save(
-                                    ctx_img_fname, ContentFile(ctx_img_content), save=False
+                                    ctx_img_fname, ContentFile(ctx_img_bytes), save=False
                                 )
                                 ctx_img_saved = True
                             elif ctx_img_saved and ctx_img_fname:
-                                task.__dict__['shared_context_image'] = ctx_img_fname
+                                task.__dict__["shared_context_image"] = ctx_img_fname
+
+                            if i in extra_task_imgs:
+                                t_bytes, t_ext = extra_task_imgs[i]
+                                task.image.save(
+                                    f"tasks/pdf_{pdf_stem}_b{block_idx + 1}_t{i + 1}.{t_ext}",
+                                    ContentFile(t_bytes),
+                                    save=False,
+                                )
+
                             task.save()
 
                     var_created += 1
-                    self.stdout.write(f'   [Вариант] создан: {variant_num}')
+                    self.stdout.write(f"   [Вариант] создан: {variant_num}")
 
         fitz_doc.close()
         return cat_added, cat_skipped, var_created, var_skipped
 
     # ------------------------------------------------------------------
 
+    def _extract_tables_html(self, page):
+        """Извлекает таблицы со страницы pdfplumber и конвертирует в HTML."""
+        try:
+            tables = page.extract_tables()
+        except Exception:
+            return ""
+        if not tables:
+            return ""
+        parts = []
+        for table in tables:
+            if not table:
+                continue
+            html = (
+                '<table border="1" cellpadding="4" '
+                'style="border-collapse:collapse;margin:8px 0;font-size:0.95em;">'
+            )
+            for row in table:
+                html += "<tr>"
+                for cell in row or []:
+                    cell_text = (cell or "").strip().replace("\n", "<br>")
+                    html += f'<td style="padding:4px;">{cell_text}</td>'
+                html += "</tr>"
+            html += "</table>"
+            parts.append(html)
+        return "\n".join(parts)
+
+    def _extract_embedded_images(self, fitz_doc, page_num, min_bytes=2000):
+        """Извлекает встроенные изображения со страницы через PyMuPDF.
+
+        Возвращает список (y_top, image_bytes, ext), отсортированный по вертикали.
+        Пропускает крошечные изображения (декоративные элементы < min_bytes байт).
+        """
+        result = []
+        try:
+            page = fitz_doc[page_num]
+            for img_info in page.get_images(full=True):
+                xref = img_info[0]
+                try:
+                    base = fitz_doc.extract_image(xref)
+                    img_bytes = base.get("image", b"")
+                    img_ext = base.get("ext", "png")
+                    if len(img_bytes) < min_bytes:
+                        continue
+                    rects = page.get_image_rects(xref)
+                    y_top = rects[0].y0 if rects else 0
+                    result.append((y_top, img_bytes, img_ext))
+                except Exception:
+                    pass
+            result.sort(key=lambda x: x[0])
+        except Exception:
+            pass
+        return result
+
+    def _render_page(self, fitz_doc, page_num, dpi=150):
+        """Рендерит страницу PDF в PNG байты (запасной вариант при отсутствии встроенных изображений)."""
+        try:
+            import fitz
+
+            page = fitz_doc[page_num]
+            mat = fitz.Matrix(dpi / 72, dpi / 72)
+            pix = page.get_pixmap(matrix=mat)
+            return pix.tobytes("png")
+        except Exception:
+            return None
+
+    # ------------------------------------------------------------------
+
     def _parse_task_numbers(self, filename):
         """Из имени файла '№01-05' возвращает [1, 2, 3, 4, 5]."""
-        m = re.search(r'№?0*(\d+)-0*(\d+)', filename)
+        m = re.search(r"№?0*(\d+)-0*(\d+)", filename)
         if m:
             start, end = int(m.group(1)), int(m.group(2))
             return list(range(start, end + 1))
-        m = re.search(r'№0*(\d+)', filename)
+        m = re.search(r"№0*(\d+)", filename)
         if m:
             return [int(m.group(1))]
         return list(range(1, 6))
@@ -325,16 +441,16 @@ class Command(BaseCommand):
         """
         positions = []
         for pattern_str in [
-            r'(?:^|\n)(Задание \d+\.)',
-            r'(?:^|\n)(Вариант \d+\.?)',
-            r'(?:^|\n)(Блок \d+\.)',
+            r"(?:^|\n)(Задание \d+\.)",
+            r"(?:^|\n)(Вариант \d+\.?)",
+            r"(?:^|\n)(Блок \d+\.)",
         ]:
             positions = [(m.start(), m.group(1)) for m in re.finditer(pattern_str, full_text)]
             if len(positions) >= 2:
                 break
 
         if not positions:
-            positions = [(0, 'Блок 1')]
+            positions = [(0, "Блок 1")]
 
         blocks = []
         for idx, (pos, title) in enumerate(positions):
@@ -344,12 +460,14 @@ class Command(BaseCommand):
             context, tasks = self._split_context_and_tasks(block_text)
             page_num = self._find_page_num(title.strip()[:20], pages_text)
 
-            blocks.append({
-                'title': title.strip(),
-                'context': context,
-                'tasks': tasks,
-                'page_num': page_num,
-            })
+            blocks.append(
+                {
+                    "title": title.strip(),
+                    "context": context,
+                    "tasks": tasks,
+                    "page_num": page_num,
+                }
+            )
 
         return blocks
 
@@ -359,33 +477,36 @@ class Command(BaseCommand):
         - context: общее условие/описание до первого '1. '
         - tasks: список текстов заданий 1..5
         """
-        first_task_m = re.search(r'\n1\.\s*(?:\([^)]+\)\s*)?', block_text)
+        first_task_m = re.search(r"\n1\.\s*(?:\([^)]+\)\s*)?", block_text)
         if first_task_m:
-            context = block_text[:first_task_m.start()].strip()
-            tasks_text = block_text[first_task_m.start():]
+            context = block_text[: first_task_m.start()].strip()
+            tasks_text = block_text[first_task_m.start() :]
         else:
-            context = ''
+            context = ""
             tasks_text = block_text
 
         tasks = self._extract_numbered_tasks(tasks_text)
         return context, tasks
 
     def _extract_numbered_tasks(self, text):
-        """Извлекает задания, пронумерованные '1.' .. '5.'"""
-        pattern = re.compile(r'(?:^|\n)(\d+)\.\s*(?:\([^)]*\)\s*)?(.*?)(?=\n\d+\.\s|\Z)', re.DOTALL)
+        """Извлекает задания, пронумерованные '1.' .. '5.', фильтрует строки-мусор."""
+        pattern = re.compile(r"(?:^|\n)(\d+)\.\s*(?:\([^)]*\)\s*)?(.*?)(?=\n\d+\.\s|\Z)", re.DOTALL)
         found = {}
         for m in pattern.finditer(text):
             num = int(m.group(1))
             if 1 <= num <= 25:
                 task_text = m.group(2).strip()
-                task_text = re.sub(r'Ответ:\s*_{3,}\.?', '', task_text).strip()
-                found[num] = task_text
+                task_text = re.sub(r"Ответ:\s*_{3,}\.?", "", task_text).strip()
+                # Фильтруем строки-мусор: авторы, названия книг, тренажёры
+                lines = task_text.splitlines()
+                clean_lines = [ln for ln in lines if not ln.strip() or not _CONTEXT_BAD_RE.search(ln.strip())]
+                found[num] = "\n".join(clean_lines).strip()
 
         if not found:
             return [text.strip()]
 
         max_num = max(found.keys())
-        return [found.get(i, '') for i in range(1, max_num + 1)]
+        return [found.get(i, "") for i in range(1, max_num + 1)]
 
     def _find_page_num(self, text_fragment, pages_text):
         """Находит номер страницы по фрагменту текста."""
@@ -393,14 +514,3 @@ class Command(BaseCommand):
             if text_fragment and text_fragment in page_text:
                 return page_num
         return 0
-
-    def _render_page(self, fitz_doc, page_num, dpi=150):
-        """Рендерит страницу PDF в PNG байты."""
-        try:
-            import fitz
-            page = fitz_doc[page_num]
-            mat = fitz.Matrix(dpi / 72, dpi / 72)
-            pix = page.get_pixmap(matrix=mat)
-            return pix.tobytes('png')
-        except Exception:
-            return None
