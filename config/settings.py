@@ -6,6 +6,7 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 try:
     from dotenv import load_dotenv
+
     load_dotenv(BASE_DIR / ".env")
 except ImportError:
     pass
@@ -14,6 +15,7 @@ _secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
 if not _secret_key or "insecure" in _secret_key:
     # Локальная разработка: генерируем временный ключ (не годится для продакшна)
     import secrets as _secrets
+
     _secret_key = _secrets.token_hex(50)
 SECRET_KEY = _secret_key
 
@@ -149,6 +151,14 @@ LOGGING = {
     "root": {
         "handlers": ["console", "file"],
         "level": "INFO",
+    },
+    "loggers": {
+        # Боты стучатся с чужими доменами — Django правильно отклоняет (400),
+        # но без этой настройки каждый такой запрос шлёт email об ошибке.
+        "django.security.DisallowedHost": {
+            "handlers": [],
+            "propagate": False,
+        },
     },
 }
 
