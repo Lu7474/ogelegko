@@ -1,23 +1,48 @@
 {% extends "admin/base_admin.html" %}
-{% block title %}Неопределённые задания — Каталог{% endblock %}
+{% block title %}Задания требующие внимания — Каталог{% endblock %}
 
 {% block content %}
 <div class="actions-bar" style="margin-bottom:20px;">
-    <h1 style="margin:0;">Неопределённые задания</h1>
+    <h1 style="margin:0;">Задания требующие внимания</h1>
     <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">← К каталогу</a>
 </div>
-<p style="color:var(--text-muted);margin-bottom:20px;">
-    Эти задания импортированы, но номер задания не определён. Нажмите на нужный номер рядом с заданием, чтобы его назначить.
+
+<!-- Вкладки -->
+<div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+    <a href="?tab=no_number{% if exam_type_filter %}&exam_type={{ exam_type_filter }}{% endif %}"
+       style="padding:10px 20px;font-weight:600;font-size:0.9rem;text-decoration:none;border-bottom:3px solid {% if tab == 'no_number' %}var(--primary){% else %}transparent{% endif %};color:{% if tab == 'no_number' %}var(--primary){% else %}var(--text-muted){% endif %};">
+        Без номера задания
+        {% if no_number_count %}<span class="notif-badge" style="position:static;display:inline-flex;margin-left:4px;">{{ no_number_count }}</span>{% endif %}
+    </a>
+    <a href="?tab=no_answer{% if exam_type_filter %}&exam_type={{ exam_type_filter }}{% endif %}"
+       style="padding:10px 20px;font-weight:600;font-size:0.9rem;text-decoration:none;border-bottom:3px solid {% if tab == 'no_answer' %}var(--primary){% else %}transparent{% endif %};color:{% if tab == 'no_answer' %}var(--primary){% else %}var(--text-muted){% endif %};">
+        Без правильного ответа
+        {% if no_answer_count %}<span class="notif-badge" style="position:static;display:inline-flex;margin-left:4px;">{{ no_answer_count }}</span>{% endif %}
+    </a>
+</div>
+
+{% if tab == 'no_number' %}
+<p style="color:var(--text-muted);margin-bottom:16px;font-size:0.875rem;">
+    Задания без номера. Нажмите на нужный номер рядом с заданием, чтобы его назначить.
 </p>
+{% else %}
+<p style="color:var(--text-muted);margin-bottom:16px;font-size:0.875rem;">
+    Задания с пустым правильным ответом (не ручная проверка). Заполните ответ через «Изменить».
+</p>
+{% endif %}
 
 <!-- Фильтр по типу экзамена -->
 <form method="get" style="margin-bottom:16px;display:flex;gap:10px;align-items:center;">
+    <input type="hidden" name="tab" value="{{ tab }}">
     <select name="exam_type" onchange="this.form.submit()" style="width:auto;">
         <option value="">Все типы</option>
         {% for value, label in exam_types %}
         <option value="{{ value }}" {% if exam_type_filter == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
+    {% if exam_type_filter %}
+    <a href="?tab={{ tab }}" class="btn btn-secondary" style="height:38px;line-height:38px;padding:0 12px;">✕</a>
+    {% endif %}
 </form>
 
 {% if page.object_list %}
@@ -26,18 +51,29 @@
     <div class="card catalog-task-card" id="task-{{ task.id }}">
         <div class="catalog-task-header">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                {% if task.task_number %}<span class="badge-num">Задание {{ task.task_number }}</span>{% endif %}
                 <span class="source-badge source-{{ task.source }}">{{ task.get_source_display }}</span>
                 <span style="color:var(--text-muted);font-size:0.78rem;">{{ task.get_exam_type_display }}</span>
                 {% if task.manual_grading %}<span class="badge-manual">Ручная проверка</span>{% endif %}
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
-                <a href="{% url 'admin_catalog_edit' task.id %}" class="btn btn-sm btn-secondary">Изм.</a>
+                <a href="{% url 'admin_catalog_edit' task.id %}" class="btn btn-sm btn-primary">Изменить</a>
                 <form method="post" action="{% url 'admin_catalog_delete' task.id %}" style="display:inline;" onsubmit="return confirm('Удалить?')">
                     {% csrf_token %}
                     <button class="btn btn-sm btn-danger">Удал.</button>
                 </form>
             </div>
         </div>
+
+        {% if task.shared_context or task.shared_context_image %}
+        <details class="shared-context" style="margin:0 0 8px;">
+            <summary style="font-size:0.8rem;color:var(--text-muted);">Общее условие</summary>
+            <div class="shared-context-body">
+                {% if task.shared_context_image %}<img src="{{ task.shared_context_image.url }}" style="max-width:100%;max-height:120px;border-radius:4px;">{% endif %}
+                {% if task.shared_context %}<div style="font-size:0.85rem;">{{ task.shared_context|truncatechars:200 }}</div>{% endif %}
+            </div>
+        </details>
+        {% endif %}
 
         {% if task.image %}
         <img src="{{ task.image.url }}" alt="" class="catalog-task-img">
@@ -47,8 +83,11 @@
         {% endif %}
         {% if task.correct_answer %}
         <div class="catalog-task-answer"><strong>Ответ:</strong> {{ task.correct_answer }}</div>
+        {% elif not task.manual_grading %}
+        <div class="catalog-task-answer" style="color:#e67e22;"><strong>Ответ не заполнен</strong></div>
         {% endif %}
 
+        {% if tab == 'no_number' %}
         <!-- Панель назначения номера -->
         <div class="assign-panel">
             <span style="font-size:0.8rem;color:var(--text-muted);margin-right:6px;">Назначить номер:</span>
@@ -56,6 +95,7 @@
             <button class="assign-btn" data-task-id="{{ task.id }}" data-num="{{ num }}" title="Задание {{ num }}">{{ num }}</button>
             {% endfor %}
         </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
@@ -64,8 +104,13 @@
 {% else %}
 <div class="empty-state">
     <div class="empty-icon">✅</div>
-    <div class="empty-title">Неопределённых заданий нет</div>
-    <div class="empty-desc">Все задания каталога имеют назначенный номер</div>
+    {% if tab == 'no_number' %}
+    <div class="empty-title">Все задания имеют номер</div>
+    <div class="empty-desc">Нет заданий без назначенного номера задания</div>
+    {% else %}
+    <div class="empty-title">Все ответы заполнены</div>
+    <div class="empty-desc">Нет заданий с пустым правильным ответом</div>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

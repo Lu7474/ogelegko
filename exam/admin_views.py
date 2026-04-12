@@ -993,11 +993,21 @@ def _run_catalog_import_job(job_id, url):
     """Фоновый поток: парсит вариант и добавляет все задания в каталог."""
     try:
         from .parser import import_variant_to_catalog
-        added, errors = import_variant_to_catalog(url)
+        sess = CatalogImportSession.objects.create(
+            source=TaskSource.SDAMGIA,
+            url=url,
+            status="running",
+        )
+        added, errors = import_variant_to_catalog(url, session=sess)
+        if errors and not added:
+            sess.status = "error"
+            sess.notes = "\n".join(errors)
+            sess.save(update_fields=["status", "notes"])
         cache.set(f"cjob:{job_id}", {
             "status": "done",
             "added": added,
             "errors": errors,
+            "session_id": sess.id,
         }, _JOB_TTL)
     except Exception as e:
         logger.exception("Ошибка импорта в каталог")
@@ -1044,7 +1054,9 @@ def catalog_list(request):
         .order_by("task_number")
     )
 
-    unclassified_count = CatalogTask.objects.filter(task_number__isnull=True).count()
+    unclassified_count = CatalogTask.objects.filter(
+        Q(task_number__isnull=True) | Q(correct_answer="", manual_grading=False)
+    ).count()
 
     page = _paginate(request, tasks, per_page=30)
 
@@ -1218,18 +1230,28 @@ def catalog_import_status(request, job_id):
 
 @admin_required
 def catalog_unclassified(request):
-    """Задания без номера — учитель назначает номер."""
+    """Задания требующие внимания: без номера ИЛИ без ответа (не ручная проверка)."""
     exam_type_filter = request.GET.get("exam_type", "")
-    tasks = CatalogTask.objects.filter(task_number__isnull=True)
+    tab = request.GET.get("tab", "no_number")  # no_number | no_answer
+    if tab == "no_answer":
+        tasks = CatalogTask.objects.filter(correct_answer="", manual_grading=False)
+    else:
+        tab = "no_number"
+        tasks = CatalogTask.objects.filter(task_number__isnull=True)
     if exam_type_filter:
         tasks = tasks.filter(exam_type=exam_type_filter)
     tasks = tasks.order_by("-created_at")
     page = _paginate(request, tasks, per_page=20)
+    no_number_count = CatalogTask.objects.filter(task_number__isnull=True).count()
+    no_answer_count = CatalogTask.objects.filter(correct_answer="", manual_grading=False).count()
     return render(request, "admin/catalog_unclassified.html", {
         "page": page,
         "exam_types": ExamType.choices,
         "exam_type_filter": exam_type_filter,
         "task_numbers": list(range(1, 26)),
+        "tab": tab,
+        "no_number_count": no_number_count,
+        "no_answer_count": no_answer_count,
     })
 
 

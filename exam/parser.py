@@ -565,8 +565,9 @@ def import_task_to_catalog(url, task_number=None):
     return ct, []
 
 
-def import_variant_to_catalog(url):
-    """Парсит вариант и добавляет все задания в каталог (не создаёт вариант)."""
+def import_variant_to_catalog(url, session=None):
+    """Парсит вариант и добавляет все задания в каталог (не создаёт вариант).
+    session — необязательный объект CatalogImportSession для привязки заданий."""
     parser = SdamgiaParser()
     try:
         data = parser.parse_variant(url)
@@ -575,6 +576,7 @@ def import_variant_to_catalog(url):
 
     exam_type = data["exam_type"]
     added = 0
+    duplicate = 0
     errors = []
 
     with transaction.atomic():
@@ -582,6 +584,7 @@ def import_variant_to_catalog(url):
             problem_id = td.get("source_id")
             if problem_id and CatalogTask.objects.filter(sdamgia_id=problem_id).exists():
                 errors.append(f"Задание №{td['number']} (ID {problem_id}) уже в каталоге — пропущено")
+                duplicate += 1
                 continue
 
             correct_answer = td["correct_answer"]
@@ -610,9 +613,16 @@ def import_variant_to_catalog(url):
                 source=TaskSource.SDAMGIA,
                 manual_grading=manual,
                 sdamgia_id=problem_id if problem_id else None,
+                import_session=session,
             )
             ct.save()
             added += 1
+
+        if session is not None:
+            session.tasks_added = added
+            session.tasks_duplicate = duplicate
+            session.status = "done"
+            session.save(update_fields=["tasks_added", "tasks_duplicate", "status"])
 
     return added, errors
 

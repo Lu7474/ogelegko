@@ -18,7 +18,20 @@ import re
 from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.core.files.base import ContentFile
-from exam.models import CatalogTask, ExamType, TaskSource
+from exam.models import CatalogTask, CatalogImportSession, ExamType, TaskSource
+
+# Паттерны строк-«мусора» в контексте PDF (авторы, названия, колонтитулы)
+_CONTEXT_BAD_RE = re.compile(
+    r'(?:'
+    r'[А-ЯЁA-Z]\.[А-ЯЁA-Z]\.\s*[А-ЯЁA-Z][а-яёa-z]+'  # Инициалы + Фамилия
+    r'|задачник|сборник|симулятор|simulator'
+    r'|учебн|пособие|издание|издательство'
+    r'|ОГЭ\s*20\d\d|ЕГЭ\s*20\d\d'
+    r'|^\d{1,3}$'                                         # Номер страницы
+    r'|^(?:стр|с)\.\s*\d'                                 # "стр. N"
+    r')',
+    re.IGNORECASE,
+)
 
 
 class Command(BaseCommand):
@@ -65,16 +78,33 @@ class Command(BaseCommand):
 
         total_added = total_skipped = total_errors = 0
 
+        # Создаём запись в истории импортов (только для реального импорта)
+        session = None
+        if not dry_run:
+            session = CatalogImportSession.objects.create(
+                source=TaskSource.PRINT_SOLVE,
+                url=str(folder),
+                status='running',
+            )
+
         for pdf_path in pdf_files:
             self.stdout.write(f'\n[PDF] {pdf_path.name}')
             try:
-                added, skipped = self._process_pdf(pdf_path, exam_type, dry_run)
+                added, skipped = self._process_pdf(pdf_path, exam_type, dry_run, session)
                 total_added += added
                 total_skipped += skipped
                 self.stdout.write(f'   Добавлено: {added}, пропущено дублей: {skipped}')
             except Exception as e:
                 self.stderr.write(self.style.ERROR(f'   Ошибка: {e}'))
                 total_errors += 1
+
+        if session is not None:
+            session.tasks_added = total_added
+            session.tasks_duplicate = total_skipped
+            session.status = 'done' if total_errors == 0 else 'error'
+            if total_errors:
+                session.notes = f'Ошибок при обработке PDF: {total_errors}'
+            session.save(update_fields=['tasks_added', 'tasks_duplicate', 'status', 'notes'])
 
         self.stdout.write(self.style.SUCCESS(
             f'\nИтого: добавлено {total_added}, дублей {total_skipped}, ошибок {total_errors}'
@@ -87,7 +117,13 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------
 
-    def _process_pdf(self, pdf_path, exam_type, dry_run):
+    def _clean_context(self, text):
+        """Убирает строки-мусор из контекста: авторов, названия, номера страниц."""
+        lines = text.splitlines()
+        clean = [ln for ln in lines if ln.strip() and not _CONTEXT_BAD_RE.search(ln.strip())]
+        return '\n'.join(clean).strip()
+
+    def _process_pdf(self, pdf_path, exam_type, dry_run, session=None):
         import pdfplumber
         import fitz
 
@@ -107,7 +143,7 @@ class Command(BaseCommand):
             for block_idx, block in enumerate(blocks):
                 page_num = block['page_num']
                 img_data = self._render_page(fitz_doc, page_num)
-                shared_ctx = block['context'].strip() if block['context'] else ''
+                shared_ctx = self._clean_context(block['context']) if block['context'] else ''
                 # Путь к картинке условия (сохраняем один раз, переиспользуем для всех заданий блока)
                 ctx_image_path = None
 
@@ -142,6 +178,7 @@ class Command(BaseCommand):
                         manual_grading=True,
                         text_hash=text_hash,
                         shared_context=shared_ctx,
+                        import_session=session,
                     )
 
                     if i == 0 and img_data:
