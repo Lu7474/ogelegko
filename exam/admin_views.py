@@ -1252,7 +1252,7 @@ def api_catalog_tasks(request):
             Q(text__icontains=search) | Q(correct_answer__icontains=search)
         )
 
-    tasks = tasks.order_by("-created_at")[:50]
+    tasks = tasks.order_by("-created_at")[:200]
 
     result = []
     for ct in tasks:

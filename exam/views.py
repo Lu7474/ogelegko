@@ -230,9 +230,20 @@ def start_exam(request, variant_id):
             Answer.objects.bulk_create([
                 Answer(attempt=attempt, task=task)
                 for task in variant.tasks.all()
-            ])
+            ], ignore_conflicts=True)
 
     tasks = variant.tasks.order_by("id")
+
+    # Если ответы не были созданы (например, задания добавлены после старта попытки),
+    # создаём недостающие
+    existing_answer_task_ids = set(attempt.answers.values_list("task_id", flat=True))
+    missing = [t for t in tasks if t.id not in existing_answer_task_ids]
+    if missing:
+        Answer.objects.bulk_create(
+            [Answer(attempt=attempt, task=t) for t in missing],
+            ignore_conflicts=True,
+        )
+
     answers = {a.task_id: a for a in attempt.answers.select_related("task").all()}
 
     elapsed = (timezone.now() - attempt.started_at).total_seconds()

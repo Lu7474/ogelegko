@@ -122,7 +122,10 @@ class Command(BaseCommand):
 
                     text_hash = CatalogTask.compute_hash(full_text_task)
 
-                    if text_hash and CatalogTask.objects.filter(text_hash=text_hash).exists():
+                    # Пропускаем если нет текста или уже есть в базе
+                    if not text_hash:
+                        continue
+                    if CatalogTask.objects.filter(text_hash=text_hash).exists():
                         skipped += 1
                         continue
 
