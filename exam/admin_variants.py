@@ -453,6 +453,28 @@ def _svg_to_png(svg_bytes):
         return None
 
 
+def _image_width(img_data, max_cm=14):
+    """Возвращает ширину для вставки изображения: натуральный размер, но не более max_cm."""
+    from docx.shared import Cm
+
+    try:
+        from PIL import Image as PILImage
+
+        img = PILImage.open(io.BytesIO(img_data))
+        w_px = img.size[0]
+        info_dpi = img.info.get("dpi", None)
+        if info_dpi:
+            dpi_x = info_dpi[0] if hasattr(info_dpi, "__getitem__") else info_dpi
+        else:
+            dpi_x = 96
+        if not dpi_x or dpi_x <= 0:
+            dpi_x = 96
+        w_cm = w_px / dpi_x * 2.54
+        return Cm(min(w_cm, max_cm))
+    except Exception:
+        return Cm(max_cm)
+
+
 def _render_segments(doc, segments, indent=None, font_size=None):
     """Рендерит сегменты в документ, создавая параграфы по мере нужды."""
     from docx.shared import Cm, Pt
@@ -496,7 +518,7 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                     img_data = _svg_to_png(img_data)
                 if img_data:
                     try:
-                        doc.add_picture(io.BytesIO(img_data), width=Cm(14))
+                        doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data))
                     except Exception as e:
                         logger.warning("Не удалось вставить изображение: %s", e)
             close()
@@ -578,8 +600,11 @@ def _build_variant_docx(variant, include_answers):
     for task in tasks:
         has_ctx = task.shared_context or task.shared_context_image
         if has_ctx:
+            from bs4 import BeautifulSoup
+
+            ctx_plain = BeautifulSoup(task.shared_context or "", "html.parser").get_text()
             ctx_key = (
-                " ".join((task.shared_context or "").split()),
+                " ".join(ctx_plain.split()),
                 str(task.shared_context_image) if task.shared_context_image else "",
             )
             if ctx_key not in printed_ctx:
@@ -600,7 +625,7 @@ def _build_variant_docx(variant, include_answers):
                         else:
                             with task.shared_context_image.open("rb") as f:
                                 ci_data = f.read()
-                        doc.add_picture(io.BytesIO(ci_data), width=Cm(15))
+                        doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data))
                     except Exception:
                         logger.warning("Не удалось вставить изображение общего условия")
 
@@ -624,7 +649,7 @@ def _build_variant_docx(variant, include_answers):
                 else:
                     with task.image.open("rb") as f:
                         img_data = f.read()
-                doc.add_picture(io.BytesIO(img_data), width=Cm(14))
+                doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data))
             except Exception:
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
@@ -645,7 +670,7 @@ def _build_variant_docx(variant, include_answers):
 
         for chunk in chunks:
             cols = len(chunk) + 1
-            tbl = doc.add_table(rows=3, cols=cols)
+            tbl = doc.add_table(rows=2, cols=cols)
             tbl.style = "Table Grid"
 
             num_row = tbl.rows[0].cells
@@ -658,10 +683,7 @@ def _build_variant_docx(variant, include_answers):
             for i, t in enumerate(chunk):
                 ans_row[i + 1].text = (t.correct_answer or "") if include_answers else ""
 
-            bal_row = tbl.rows[2].cells
-            bal_row[0].text = "Балл"
-
-            ROW_HEIGHTS = ("480", "600", "480")
+            ROW_HEIGHTS = ("480", "600")
             for row_idx, row in enumerate(tbl.rows):
                 tr_el = row._tr
                 trPr = tr_el.get_or_add_trPr()
