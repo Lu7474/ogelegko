@@ -721,19 +721,22 @@ def _build_variant_docx(variant, include_answers):
 @admin_required
 def variant_print_docx(request, variant_id, mode):
     """Скачать docx: mode='teacher' (с ответами) или 'student' (без)."""
+    from urllib.parse import quote
+
     variant = get_object_or_404(Variant, id=variant_id)
     safe_num = variant.number.replace("/", "-")
     include_answers = mode == "teacher"
-    suffix = " (ответы)" if include_answers else ""
+    suffix = "_answers" if include_answers else ""
 
     buf = _build_variant_docx(variant, include_answers=include_answers)
 
-    fname = f"{safe_num} вариант{suffix}.docx"
+    fname = f"{safe_num}_variant{suffix}.docx"
+    fname_utf8 = quote(f"{safe_num} вариант{' (ответы)' if include_answers else ''}.docx")
     response = HttpResponse(
         buf,
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
-    response["Content-Disposition"] = f'attachment; filename="{fname}"'
+    response["Content-Disposition"] = f"attachment; filename=\"{fname}\"; filename*=UTF-8''{fname_utf8}"
     return response
 
 

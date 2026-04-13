@@ -68,7 +68,7 @@
                 <div class="row-actions" style="flex-wrap:wrap;">
                 <a href="{% url 'admin_variant_stats' v.id %}" class="btn btn-sm">Статистика</a>
                 <a href="{% url 'admin_variant_edit' v.id %}" class="btn btn-sm">Редактировать</a>
-                <a href="{% url 'admin_variant_print' v.id 'teacher' %}" class="btn btn-sm btn-secondary">Распечатать</a>
+                <a href="{% url 'admin_variant_print' v.id 'teacher' %}" class="btn btn-sm btn-secondary" download>Распечатать</a>
                 <form method="post" action="{% url 'admin_variant_toggle' v.id %}">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-secondary">{% if v.is_active %}Скрыть{% else %}Активировать{% endif %}</button>
