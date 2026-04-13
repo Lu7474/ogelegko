@@ -509,7 +509,6 @@ def _render_segments(doc, segments, indent=None, font_size=None):
         elif seg[0] == "break":
             close()
         elif seg[0] == "image":
-            close()
             img_src = seg[1]
             img_data = _get_image_bytes(img_src)
             if img_data:
@@ -518,11 +517,18 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                     img_data = _svg_to_png(img_data)
                 if img_data:
                     try:
-                        max_w = 5 if is_svg else 12
-                        doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data, max_cm=max_w))
+                        if is_svg:
+                            # Формула — вставляем inline в текущий параграф
+                            get_para().add_run().add_picture(
+                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=3)
+                            )
+                        else:
+                            # Обычное изображение — отдельным блоком
+                            close()
+                            doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data, max_cm=12))
+                            close()
                     except Exception as e:
                         logger.warning("Не удалось вставить изображение: %s", e)
-            close()
         elif seg[0] == "table":
             close()
             rows_data = seg[1]
@@ -563,11 +569,10 @@ def _render_segments(doc, segments, indent=None, font_size=None):
 def _build_variant_docx(variant, include_answers):
     """Строит docx-документ для варианта. Возвращает BytesIO.
 
-    Формат: A4 альбомная, 2 колонки — ~5 страниц для ОГЭ (как PDF-образец).
+    Формат: A4 книжная, компактные отступы, формулы inline.
     """
     import requests as _req
     from docx import Document
-    from docx.enum.section import WD_ORIENT
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
@@ -575,22 +580,12 @@ def _build_variant_docx(variant, include_answers):
 
     doc = Document()
 
-    # A4 альбомная, узкие поля
+    # A4 книжная, узкие поля
     section = doc.sections[0]
-    section.orientation = WD_ORIENT.LANDSCAPE
-    section.page_width = Cm(29.7)
-    section.page_height = Cm(21.0)
     section.top_margin = Cm(1.5)
     section.bottom_margin = Cm(1.5)
     section.left_margin = Cm(2.0)
     section.right_margin = Cm(1.5)
-
-    # 2 колонки
-    sectPr = section._sectPr
-    cols_el = OxmlElement("w:cols")
-    cols_el.set(qn("w:num"), "2")
-    cols_el.set(qn("w:space"), "720")  # 720 twips = 1.27 cm между колонками
-    sectPr.append(cols_el)
 
     FS = Pt(12)
 
@@ -681,7 +676,7 @@ def _build_variant_docx(variant, include_answers):
         sep.add_run("Таблица ответов").bold = True
         sep.runs[0].font.size = Pt(13)
 
-        col_groups = 3
+        col_groups = 2
         n = len(auto_tasks)
         rpg = (n + col_groups - 1) // col_groups
         groups = [auto_tasks[g * rpg : (g + 1) * rpg] for g in range(col_groups)]
