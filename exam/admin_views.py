@@ -2024,16 +2024,20 @@ def variants_print_zip(request):
     if not variants.exists():
         return HttpResponse("Варианты не найдены", status=404)
 
+    numbers = [v.number for v in variants]
+    safe_numbers = ", ".join(n.replace("/", "-") for n in numbers)
+    zip_name = f"Варианты {safe_numbers}.zip"
+
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for variant in variants:
             docx_buf = _build_variant_docx(variant, include_answers=True)
             safe_num = variant.number.replace("/", "-")
-            zf.writestr(f"{safe_num} вариант (ответы).docx", docx_buf.read())
+            zf.writestr(f"{safe_num} вариант.docx", docx_buf.read())
 
     buf.seek(0)
     response = HttpResponse(buf, content_type="application/zip")
-    response["Content-Disposition"] = 'attachment; filename="варианты.zip"'
+    response["Content-Disposition"] = f'attachment; filename="{zip_name}"'
     return response
 
 
