@@ -1,4 +1,5 @@
 {% extends "admin/base_admin.html" %}
+{% load exam_tags %}
 {% block title %}Проверка попытки — Админ{% endblock %}
 
 {% block content %}
@@ -38,34 +39,64 @@
             </td>
             <td>
                 {% if answer.task.manual_grading %}
-                    {% if answer.is_correct is None %}
-                        <span style="color:#e67e22">⏳ Ожидает</span>
-                        <div style="margin-top:6px;display:flex;gap:8px">
-                            <form method="post" action="{% url 'admin_grade_answer' answer.id %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="is_correct" value="true">
-                                <button class="btn btn-primary" style="padding:4px 12px">✓ Верно</button>
-                            </form>
-                            <form method="post" action="{% url 'admin_grade_answer' answer.id %}">
+                    {% if answer.task.points > 1 %}
+                        {# Задания с частичным баллом (0/1/2 и т.д.) #}
+                        {% if answer.awarded_points is not None %}
+                            <span style="font-weight:600">{{ answer.awarded_points }}&nbsp;/&nbsp;{{ answer.task.points }}&nbsp;б</span>
+                            <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
+                                {% for pts in answer.task.points|get_points_range %}
+                                <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="points" value="{{ pts }}">
+                                    <button class="btn {% if pts == answer.awarded_points %}btn-primary{% else %}btn-secondary{% endif %}"
+                                            style="padding:2px 10px;font-size:0.85em">{{ pts }}</button>
+                                </form>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <span style="color:#e67e22">⏳ Ожидает</span>
+                            <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                                {% for pts in answer.task.points|get_points_range %}
+                                <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="points" value="{{ pts }}">
+                                    <button class="btn {% if pts == 0 %}btn-danger{% elif pts == answer.task.points %}btn-primary{% else %}btn-secondary{% endif %}"
+                                            style="padding:4px 12px">{{ pts }}&nbsp;б</button>
+                                </form>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        {# Обычные задания с ручной проверкой (1 балл — верно/неверно) #}
+                        {% if answer.is_correct is None %}
+                            <span style="color:#e67e22">⏳ Ожидает</span>
+                            <div style="margin-top:6px;display:flex;gap:8px">
+                                <form method="post" action="{% url 'admin_grade_answer' answer.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="is_correct" value="true">
+                                    <button class="btn btn-primary" style="padding:4px 12px">✓ Верно</button>
+                                </form>
+                                <form method="post" action="{% url 'admin_grade_answer' answer.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="is_correct" value="false">
+                                    <button class="btn btn-danger" style="padding:4px 12px">✗ Неверно</button>
+                                </form>
+                            </div>
+                        {% elif answer.is_correct %}
+                            <span style="color:#27ae60">✓ Верно</span>
+                            <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
                                 {% csrf_token %}
                                 <input type="hidden" name="is_correct" value="false">
-                                <button class="btn btn-danger" style="padding:4px 12px">✗ Неверно</button>
+                                <button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>
                             </form>
-                        </div>
-                    {% elif answer.is_correct %}
-                        <span style="color:#27ae60">✓ Верно</span>
-                        <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
-                            {% csrf_token %}
-                            <input type="hidden" name="is_correct" value="false">
-                            <button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>
-                        </form>
-                    {% else %}
-                        <span style="color:#e74c3c">✗ Неверно</span>
-                        <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
-                            {% csrf_token %}
-                            <input type="hidden" name="is_correct" value="true">
-                            <button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>
-                        </form>
+                        {% else %}
+                            <span style="color:#e74c3c">✗ Неверно</span>
+                            <form method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
+                                {% csrf_token %}
+                                <input type="hidden" name="is_correct" value="true">
+                                <button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>
+                            </form>
+                        {% endif %}
                     {% endif %}
                 {% elif answer.is_correct %}
                     <span style="color:#27ae60">✓</span>

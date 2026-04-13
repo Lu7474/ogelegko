@@ -144,6 +144,11 @@ class Task(models.Model):
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)
+    no_student_input = models.BooleanField(
+        "Без поля ответа",
+        default=False,
+        help_text="Задание решается на бумаге — студент ничего не вводит (напр. ОГЭ 20–25)",
+    )
     shared_context = models.TextField("Общее условие", blank=True)
     shared_context_image = models.ImageField(
         "Изображение общего условия",
@@ -285,6 +290,11 @@ class CatalogTask(models.Model):
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)
+    no_student_input = models.BooleanField(
+        "Без поля ответа",
+        default=False,
+        help_text="Задание решается на бумаге — студент ничего не вводит (напр. ОГЭ 20–25)",
+    )
     shared_context = models.TextField("Общее условие", blank=True)
     shared_context_image = models.ImageField(
         "Изображение общего условия",
@@ -335,6 +345,7 @@ class Answer(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, verbose_name="Задание", related_name="answers")
     student_answer = models.TextField("Ответ ученика", blank=True)
     is_correct = models.BooleanField("Правильно", default=False, null=True, blank=True)
+    awarded_points = models.IntegerField("Начислено баллов", null=True, blank=True)
 
     class Meta:
         verbose_name = "Ответ"

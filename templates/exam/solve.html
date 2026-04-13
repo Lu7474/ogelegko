@@ -90,7 +90,10 @@
         </div>
         {% endif %}
         <div class="form-group">
-            {% if task.manual_grading %}
+            {% if task.no_student_input %}
+            <div class="answer-hint" style="font-style:italic;padding:6px 0;">Задание решается на листе бумаги — учитель проверит и выставит баллы</div>
+            <div class="no-input-task" data-task-number="{{ task.number }}" style="display:none"></div>
+            {% elif task.manual_grading %}
             <label for="answer-{{ task.number }}">Решение (запишите ход работы):</label>
             <textarea id="answer-{{ task.number }}"
                       class="answer-input"
@@ -245,6 +248,10 @@ document.getElementById('finishBtn').addEventListener('click', function() {
         const val = input.value.trim();
         if (!val) unanswered++;
         rows += `<tr><td>${num}</td><td class="${val ? '' : 'empty'}">${val || '— пусто —'}</td></tr>`;
+    });
+    // Задания без поля ввода — на проверке учителя
+    document.querySelectorAll('.no-input-task').forEach(el => {
+        rows += `<tr><td>${el.dataset.taskNumber}</td><td style="color:#7f8c8d;font-style:italic">на проверке учителя</td></tr>`;
     });
 
     const text = unanswered > 0

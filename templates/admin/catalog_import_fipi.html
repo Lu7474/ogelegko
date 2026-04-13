@@ -70,7 +70,7 @@
                 <label><b>Тип экзамена</b></label>
                 <select id="examTypeSelect" style="min-width:180px;">
                     {% for val, label in exam_types %}
-                    <option value="{{ val }}">{{ label }}</option>
+                    <option value="{{ val }}" {% if val == "oge" %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>

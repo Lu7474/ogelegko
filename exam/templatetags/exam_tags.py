@@ -7,3 +7,12 @@ register = template.Library()
 def get_answer(answers_dict, task_id):
     """Получить объект Answer из словаря {task_id: Answer} по task_id."""
     return answers_dict.get(task_id)
+
+
+@register.filter
+def get_points_range(max_points):
+    """Возвращает список [0, 1, ..., max_points] для шаблона выставления баллов."""
+    try:
+        return range(int(max_points) + 1)
+    except (ValueError, TypeError):
+        return range(2)

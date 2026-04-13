@@ -12,12 +12,13 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
-from .utils import check_answer, get_grade, get_grade_display
+from .utils import check_answer, get_grade, get_grade_display, get_grade_for_attempt
 
 logger = logging.getLogger(__name__)
 
 
 # --- Rate-limiting (IP-based via cache) ---
+
 
 def _get_client_ip(request):
     xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
@@ -55,6 +56,7 @@ def _clear_login_fails(request, prefix="login"):
 
 # --- Авторизация ---
 
+
 def get_student(request):
     student_id = request.session.get("student_id")
     if not student_id:
@@ -77,10 +79,12 @@ def student_required(view_func):
             return redirect("login")
         request.student = student
         return view_func(request, *args, **kwargs)
+
     return wrapper
 
 
 # --- Вход / Выход ---
+
 
 def login_view(request):
     if get_student(request):
@@ -129,22 +133,25 @@ def logout_view(request):
 
 # --- Выбор варианта ---
 
+
 @student_required
 def choose_variant(request):
     student = request.student
     error = ""
 
-    past_attempts = Attempt.objects.filter(
-        student=student, is_finished=True
-    ).select_related("variant").order_by("-finished_at")
+    past_attempts = (
+        Attempt.objects.filter(student=student, is_finished=True)
+        .select_related("variant")
+        .order_by("-finished_at")
+    )
 
     if request.method == "POST":
         action = request.POST.get("action")
 
         if action == "random":
-            variant = Variant.objects.filter(
-                exam_type=student.exam_type, is_active=True
-            ).order_by("?").first()
+            variant = (
+                Variant.objects.filter(exam_type=student.exam_type, is_active=True).order_by("?").first()
+            )
             if variant:
                 limit_error = _check_attempt_limit(student, variant)
                 if limit_error:
@@ -171,19 +178,21 @@ def choose_variant(request):
                 except Variant.DoesNotExist:
                     error = "Вариант с таким ID не найден"
 
-    return render(request, "exam/choose_variant.html", {
-        "student": student,
-        "past_attempts": past_attempts,
-        "error": error,
-    })
+    return render(
+        request,
+        "exam/choose_variant.html",
+        {
+            "student": student,
+            "past_attempts": past_attempts,
+            "error": error,
+        },
+    )
 
 
 def _check_attempt_limit(student, variant):
     if variant.max_attempts == 0:
         return None
-    finished_count = Attempt.objects.filter(
-        student=student, variant=variant, is_finished=True
-    ).count()
+    finished_count = Attempt.objects.filter(student=student, variant=variant, is_finished=True).count()
     if finished_count >= variant.max_attempts:
         return f"Исчерпан лимит попыток ({variant.max_attempts}) для этого варианта"
     return None
@@ -198,40 +207,52 @@ def _is_attempt_expired(attempt):
 
 # --- Решение варианта ---
 
+
 @student_required
 def start_exam(request, variant_id):
     student = request.student
     variant = get_object_or_404(Variant, id=variant_id, exam_type=student.exam_type, is_active=True)
 
     if not variant.tasks.exists():
-        return render(request, "exam/choose_variant.html", {
-            "student": student,
-            "past_attempts": Attempt.objects.filter(student=student, is_finished=True).select_related("variant"),
-            "error": "В этом варианте нет заданий",
-        })
+        return render(
+            request,
+            "exam/choose_variant.html",
+            {
+                "student": student,
+                "past_attempts": Attempt.objects.filter(student=student, is_finished=True).select_related(
+                    "variant"
+                ),
+                "error": "В этом варианте нет заданий",
+            },
+        )
 
-    attempt = Attempt.objects.filter(
-        student=student, variant=variant, is_finished=False
-    ).first()
+    attempt = Attempt.objects.filter(student=student, variant=variant, is_finished=False).first()
 
     if not attempt:
         limit_error = _check_attempt_limit(student, variant)
         if limit_error:
-            return render(request, "exam/choose_variant.html", {
-                "student": student,
-                "past_attempts": Attempt.objects.filter(student=student, is_finished=True).select_related("variant"),
-                "error": limit_error,
-            })
+            return render(
+                request,
+                "exam/choose_variant.html",
+                {
+                    "student": student,
+                    "past_attempts": Attempt.objects.filter(student=student, is_finished=True).select_related(
+                        "variant"
+                    ),
+                    "error": limit_error,
+                },
+            )
 
         max_score = variant.tasks.aggregate(total=Sum("points"))["total"] or 0
         with transaction.atomic():
             attempt = Attempt.objects.create(
-                student=student, variant=variant, max_score=max_score,
+                student=student,
+                variant=variant,
+                max_score=max_score,
             )
-            Answer.objects.bulk_create([
-                Answer(attempt=attempt, task=task)
-                for task in variant.tasks.all()
-            ], ignore_conflicts=True)
+            Answer.objects.bulk_create(
+                [Answer(attempt=attempt, task=task) for task in variant.tasks.all()], ignore_conflicts=True
+            )
 
     tasks = variant.tasks.order_by("id")
 
@@ -258,15 +279,19 @@ def start_exam(request, variant_id):
     for a in attempt.answers.select_related("task").all():
         answer_map[str(a.task.number)] = a.id
 
-    return render(request, "exam/solve.html", {
-        "student": student,
-        "variant": variant,
-        "attempt": attempt,
-        "tasks": tasks,
-        "answers": answers,
-        "remaining_seconds": int(remaining),
-        "answer_map_json": json.dumps(answer_map),
-    })
+    return render(
+        request,
+        "exam/solve.html",
+        {
+            "student": student,
+            "variant": variant,
+            "attempt": attempt,
+            "tasks": tasks,
+            "answers": answers,
+            "remaining_seconds": int(remaining),
+            "answer_map_json": json.dumps(answer_map),
+        },
+    )
 
 
 @require_POST
@@ -322,7 +347,8 @@ def _finish_attempt(attempt):
         max_score += answer.task.points
         if answer.task.manual_grading:
             answer.is_correct = None  # ожидает проверки учителя
-            answer.save(update_fields=["is_correct"])
+            answer.awarded_points = None
+            answer.save(update_fields=["is_correct", "awarded_points"])
         else:
             is_correct = check_answer(answer.student_answer, answer.task.correct_answer)
             answer.is_correct = is_correct
@@ -334,22 +360,23 @@ def _finish_attempt(attempt):
     attempt.finished_at = timezone.now()
     attempt.score = total_score
     attempt.max_score = max_score
-    attempt.grade = get_grade(attempt.variant.exam_type, total_score)
     attempt.save()
+    attempt.grade = get_grade_for_attempt(attempt)
+    attempt.save(update_fields=["grade"])
 
 
 def _recalculate_attempt_score(attempt):
     """Пересчитывает балл после ручной проверки учителем."""
-    total_score = sum(
-        a.task.points
-        for a in attempt.answers.select_related("task").all()
-        if a.is_correct is True
-    )
+    total_score = 0
+    for a in attempt.answers.select_related("task").all():
+        if a.awarded_points is not None:
+            total_score += a.awarded_points
+        elif a.is_correct is True:
+            total_score += a.task.points
     attempt.score = total_score
-    attempt.grade = get_grade(attempt.variant.exam_type, total_score)
+    attempt.grade = get_grade_for_attempt(attempt)
     attempt.save(update_fields=["score", "grade"])
-    logger.info("Попытка %d завершена: %s — %d баллов",
-                attempt.id, attempt.student.full_name, total_score)
+    logger.info("Попытка %d пересчитана: %s — %d баллов", attempt.id, attempt.student.full_name, total_score)
 
 
 @require_POST
@@ -363,42 +390,50 @@ def finish_exam(request, attempt_id):
 
 # --- Итоги ---
 
+
 @student_required
 def results_view(request, attempt_id):
     student = request.student
-    attempt = get_object_or_404(
-        Attempt, id=attempt_id, student=student, is_finished=True
-    )
+    attempt = get_object_or_404(Attempt, id=attempt_id, student=student, is_finished=True)
 
     answers = attempt.answers.select_related("task").order_by("task__id")
     wrong_answers = answers.filter(is_correct=False)
     manual_answers = answers.filter(task__manual_grading=True)
 
-    previous_attempts = Attempt.objects.filter(
-        student=student, variant=attempt.variant, is_finished=True
-    ).exclude(id=attempt.id).order_by("-finished_at")
+    previous_attempts = (
+        Attempt.objects.filter(student=student, variant=attempt.variant, is_finished=True)
+        .exclude(id=attempt.id)
+        .order_by("-finished_at")
+    )
 
     grade_display = get_grade_display(attempt.variant.exam_type, attempt.grade)
 
-    return render(request, "exam/results.html", {
-        "student": student,
-        "attempt": attempt,
-        "answers": answers,
-        "wrong_answers": wrong_answers,
-        "manual_answers": manual_answers,
-        "previous_attempts": previous_attempts,
-        "grade_display": grade_display,
-    })
+    return render(
+        request,
+        "exam/results.html",
+        {
+            "student": student,
+            "attempt": attempt,
+            "answers": answers,
+            "wrong_answers": wrong_answers,
+            "manual_answers": manual_answers,
+            "previous_attempts": previous_attempts,
+            "grade_display": grade_display,
+        },
+    )
 
 
 # --- Профиль / Статистика ---
 
+
 @student_required
 def profile_view(request):
     student = request.student
-    attempts = Attempt.objects.filter(
-        student=student, is_finished=True
-    ).select_related("variant").order_by("-finished_at")
+    attempts = (
+        Attempt.objects.filter(student=student, is_finished=True)
+        .select_related("variant")
+        .order_by("-finished_at")
+    )
 
     avg_percentage = None
     if attempts.exists():
@@ -407,34 +442,43 @@ def profile_view(request):
 
     chart_data = []
     for a in reversed(list(attempts)):
-        chart_data.append({
-            "date": a.finished_at.strftime("%d.%m.%Y"),
-            "variant": a.variant.number,
-            "score": a.score,
-            "max_score": a.max_score,
-            "percentage": a.percentage,
-        })
+        chart_data.append(
+            {
+                "date": a.finished_at.strftime("%d.%m.%Y"),
+                "variant": a.variant.number,
+                "score": a.score,
+                "max_score": a.max_score,
+                "percentage": a.percentage,
+            }
+        )
 
-    return render(request, "exam/profile.html", {
-        "student": student,
-        "attempts": attempts,
-        "avg_percentage": avg_percentage,
-        "chart_data": json.dumps(chart_data),
-    })
+    return render(
+        request,
+        "exam/profile.html",
+        {
+            "student": student,
+            "attempts": attempts,
+            "avg_percentage": avg_percentage,
+            "chart_data": json.dumps(chart_data),
+        },
+    )
 
 
 # --- Просмотр варианта с ответами ---
 
+
 @student_required
 def view_attempt(request, attempt_id):
     student = request.student
-    attempt = get_object_or_404(
-        Attempt, id=attempt_id, student=student, is_finished=True
-    )
+    attempt = get_object_or_404(Attempt, id=attempt_id, student=student, is_finished=True)
     answers = attempt.answers.select_related("task").order_by("task__id")
 
-    return render(request, "exam/view_attempt.html", {
-        "student": student,
-        "attempt": attempt,
-        "answers": answers,
-    })
+    return render(
+        request,
+        "exam/view_attempt.html",
+        {
+            "student": student,
+            "attempt": attempt,
+            "answers": answers,
+        },
+    )

@@ -110,6 +110,10 @@ EGE_BASE_GRADE_TABLE = {
 }
 
 
+# Задания ОГЭ, по которым считается обязательный минимум 2 балла для оценки ≥ 3
+OGE_REQUIRED_SECTION = frozenset(range(15, 20)) | frozenset(range(23, 26))  # 15–19 и 23–25
+
+
 def get_grade(exam_type: str, primary_score: int) -> str:
     """Возвращает оценку/тестовый балл по первичному баллу."""
     if exam_type == "oge":
@@ -141,3 +145,29 @@ def get_grade_display(exam_type: str, grade: str) -> str:
     if exam_type == "ege_profile":
         return f"{grade} тестовых баллов"
     return f"Оценка: {grade}"
+
+
+def get_grade_for_attempt(attempt) -> str:
+    """Вычисляет оценку с учётом дополнительных критериев ОГЭ.
+
+    ОГЭ: если сумма баллов по заданиям 15–19 и 23–25 меньше 2 — оценка 2
+    независимо от общего первичного балла.
+    """
+    exam_type = attempt.variant.exam_type
+
+    if exam_type == "oge":
+        section_score = 0
+        for answer in attempt.answers.select_related("task").all():
+            try:
+                n = int(str(answer.task.number).split(".")[0])
+            except (ValueError, TypeError):
+                continue
+            if n in OGE_REQUIRED_SECTION:
+                if answer.awarded_points is not None:
+                    section_score += answer.awarded_points
+                elif answer.is_correct:
+                    section_score += answer.task.points
+        if section_score < 2:
+            return "2"
+
+    return get_grade(exam_type, attempt.score)

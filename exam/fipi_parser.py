@@ -370,7 +370,8 @@ def _parse_page(sess, proj, page, theme=""):
         show_pic_urls = [f"{FIPI_BASE}/{p.lstrip('/')}" for p in pics]
         inline_srcs = re.findall(r'<img[^>]+\bsrc=["\']?(/[^"\'>\s]+)', raw_html, re.IGNORECASE)
         inline_urls = [f"{FIPI_BASE}{s}" for s in inline_srcs]
-        # inline первые (они важнее — видны в тексте), потом ShowPictureQ
+        # popup-картинки, которых нет в тексте
+        popup_only_urls = [u for u in show_pic_urls if u not in inline_urls]
         image_urls = list(dict.fromkeys(inline_urls + show_pic_urls))
 
         # Тема из info-панели (следующий div id="i{task_id}")
@@ -388,7 +389,9 @@ def _parse_page(sess, proj, page, theme=""):
                 "task_id": task_id,
                 "guid": guid,
                 "html": sanitize_html(_process_cell_html(raw_html)),
-                "image_urls": image_urls,
+                "inline_image_urls": list(dict.fromkeys(inline_urls)),
+                "popup_image_urls": popup_only_urls,
+                "image_urls": image_urls,  # оставляем для обратной совместимости
                 "theme": theme_text,
             }
         )
@@ -470,13 +473,32 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
                     )
                 continue
 
-            # 3. Скачиваем картинку
-            image_content = None
-            image_name = None
-            if td["image_urls"]:
+            # 3. Скачиваем inline-картинки из текста и заменяем FIPI-URLs на локальные
+            from django.core.files.storage import default_storage
+
+            processed_text = text
+            for img_url in td.get("inline_image_urls", []):
                 try:
                     time.sleep(FIPI_IMG_DELAY)
-                    img_resp = sess.get(td["image_urls"][0], headers=FIPI_HEADERS, timeout=15, verify=False)
+                    img_resp = sess.get(img_url, headers=FIPI_HEADERS, timeout=15, verify=False)
+                    if img_resp.status_code == 200:
+                        ct_header = img_resp.headers.get("Content-Type", "")
+                        ext = ".png" if "png" in ct_header else ".jpg"
+                        fname = f"catalog/fipi_{uuid.uuid4().hex[:8]}{ext}"
+                        saved_path = default_storage.save(fname, ContentFile(img_resp.content))
+                        local_url = default_storage.url(saved_path)
+                        processed_text = processed_text.replace(img_url, local_url)
+                except Exception:
+                    pass
+
+            # 4. Для popup-картинок (не в тексте) — сохраняем как ct.image
+            image_content = None
+            image_name = None
+            popup_urls = td.get("popup_image_urls", [])
+            if popup_urls:
+                try:
+                    time.sleep(FIPI_IMG_DELAY)
+                    img_resp = sess.get(popup_urls[0], headers=FIPI_HEADERS, timeout=15, verify=False)
                     if img_resp.status_code == 200:
                         ct_header = img_resp.headers.get("Content-Type", "")
                         ext = ".png" if "png" in ct_header else ".jpg"
@@ -488,7 +510,7 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
             ct = CatalogTask(
                 task_number=None,
                 exam_type=exam_type,
-                text=text,
+                text=processed_text,
                 correct_answer="",
                 source=TaskSource.FIPI,
                 manual_grading=True,

@@ -524,7 +524,7 @@ def student_stats(request, student_id):
 
 @admin_required
 def variant_list(request):
-    exam_filter = request.GET.get("exam_type", "")
+    exam_filter = request.GET.get("exam_type", "oge")
     variants = Variant.objects.annotate(
         task_count=Count("tasks", distinct=True),
         attempts_count=Count("attempts", filter=Q(attempts__is_finished=True), distinct=True),
@@ -871,14 +871,28 @@ def attempt_grade_answer(request, answer_id):
     from .views import _recalculate_attempt_score
 
     answer = get_object_or_404(Answer, id=answer_id, task__manual_grading=True)
-    value = request.POST.get("is_correct")
-    if value == "true":
-        answer.is_correct = True
-    elif value == "false":
-        answer.is_correct = False
+
+    if "points" in request.POST:
+        try:
+            pts = int(request.POST["points"])
+            pts = max(0, min(pts, answer.task.points))
+            answer.awarded_points = pts
+            answer.is_correct = pts > 0
+        except (ValueError, TypeError):
+            pass
     else:
-        answer.is_correct = None
-    answer.save(update_fields=["is_correct"])
+        value = request.POST.get("is_correct")
+        if value == "true":
+            answer.is_correct = True
+            answer.awarded_points = answer.task.points
+        elif value == "false":
+            answer.is_correct = False
+            answer.awarded_points = 0
+        else:
+            answer.is_correct = None
+            answer.awarded_points = None
+
+    answer.save(update_fields=["is_correct", "awarded_points"])
     _recalculate_attempt_score(answer.attempt)
     return redirect("admin_attempt_detail", attempt_id=answer.attempt_id)
 
@@ -1147,7 +1161,7 @@ def _run_catalog_import_job(job_id, url):
 @admin_required
 def catalog_list(request):
     """Список заданий каталога с фильтрацией."""
-    exam_type_filter = request.GET.get("exam_type", "")
+    exam_type_filter = request.GET.get("exam_type", "oge")
     num_filter = request.GET.get("task_number", "")
     source_filter = request.GET.get("source", "")
     search = request.GET.get("q", "").strip()
@@ -1368,7 +1382,7 @@ def catalog_import_status(request, job_id):
 @admin_required
 def catalog_unclassified(request):
     """Задания требующие внимания: без номера ИЛИ без ответа (не ручная проверка)."""
-    exam_type_filter = request.GET.get("exam_type", "")
+    exam_type_filter = request.GET.get("exam_type", "oge")
     tab = request.GET.get("tab", "no_number")  # no_number | no_answer
     if tab == "no_answer":
         tasks = CatalogTask.objects.filter(correct_answer="", manual_grading=False)
@@ -1412,7 +1426,7 @@ def catalog_assign_number(request, task_id):
 @admin_required
 def api_catalog_tasks(request):
     """JSON API для модального окна: задания каталога по типу, номеру, поиску."""
-    exam_type = request.GET.get("exam_type", "")
+    exam_type = request.GET.get("exam_type", "oge")
     task_number = request.GET.get("task_number", "")
     search = request.GET.get("q", "").strip()
     source = request.GET.get("source", "")
@@ -1494,6 +1508,7 @@ def variant_from_catalog(request):
                     topic=ct.topic,
                     points=ct.points,
                     manual_grading=ct.manual_grading,
+                    no_student_input=ct.no_student_input,
                     shared_context=ct.shared_context,
                 )
                 if ct.image:

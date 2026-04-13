@@ -544,6 +544,28 @@ _FORMULA_KEYWORDS = [
 ]
 
 
+def _is_no_input_task(exam_type, task_number) -> bool:
+    """ОГЭ задания 20–25 решаются на бумаге — студент ничего не вводит."""
+    if exam_type != ExamType.OGE:
+        return False
+    try:
+        n = int(str(task_number).split(".")[0])
+        return n >= 20
+    except (ValueError, TypeError):
+        return False
+
+
+def _get_oge_default_points(task_number) -> int:
+    """Возвращает максимальный балл для задания ОГЭ по математике.
+    Задания 20–25 (развёрнутый ответ): 2 балла. Остальные: 1 балл.
+    """
+    try:
+        n = int(str(task_number).split(".")[0])
+        return 2 if n >= 20 else 1
+    except (ValueError, TypeError):
+        return 1
+
+
 def _is_formula_answer(answer: str) -> bool:
     """Ответ — alt-текст формулы-картинки, ученик не сможет его ввести."""
     a = answer.lower()
@@ -572,7 +594,15 @@ def import_task_to_catalog(url, task_number=None):
         return None, [str(e)]
 
     correct_answer = task_data["correct_answer"]
-    manual = not correct_answer or correct_answer.startswith("Критерии") or _is_formula_answer(correct_answer)
+    no_input = _is_no_input_task(exam_type, task_number)
+    if no_input:
+        correct_answer = ""
+    manual = (
+        no_input
+        or not correct_answer
+        or correct_answer.startswith("Критерии")
+        or _is_formula_answer(correct_answer)
+    )
     if not manual and exam_type == ExamType.EGE_PROFILE and task_number:
         try:
             if int(str(task_number).split(".")[0]) >= 13:
@@ -581,6 +611,7 @@ def import_task_to_catalog(url, task_number=None):
             pass
 
     try:
+        default_pts = _get_oge_default_points(task_number) if exam_type == ExamType.OGE else 1
         ct = CatalogTask(
             task_number=task_number,
             exam_type=exam_type,
@@ -588,6 +619,8 @@ def import_task_to_catalog(url, task_number=None):
             correct_answer=correct_answer,
             source=TaskSource.SDAMGIA,
             manual_grading=manual,
+            no_student_input=no_input,
+            points=default_pts,
             sdamgia_id=problem_id,
         )
         ct.save()
@@ -619,8 +652,16 @@ def import_variant_to_catalog(url, session=None):
                 duplicate += 1
                 continue
 
+            try:
+                task_num_int = int(str(td["number"]).split(".")[0])
+            except (ValueError, TypeError):
+                task_num_int = None
+
             correct_answer = td["correct_answer"]
-            manual = (
+            no_input = _is_no_input_task(exam_type, task_num_int)
+            if no_input:
+                correct_answer = ""
+            manual = no_input or (
                 not correct_answer
                 or correct_answer.startswith("Критерии")
                 or _is_formula_answer(correct_answer)
@@ -632,11 +673,7 @@ def import_variant_to_catalog(url, session=None):
                 except (ValueError, TypeError):
                     pass
 
-            try:
-                task_num_int = int(str(td["number"]).split(".")[0])
-            except (ValueError, TypeError):
-                task_num_int = None
-
+            default_pts = _get_oge_default_points(task_num_int) if exam_type == ExamType.OGE else 1
             ct = CatalogTask(
                 task_number=task_num_int,
                 exam_type=exam_type,
@@ -644,6 +681,8 @@ def import_variant_to_catalog(url, session=None):
                 correct_answer=correct_answer,
                 source=TaskSource.SDAMGIA,
                 manual_grading=manual,
+                no_student_input=no_input,
+                points=default_pts,
                 sdamgia_id=problem_id if problem_id else None,
                 import_session=session,
             )
@@ -685,7 +724,14 @@ def import_variant_from_sdamgia(url, variant_number=None):
             no_answer = []
             for td in data["tasks"]:
                 correct_answer = td["correct_answer"]
-                manual = (
+                try:
+                    task_num_int = int(str(td["number"]).split(".")[0])
+                except (ValueError, TypeError):
+                    task_num_int = None
+                no_input = _is_no_input_task(exam_type, task_num_int)
+                if no_input:
+                    correct_answer = ""
+                manual = no_input or (
                     not correct_answer
                     or correct_answer.startswith("Критерии")
                     or _is_formula_answer(correct_answer)
@@ -697,6 +743,7 @@ def import_variant_from_sdamgia(url, variant_number=None):
                             manual = True
                     except (ValueError, TypeError):
                         pass
+                default_pts = _get_oge_default_points(task_num_int) if exam_type == ExamType.OGE else 1
                 task = Task(
                     variant=variant,
                     number=td["number"],
@@ -704,6 +751,8 @@ def import_variant_from_sdamgia(url, variant_number=None):
                     correct_answer=correct_answer,
                     source=TaskSource.SDAMGIA,
                     manual_grading=manual,
+                    no_student_input=no_input,
+                    points=default_pts,
                 )
                 if td.get("image_data"):
                     img = td["image_data"]

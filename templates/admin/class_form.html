@@ -18,7 +18,7 @@
         <select id="exam_type" name="exam_type" required>
             <option value="">Выберите...</option>
             {% for value, label in exam_types %}
-            <option value="{{ value }}" {% if school_class.exam_type == value %}selected{% endif %}>{{ label }}</option>
+            <option value="{{ value }}" {% if school_class.exam_type == value or not school_class.exam_type and value == "oge" %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
     </div>
