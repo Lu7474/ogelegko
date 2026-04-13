@@ -6,6 +6,7 @@
 
 <div class="actions-bar">
     <a href="{% url 'admin_variant_add' %}" class="btn btn-primary">Создать вариант</a>
+    <button type="button" class="btn btn-primary" onclick="openAutoGenModal()">Автогенерация из каталога</button>
     <a href="{% url 'admin_variant_import' %}" class="btn btn-secondary">Импорт с sdamgia.ru</a>
 
     <form method="get" class="filter-form">
@@ -67,8 +68,95 @@
 {% include "includes/pagination.html" %}
 {% endblock %}
 
+<!-- Модалка автогенерации -->
+<div class="modal-overlay" id="autoGenModal" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal" style="max-width:420px;width:100%">
+        <h3>Автогенерация варианта</h3>
+        <div id="autoGenError" class="error-message" style="display:none;margin-bottom:12px"></div>
+        <div class="form-group" style="margin-bottom:12px">
+            <label for="autoGenNumber">Название варианта</label>
+            <input type="text" id="autoGenNumber" placeholder="Например: 101" style="width:100%">
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+            <label for="autoGenExamType">Тип экзамена</label>
+            <select id="autoGenExamType" style="width:100%">
+                {% for value, label in exam_types %}
+                <option value="{{ value }}" {% if value == "oge" %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+            <label>Стратегия выбора заданий</label>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+                <label style="font-weight:normal;display:flex;align-items:center;gap:8px">
+                    <input type="radio" name="autoGenStrategy" value="random" checked> Случайное из каталога
+                </label>
+                <label style="font-weight:normal;display:flex;align-items:center;gap:8px">
+                    <input type="radio" name="autoGenStrategy" value="latest"> Последнее добавленное
+                </label>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px">
+            <button class="btn btn-primary" id="autoGenSubmit" onclick="submitAutoGen()">Сгенерировать</button>
+            <button class="btn btn-secondary" onclick="closeAutoGenModal()">Отмена</button>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 <script>
+function openAutoGenModal() {
+    document.getElementById('autoGenModal').style.display = 'flex';
+    document.getElementById('autoGenNumber').focus();
+    document.getElementById('autoGenError').style.display = 'none';
+}
+function closeAutoGenModal() {
+    document.getElementById('autoGenModal').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeAutoGenModal();
+});
+function submitAutoGen() {
+    const number = document.getElementById('autoGenNumber').value.trim();
+    const examType = document.getElementById('autoGenExamType').value;
+    const strategy = document.querySelector('input[name="autoGenStrategy"]:checked').value;
+    const errEl = document.getElementById('autoGenError');
+    const btn = document.getElementById('autoGenSubmit');
+
+    if (!number) { errEl.textContent = 'Введите название варианта'; errEl.style.display = ''; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Создаём...';
+    errEl.style.display = 'none';
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]') ?
+        document.querySelector('meta[name="csrf-token"]').content :
+        '{{ csrf_token }}';
+
+    fetch('{% url "admin_variant_auto_generate" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrfToken},
+        body: new URLSearchParams({variant_number: number, exam_type: examType, strategy: strategy})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            window.location.href = data.redirect;
+        } else {
+            errEl.textContent = data.errors.join(' ');
+            errEl.style.display = '';
+            btn.disabled = false;
+            btn.textContent = 'Сгенерировать';
+        }
+    })
+    .catch(() => {
+        errEl.textContent = 'Ошибка сети';
+        errEl.style.display = '';
+        btn.disabled = false;
+        btn.textContent = 'Сгенерировать';
+    });
+}
+
 function printVariant(teacherUrl, studentUrl) {
     // Небольшая задержка между скачиваниями — браузеры блокируют одновременные
     var a1 = document.createElement('a');

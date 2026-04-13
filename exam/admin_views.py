@@ -1533,6 +1533,79 @@ def variant_from_catalog(request):
     return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})
 
 
+@admin_required
+@require_POST
+def variant_auto_generate(request):
+    """Автоматически создаёт вариант из каталога — по одному заданию на каждый номер."""
+    from django.core.files.base import ContentFile as _CF
+    from django.urls import reverse
+
+    from .models import EXAM_TASK_COUNT
+
+    variant_number = request.POST.get("variant_number", "").strip()
+    exam_type = request.POST.get("exam_type", "oge").strip()
+    strategy = request.POST.get("strategy", "random")  # random | latest
+
+    errors = []
+    if not variant_number:
+        errors.append("Введите название варианта")
+    if exam_type not in dict(ExamType.choices):
+        errors.append("Укажите тип экзамена")
+    if Variant.objects.filter(number=variant_number).exists():
+        errors.append(f"Вариант «{variant_number}» уже существует")
+    if errors:
+        return JsonResponse({"ok": False, "errors": errors}, status=400)
+
+    task_count = EXAM_TASK_COUNT.get(exam_type, 25)
+    task_numbers = range(1, task_count + 1)
+
+    # Проверяем, какие номера отсутствуют в каталоге
+    missing = []
+    for n in task_numbers:
+        if not CatalogTask.objects.filter(exam_type=exam_type, task_number=n).exists():
+            missing.append(n)
+    if missing:
+        return JsonResponse(
+            {
+                "ok": False,
+                "errors": [f"В каталоге нет заданий для номеров: {', '.join(map(str, missing))}"],
+            },
+            status=400,
+        )
+
+    try:
+        with transaction.atomic():
+            variant = Variant.objects.create(number=variant_number, exam_type=exam_type)
+            for n in task_numbers:
+                qs = CatalogTask.objects.filter(exam_type=exam_type, task_number=n)
+                ct = qs.order_by("?").first() if strategy == "random" else qs.order_by("-created_at").first()
+                task = Task(
+                    variant=variant,
+                    number=str(n),
+                    text=ct.text,
+                    correct_answer=ct.correct_answer,
+                    source=ct.source,
+                    topic=ct.topic,
+                    points=ct.points,
+                    manual_grading=ct.manual_grading,
+                    no_student_input=ct.no_student_input,
+                    shared_context=ct.shared_context,
+                )
+                if ct.image:
+                    try:
+                        with ct.image.open("rb") as f:
+                            task.image.save(ct.image.name.split("/")[-1], _CF(f.read()), save=False)
+                    except Exception:
+                        pass
+                if ct.shared_context_image:
+                    task.__dict__["shared_context_image"] = ct.shared_context_image.name
+                task.save()
+    except IntegrityError as e:
+        return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
+
+    return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})
+
+
 # ===== ПЕЧАТЬ ВАРИАНТА (DOCX) =====
 
 
