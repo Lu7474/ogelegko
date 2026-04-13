@@ -94,19 +94,29 @@ class SdamgiaParser:
             _thread_local.session = s
         return _thread_local.session
 
-    def _get(self, url, _retry=3):
+    def _get(self, url, _retry=2):
         try:
             time.sleep(REQUEST_DELAY)
-            resp = self._session().get(url, timeout=20)
+            resp = self._session().get(url, timeout=15)
             resp.raise_for_status()
             resp.encoding = "utf-8"
             return resp
-        except requests.RequestException as e:
+        except requests.exceptions.Timeout:
+            # Таймаут — ретраим один раз с паузой
             if _retry > 0:
-                wait = (4 - _retry) * 3  # 3s, 6s, 9s
-                logger.warning("Ошибка загрузки %s (%s), повтор через %ds...", url, e, wait)
+                logger.warning("Таймаут %s, повтор...", url)
+                time.sleep(3)
+                return self._get(url, _retry=0)
+            raise ParserError("Таймаут при загрузке страницы")
+        except requests.exceptions.HTTPError as e:
+            # 5xx — временный сбой сервера, ретраим несколько раз
+            if e.response is not None and e.response.status_code >= 500 and _retry > 0:
+                wait = (3 - _retry) * 4 + 4  # 4s, 8s
+                logger.warning("Ошибка %d для %s, повтор через %ds...", e.response.status_code, url, wait)
                 time.sleep(wait)
                 return self._get(url, _retry=_retry - 1)
+            raise ParserError(f"Не удалось загрузить: {e}")
+        except requests.RequestException as e:
             raise ParserError(f"Не удалось загрузить: {e}")
 
     def _detect_exam_type(self, url):
