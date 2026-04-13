@@ -561,44 +561,70 @@ def _render_segments(doc, segments, indent=None, font_size=None):
 
 
 def _build_variant_docx(variant, include_answers):
-    """Строит docx-документ для варианта. Возвращает BytesIO."""
+    """Строит docx-документ для варианта. Возвращает BytesIO.
+
+    Формат: A4 альбомная, 2 колонки — ~5 страниц для ОГЭ (как PDF-образец).
+    """
     import requests as _req
     from docx import Document
+    from docx.enum.section import WD_ORIENT
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
-    from docx.shared import Cm, Pt, RGBColor
+    from docx.shared import Cm, Pt
 
     doc = Document()
 
-    for section in doc.sections:
-        section.top_margin = Cm(1.5)
-        section.bottom_margin = Cm(1.5)
-        section.left_margin = Cm(2)
-        section.right_margin = Cm(1.5)
+    # A4 альбомная, узкие поля
+    section = doc.sections[0]
+    section.orientation = WD_ORIENT.LANDSCAPE
+    section.page_width = Cm(29.7)
+    section.page_height = Cm(21.0)
+    section.top_margin = Cm(1.5)
+    section.bottom_margin = Cm(1.5)
+    section.left_margin = Cm(2.0)
+    section.right_margin = Cm(1.5)
 
-    FS = Pt(11)
+    # 2 колонки
+    sectPr = section._sectPr
+    cols_el = OxmlElement("w:cols")
+    cols_el.set(qn("w:num"), "2")
+    cols_el.set(qn("w:space"), "720")  # 720 twips = 1.27 cm между колонками
+    sectPr.append(cols_el)
 
-    def _set_para_spacing(p, before=0, after=2):
+    FS = Pt(12)
+
+    def _sp(p, before=0, after=2):
         p.paragraph_format.space_before = Pt(before)
         p.paragraph_format.space_after = Pt(after)
 
+    def _shade_cell(cell, fill="D9D9D9"):
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"), "clear")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:fill"), fill)
+        tcPr.append(shd)
+
+    # Заголовок
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _set_para_spacing(title, before=0, after=2)
+    _sp(title, before=0, after=1)
     r = title.add_run(f"Вариант {variant.number}")
     r.bold = True
     r.font.size = Pt(14)
 
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _set_para_spacing(sub, before=0, after=4)
+    _sp(sub, before=0, after=4)
     sub.add_run(variant.get_exam_type_display()).font.size = Pt(11)
 
     tasks = list(variant.tasks.order_by("id"))
     printed_ctx = set()
 
     for task in tasks:
+        # Общее условие — один раз на группу
         has_ctx = task.shared_context or task.shared_context_image
         if has_ctx:
             from bs4 import BeautifulSoup
@@ -607,101 +633,79 @@ def _build_variant_docx(variant, include_answers):
             ctx_key = " ".join(ctx_plain.split()) or str(task.shared_context_image)
             if ctx_key not in printed_ctx:
                 printed_ctx.add(ctx_key)
-
-                ctx_h = doc.add_paragraph()
-                _set_para_spacing(ctx_h, before=6, after=2)
-                cr = ctx_h.add_run("Общее условие")
-                cr.bold = True
-                cr.font.size = Pt(11)
-                cr.font.color.rgb = RGBColor(0x33, 0x66, 0x99)
-
                 if task.shared_context_image:
                     try:
                         ci_url = task.shared_context_image.url
-                        if ci_url.startswith("http"):
-                            ci_data = _req.get(ci_url, timeout=15).content
-                        else:
-                            with task.shared_context_image.open("rb") as f:
-                                ci_data = f.read()
+                        ci_data = (
+                            _req.get(ci_url, timeout=15).content
+                            if ci_url.startswith("http")
+                            else task.shared_context_image.open("rb").read()
+                        )
                         doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data))
                     except Exception:
                         logger.warning("Не удалось вставить изображение общего условия")
-
                 if task.shared_context:
                     _render_segments(doc, _parse_html_segments(task.shared_context), font_size=FS)
 
+        # Номер задания
         th = doc.add_paragraph()
-        _set_para_spacing(th, before=5, after=1)
-        hr = th.add_run(f"Задание {task.number}")
+        _sp(th, before=4, after=1)
+        hr = th.add_run(f"{task.number}.")
         hr.bold = True
-        hr.font.size = Pt(11)
+        hr.font.size = Pt(14)
 
+        # Текст задания
         if task.text:
             _render_segments(doc, _parse_html_segments(task.text), font_size=FS)
 
+        # Картинка задания
         if task.image:
             try:
                 img_url = task.image.url
-                if img_url.startswith("http"):
-                    img_data = _req.get(img_url, timeout=15).content
-                else:
-                    with task.image.open("rb") as f:
-                        img_data = f.read()
+                img_data = (
+                    _req.get(img_url, timeout=15).content
+                    if img_url.startswith("http")
+                    else task.image.open("rb").read()
+                )
                 doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data))
             except Exception:
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
-    # ─── Таблица ответов на отдельной странице (вертикальная, 3 группы) ──
+    # ─── Таблица ответов (только для учителя, на отдельной странице) ──────
     auto_tasks = [t for t in tasks if not t.no_student_input]
-    if auto_tasks:
-        page_break = doc.add_paragraph()
-        page_break.add_run().add_break(WD_BREAK.PAGE)
+    if auto_tasks and include_answers:
+        doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
         sep = doc.add_paragraph()
-        _set_para_spacing(sep, before=0, after=6)
-        sr = sep.add_run("Таблица ответов")
-        sr.bold = True
-        sr.font.size = Pt(13)
+        _sp(sep, before=0, after=6)
+        sep.add_run("Таблица ответов").bold = True
+        sep.runs[0].font.size = Pt(13)
 
         col_groups = 3
         n = len(auto_tasks)
-        rows_per_group = (n + col_groups - 1) // col_groups
-        groups = [auto_tasks[g * rows_per_group : (g + 1) * rows_per_group] for g in range(col_groups)]
+        rpg = (n + col_groups - 1) // col_groups
+        groups = [auto_tasks[g * rpg : (g + 1) * rpg] for g in range(col_groups)]
 
-        total_cols = col_groups * 2
-        tbl = doc.add_table(rows=rows_per_group + 1, cols=total_cols)
+        tbl = doc.add_table(rows=rpg + 1, cols=col_groups * 2)
         tbl.style = "Table Grid"
 
-        # Заголовок
         hdr = tbl.rows[0].cells
         for g in range(col_groups):
             hdr[g * 2].text = "№"
             hdr[g * 2 + 1].text = "Ответ"
 
-        # Данные
-        for row_i in range(rows_per_group):
-            row_cells = tbl.rows[row_i + 1].cells
+        for row_i in range(rpg):
+            cells = tbl.rows[row_i + 1].cells
             for g, grp in enumerate(groups):
                 if row_i < len(grp):
-                    t = grp[row_i]
-                    row_cells[g * 2].text = str(t.number)
-                    row_cells[g * 2 + 1].text = (t.correct_answer or "") if include_answers else ""
-
-        # Форматирование
-        def _shade_cell(cell):
-            tc = cell._tc
-            tcPr = tc.get_or_add_tcPr()
-            shd = OxmlElement("w:shd")
-            shd.set(qn("w:val"), "clear")
-            shd.set(qn("w:color"), "auto")
-            shd.set(qn("w:fill"), "D9D9D9")
-            tcPr.append(shd)
+                    cells[g * 2].text = str(grp[row_i].number)
+                    cells[g * 2 + 1].text = grp[row_i].correct_answer or ""
 
         for row_idx, row in enumerate(tbl.rows):
             for c_idx, cell in enumerate(row.cells):
                 for para in cell.paragraphs:
                     para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    _set_para_spacing(para, before=1, after=1)
+                    _sp(para, before=1, after=1)
                     for run in para.runs:
                         run.font.size = Pt(9)
                         if row_idx == 0 or c_idx % 2 == 0:
