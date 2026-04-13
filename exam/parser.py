@@ -377,6 +377,8 @@ class SdamgiaParser:
         raw = raw.rstrip(". \t\n\r").strip()
         # Убираем единицы измерения из числового ответа: "0.4 мм" → "0.4"
         raw = _strip_measurement_unit(raw)
+        # Убираем π из ответа: "27π" → "27" (ученик вводит только коэффициент)
+        raw = re.sub(r"^(-?\d+(?:[.,]\d+)?)\s*[π]\s*$", r"\1", raw)
         return raw
 
     def _extract_answer_from_block(self, block):

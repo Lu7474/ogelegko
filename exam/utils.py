@@ -10,6 +10,9 @@ def normalize_answer(answer: str) -> str:
     # Нормализуем π: "pi" после цифры ("27pi") или отдельно ("pi") → символ π
     answer = re.sub(r"(?i)(?<=\d)pi|^pi$", "π", answer)
     answer = answer.replace(",", ".").replace(" ", "")
+    # Убираем π из конца числового ответа: "27π" → "27", "-3π" → "-3"
+    # (ученик вводит только коэффициент, π — часть единицы измерения ответа)
+    answer = re.sub(r"^(-?\d+(?:\.\d+)?)π$", r"\1", answer)
     if not answer:
         return ""
 
