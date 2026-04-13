@@ -1689,16 +1689,36 @@ def _get_image_bytes(src):
             if os.path.exists(local):
                 with open(local, "rb") as f:
                     return f.read()
+            # Cloudinary или другое хранилище — получаем URL и скачиваем
             from django.core.files.storage import default_storage
 
             try:
-                with default_storage.open(rel) as f:
-                    return f.read()
+                url = default_storage.url(rel)
+                if url.startswith("http://") or url.startswith("https://"):
+                    r = _req.get(url, timeout=15)
+                    if r.status_code == 200:
+                        return r.content
+                else:
+                    with default_storage.open(rel) as f:
+                        return f.read()
             except Exception:
                 pass
     except Exception as e:
         logger.warning("Не удалось загрузить изображение %s: %s", src, e)
     return None
+
+
+def _svg_to_png(svg_bytes):
+    """Конвертирует SVG байты в PNG байты через PyMuPDF. Возвращает None при ошибке."""
+    try:
+        import fitz  # PyMuPDF
+
+        fitz_doc = fitz.open("svg", svg_bytes)
+        pix = fitz_doc[0].get_pixmap(matrix=fitz.Matrix(3, 3), alpha=False)
+        return pix.tobytes("png")
+    except Exception as e:
+        logger.warning("SVG→PNG конвертация не удалась: %s", e)
+        return None
 
 
 def _render_segments(doc, segments, indent=None, font_size=None):
@@ -1738,12 +1758,18 @@ def _render_segments(doc, segments, indent=None, font_size=None):
             close()
         elif seg[0] == "image":
             close()
-            img_data = _get_image_bytes(seg[1])
+            img_src = seg[1]
+            img_data = _get_image_bytes(img_src)
             if img_data:
-                try:
-                    doc.add_picture(io.BytesIO(img_data), width=Cm(14))
-                except Exception as e:
-                    logger.warning("Не удалось вставить изображение: %s", e)
+                # Конвертируем SVG → PNG (python-docx не поддерживает SVG)
+                is_svg = img_src.lower().endswith(".svg") or img_data[:5] in (b"<svg ", b"<?xml")
+                if is_svg:
+                    img_data = _svg_to_png(img_data)
+                if img_data:
+                    try:
+                        doc.add_picture(io.BytesIO(img_data), width=Cm(14))
+                    except Exception as e:
+                        logger.warning("Не удалось вставить изображение: %s", e)
             close()
 
 
