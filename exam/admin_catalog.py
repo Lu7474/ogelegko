@@ -471,7 +471,7 @@ def variant_auto_generate(request):
     except IntegrityError as e:
         return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
 
-    return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})
+    return JsonResponse({"ok": True, "redirect": reverse("admin_variants")})
 
 
 # ===== ФИПИ ИМПОРТ =====
