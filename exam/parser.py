@@ -94,7 +94,7 @@ class SdamgiaParser:
             _thread_local.session = s
         return _thread_local.session
 
-    def _get(self, url):
+    def _get(self, url, _retry=1):
         try:
             time.sleep(REQUEST_DELAY)
             resp = self._session().get(url, timeout=15)
@@ -102,6 +102,9 @@ class SdamgiaParser:
             resp.encoding = "utf-8"
             return resp
         except requests.RequestException as e:
+            if _retry > 0:
+                time.sleep(2)
+                return self._get(url, _retry=_retry - 1)
             raise ParserError(f"Не удалось загрузить: {e}")
 
     def _detect_exam_type(self, url):
@@ -247,7 +250,13 @@ class SdamgiaParser:
                 target_block = blocks[0]
 
         if not target_block:
-            raise ParserError(f"Не найден блок задания {problem_id}")
+            # Fallback: ищем любой div с pbody (некоторые страницы не имеют prob_maindiv)
+            fallback = soup.find("div", class_=re.compile(r"prob"))
+            if fallback:
+                target_block = fallback
+                blocks = [target_block]
+            else:
+                raise ParserError(f"Не найден блок задания {problem_id} (страница: {url})")
 
         is_grouped = len(blocks) > 1
 
@@ -508,7 +517,7 @@ class SdamgiaParser:
                 logger.warning("  %d/%d (ID %s) ОШИБКА: %s", i, total, pid, e)
                 return {
                     "number": display_number,
-                    "text": f"[Ошибка парсинга задания {pid}]",
+                    "text": f"[Ошибка загрузки задания {pid}: {e}]",
                     "correct_answer": "",
                     "image_data": None,
                     "source_id": pid,
