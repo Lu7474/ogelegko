@@ -1854,15 +1854,6 @@ def _build_variant_docx(variant, include_answers):
             except Exception:
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
-        # Ответ для учителя (строчкой под заданием)
-        if include_answers and task.correct_answer:
-            ap = doc.add_paragraph()
-            _set_para_spacing(ap, before=0, after=0)
-            ar = ap.add_run("Ответ: " + task.correct_answer)
-            ar.bold = True
-            ar.font.color.rgb = RGBColor(0x27, 0xAE, 0x60)
-            ar.font.size = Pt(10)
-
     # ─── Таблица ответов в конце ──────────────────────────────────────────
     auto_tasks = [t for t in tasks if not t.no_student_input]
     if auto_tasks:
