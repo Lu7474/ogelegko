@@ -1621,6 +1621,15 @@ def _parse_html_segments(html):
                 walk(c, bold, italic, sup, sub)
             segments.append(("break",))
             return
+        if tag == "table":
+            rows = []
+            for tr in node.find_all("tr"):
+                cells = [str(td) for td in tr.find_all(["td", "th"])]
+                if cells:
+                    rows.append(cells)
+            if rows:
+                segments.append(("table", rows))
+            return
         if tag in ("td", "th"):
             for c in node.children:
                 walk(c, bold, italic, sup, sub)
@@ -1771,6 +1780,41 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                     except Exception as e:
                         logger.warning("Не удалось вставить изображение: %s", e)
             close()
+        elif seg[0] == "table":
+            close()
+            rows_data = seg[1]
+            if not rows_data:
+                continue
+            max_cols = max(len(row) for row in rows_data)
+            if max_cols == 0:
+                continue
+            tbl = doc.add_table(rows=len(rows_data), cols=max_cols)
+            tbl.style = "Table Grid"
+            for r_idx, row in enumerate(rows_data):
+                for c_idx, cell_html in enumerate(row):
+                    if c_idx >= max_cols:
+                        break
+                    cell = tbl.rows[r_idx].cells[c_idx]
+                    cell_segs = _parse_html_segments(cell_html)
+                    p = cell.paragraphs[0]
+                    p.paragraph_format.space_before = Pt(1)
+                    p.paragraph_format.space_after = Pt(1)
+                    for seg2 in cell_segs:
+                        if seg2[0] == "text":
+                            run = p.add_run(seg2[1])
+                            if seg2[2]:
+                                run.bold = True
+                            if seg2[3]:
+                                run.italic = True
+                            run.font.superscript = seg2[4]
+                            run.font.subscript = seg2[5]
+                            if font_size:
+                                run.font.size = font_size
+                        elif seg2[0] == "break":
+                            p = cell.add_paragraph()
+                            p.paragraph_format.space_before = Pt(0)
+                            p.paragraph_format.space_after = Pt(1)
+            close()
 
 
 def _build_variant_docx(variant, include_answers):
@@ -1779,7 +1823,7 @@ def _build_variant_docx(variant, include_answers):
 
     import requests as _req
     from docx import Document
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
     from docx.shared import Cm, Pt, RGBColor
@@ -1872,52 +1916,73 @@ def _build_variant_docx(variant, include_answers):
             except Exception:
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
-    # ─── Таблица ответов в конце ──────────────────────────────────────────
+    # ─── Таблица ответов на отдельной странице ───────────────────────────
     auto_tasks = [t for t in tasks if not t.no_student_input]
     if auto_tasks:
+        # Перенос на новую страницу
+        page_break = doc.add_paragraph()
+        page_break.add_run().add_break(WD_BREAK.PAGE)
+
         sep = doc.add_paragraph()
-        _set_para_spacing(sep, before=10, after=4)
+        _set_para_spacing(sep, before=0, after=8)
         sr = sep.add_run("Таблица ответов")
         sr.bold = True
-        sr.font.size = Pt(12)
+        sr.font.size = Pt(14)
 
-        chunk_size = 13
+        chunk_size = 10
         chunks = [auto_tasks[i : i + chunk_size] for i in range(0, len(auto_tasks), chunk_size)]
 
         for chunk in chunks:
             cols = len(chunk) + 1
-            tbl = doc.add_table(rows=2, cols=cols)
+            tbl = doc.add_table(rows=3, cols=cols)
             tbl.style = "Table Grid"
 
-            # Строка с номерами заданий
+            # ── Строка 0: заголовки «№ задания» / номера ──────────────────
             num_row = tbl.rows[0].cells
-            num_row[0].text = "№"
+            num_row[0].text = "№\nзадания"
             for i, t in enumerate(chunk):
                 num_row[i + 1].text = str(t.number)
 
-            # Строка с ответами
+            # ── Строка 1: «Ответ» / ответы ────────────────────────────────
             ans_row = tbl.rows[1].cells
             ans_row[0].text = "Ответ"
             for i, t in enumerate(chunk):
-                ans_row[i + 1].text = (t.correct_answer or "—") if include_answers else ""
+                ans_row[i + 1].text = (t.correct_answer or "") if include_answers else ""
 
-            # Форматирование ячеек: мелкий шрифт, компактная высота, центр
-            for row in tbl.rows:
+            # ── Строка 2: «Балл» / пустые ячейки для заполнения ──────────
+            bal_row = tbl.rows[2].cells
+            bal_row[0].text = "Балл"
+
+            # ── Форматирование ────────────────────────────────────────────
+            ROW_HEIGHTS = ("480", "600", "480")  # twips (1/20 pt): ~8mm, ~10mm, ~8mm
+            for row_idx, row in enumerate(tbl.rows):
                 tr_el = row._tr
                 trPr = tr_el.get_or_add_trPr()
                 trH = OxmlElement("w:trHeight")
-                trH.set(qn("w:val"), "320")
-                trH.set(qn("w:hRule"), "exact")
+                trH.set(qn("w:val"), ROW_HEIGHTS[row_idx])
+                trH.set(qn("w:hRule"), "atLeast")
                 trPr.append(trH)
-                for cell in row.cells:
+
+                for c_idx, cell in enumerate(row.cells):
                     for para in cell.paragraphs:
                         para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        _set_para_spacing(para, before=0, after=0)
+                        _set_para_spacing(para, before=2, after=2)
                         for run in para.runs:
-                            run.font.size = Pt(9)
+                            run.font.size = Pt(10)
+                            if c_idx == 0 or row_idx == 0:
+                                run.bold = True
+                    # Серый фон для строки номеров и столбца-метки
+                    if row_idx == 0 or c_idx == 0:
+                        tc = cell._tc
+                        tcPr = tc.get_or_add_tcPr()
+                        shd = OxmlElement("w:shd")
+                        shd.set(qn("w:val"), "clear")
+                        shd.set(qn("w:color"), "auto")
+                        shd.set(qn("w:fill"), "D9D9D9")
+                        tcPr.append(shd)
 
             sp = doc.add_paragraph()
-            _set_para_spacing(sp, before=0, after=4)
+            _set_para_spacing(sp, before=0, after=8)
 
     buf = io.BytesIO()
     doc.save(buf)
