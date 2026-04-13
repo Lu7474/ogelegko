@@ -36,8 +36,7 @@
                 <div class="row-actions" style="flex-wrap:wrap;">
                 <a href="{% url 'admin_variant_stats' v.id %}" class="btn btn-sm">Статистика</a>
                 <a href="{% url 'admin_variant_edit' v.id %}" class="btn btn-sm">Редактировать</a>
-                <button type="button" class="btn btn-sm btn-secondary"
-                        onclick="printVariant('{% url 'admin_variant_print' v.id 'teacher' %}','{% url 'admin_variant_print' v.id 'student' %}')">Распечатать</button>
+                <a href="{% url 'admin_variant_print' v.id 'teacher' %}" class="btn btn-sm btn-secondary">Распечатать</a>
                 <form method="post" action="{% url 'admin_variant_toggle' v.id %}">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-secondary">{% if v.is_active %}Скрыть{% else %}Активировать{% endif %}</button>
@@ -158,25 +157,5 @@ function submitAutoGen() {
     });
 }
 
-function printVariant(teacherUrl, studentUrl) {
-    // Небольшая задержка между скачиваниями — браузеры блокируют одновременные
-    var a1 = document.createElement('a');
-    a1.href = teacherUrl;
-    a1.download = '';
-    a1.style.display = 'none';
-    document.body.appendChild(a1);
-    a1.click();
-    document.body.removeChild(a1);
-
-    setTimeout(function() {
-        var a2 = document.createElement('a');
-        a2.href = studentUrl;
-        a2.download = '';
-        a2.style.display = 'none';
-        document.body.appendChild(a2);
-        a2.click();
-        document.body.removeChild(a2);
-    }, 500);
-}
 </script>
 {% endblock %}
