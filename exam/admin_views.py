@@ -1812,14 +1812,6 @@ def _build_variant_docx(variant, include_answers):
     _set_para_spacing(sub, before=0, after=4)
     sub.add_run(variant.get_exam_type_display()).font.size = Pt(11)
 
-    if include_answers:
-        lp = doc.add_paragraph()
-        lp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        _set_para_spacing(lp, before=0, after=6)
-        r2 = lp.add_run("(с ответами — для учителя)")
-        r2.font.color.rgb = RGBColor(0x7F, 0x8C, 0x8D)
-        r2.font.size = Pt(9)
-
     tasks = list(variant.tasks.order_by("id"))
     printed_ctx = set()  # ключи уже напечатанных общих условий
 
@@ -1828,7 +1820,7 @@ def _build_variant_docx(variant, include_answers):
         has_ctx = task.shared_context or task.shared_context_image
         if has_ctx:
             ctx_key = (
-                task.shared_context or "",
+                " ".join((task.shared_context or "").split()),
                 str(task.shared_context_image) if task.shared_context_image else "",
             )
             if ctx_key not in printed_ctx:
