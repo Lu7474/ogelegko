@@ -19,13 +19,28 @@
     </form>
 </div>
 
+<!-- Панель массового скачивания (появляется при выборе) -->
+<div id="bulkBar" style="display:none;align-items:center;gap:12px;padding:10px 14px;margin-bottom:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);">
+    <span id="bulkCount" style="font-size:0.9rem;color:var(--text-muted);"></span>
+    <form method="post" action="{% url 'admin_variants_print_zip' %}" id="bulkForm">
+        {% csrf_token %}
+        <div id="bulkIds"></div>
+        <button type="submit" class="btn btn-primary btn-sm">Скачать ZIP</button>
+    </form>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()">Снять выбор</button>
+</div>
+
 <table class="table">
     <thead>
-        <tr><th>Номер</th><th>Тип</th><th>Заданий</th><th>Попыток</th><th>Лимит</th><th>Статус</th><th>Действия</th></tr>
+        <tr>
+            <th style="width:36px"><input type="checkbox" id="selectAll" title="Выбрать все" onchange="toggleAll(this)"></th>
+            <th>Номер</th><th>Тип</th><th>Заданий</th><th>Попыток</th><th>Лимит</th><th>Статус</th><th>Действия</th>
+        </tr>
     </thead>
     <tbody>
         {% for v in variants %}
         <tr class="{% if not v.is_active %}row-inactive{% endif %}">
+            <td><input type="checkbox" class="row-check" value="{{ v.id }}" onchange="updateBulkBar()"></td>
             <td><strong>{{ v.number }}</strong></td>
             <td>{{ v.get_exam_type_display }}</td>
             <td>{{ v.task_count }}</td>
@@ -53,7 +68,7 @@
             </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" style="padding:0;border:none">
+        <tr><td colspan="8" style="padding:0;border:none">
             <div class="empty-state">
                 <span class="empty-state-icon">📋</span>
                 <h3>Вариантов пока нет</h3>
@@ -105,6 +120,33 @@
 
 {% block scripts %}
 <script>
+function toggleAll(cb) {
+    document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const checked = Array.from(document.querySelectorAll('.row-check:checked'));
+    const bar = document.getElementById('bulkBar');
+    const countEl = document.getElementById('bulkCount');
+    const idsEl = document.getElementById('bulkIds');
+
+    if (checked.length === 0) {
+        bar.style.display = 'none';
+        document.getElementById('selectAll').checked = false;
+        return;
+    }
+    bar.style.display = 'flex';
+    countEl.textContent = 'Выбрано: ' + checked.length;
+    idsEl.innerHTML = checked.map(c => `<input type="hidden" name="ids" value="${c.value}">`).join('');
+}
+
+function clearSelection() {
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBulkBar();
+}
+
 function openAutoGenModal() {
     document.getElementById('autoGenModal').style.display = 'flex';
     document.getElementById('autoGenNumber').focus();
@@ -156,6 +198,5 @@ function submitAutoGen() {
         btn.textContent = 'Сгенерировать';
     });
 }
-
 </script>
 {% endblock %}

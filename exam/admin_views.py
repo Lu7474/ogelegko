@@ -1935,6 +1935,34 @@ def variant_print_docx(request, variant_id, mode):
     return response
 
 
+@admin_required
+@require_POST
+def variants_print_zip(request):
+    """Скачать ZIP с DOCX-файлами для выбранных вариантов."""
+    import io
+    import zipfile
+
+    ids = request.POST.getlist("ids")
+    if not ids:
+        return HttpResponse("Не выбрано ни одного варианта", status=400)
+
+    variants = Variant.objects.filter(id__in=ids)
+    if not variants.exists():
+        return HttpResponse("Варианты не найдены", status=404)
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for variant in variants:
+            docx_buf = _build_variant_docx(variant, include_answers=True)
+            safe_num = variant.number.replace("/", "-")
+            zf.writestr(f"{safe_num} вариант (ответы).docx", docx_buf.read())
+
+    buf.seek(0)
+    response = HttpResponse(buf, content_type="application/zip")
+    response["Content-Disposition"] = 'attachment; filename="варианты.zip"'
+    return response
+
+
 # ===== ФИПИ ИМПОРТ =====
 
 
