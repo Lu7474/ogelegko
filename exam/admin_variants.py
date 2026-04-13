@@ -616,31 +616,36 @@ def _build_variant_docx(variant, include_answers):
     sub.add_run(variant.get_exam_type_display()).font.size = Pt(11)
 
     tasks = list(variant.tasks.order_by("id"))
-    printed_ctx = set()
+    # Флаг: было ли уже напечатано условие для текущей группы заданий.
+    # Группа — непрерывная последовательность заданий с has_ctx=True.
+    # Сбрасываем флаг при переходе от «нет условия» к «есть условие».
+    ctx_group_printed = False
+    prev_had_ctx = False
 
     for task in tasks:
-        # Общее условие — один раз на группу
-        has_ctx = task.shared_context or task.shared_context_image
-        if has_ctx:
-            from bs4 import BeautifulSoup
+        has_ctx = bool(task.shared_context or task.shared_context_image)
 
-            ctx_plain = BeautifulSoup(task.shared_context or "", "html.parser").get_text()
-            ctx_key = " ".join(ctx_plain.split()) or str(task.shared_context_image)
-            if ctx_key not in printed_ctx:
-                printed_ctx.add(ctx_key)
-                if task.shared_context_image:
-                    try:
-                        ci_url = task.shared_context_image.url
-                        ci_data = (
-                            _req.get(ci_url, timeout=15).content
-                            if ci_url.startswith("http")
-                            else task.shared_context_image.open("rb").read()
-                        )
-                        doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data))
-                    except Exception:
-                        logger.warning("Не удалось вставить изображение общего условия")
-                if task.shared_context:
-                    _render_segments(doc, _parse_html_segments(task.shared_context), font_size=FS)
+        # Начало новой группы → сбросить флаг
+        if has_ctx and not prev_had_ctx:
+            ctx_group_printed = False
+
+        if has_ctx and not ctx_group_printed:
+            ctx_group_printed = True
+            if task.shared_context_image:
+                try:
+                    ci_url = task.shared_context_image.url
+                    ci_data = (
+                        _req.get(ci_url, timeout=15).content
+                        if ci_url.startswith("http")
+                        else task.shared_context_image.open("rb").read()
+                    )
+                    doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data))
+                except Exception:
+                    logger.warning("Не удалось вставить изображение общего условия")
+            if task.shared_context:
+                _render_segments(doc, _parse_html_segments(task.shared_context), font_size=FS)
+
+        prev_had_ctx = has_ctx
 
         # Номер задания
         th = doc.add_paragraph()
@@ -676,7 +681,7 @@ def _build_variant_docx(variant, include_answers):
         sep.add_run("Таблица ответов").bold = True
         sep.runs[0].font.size = Pt(13)
 
-        col_groups = 2
+        col_groups = 1
         n = len(auto_tasks)
         rpg = (n + col_groups - 1) // col_groups
         groups = [auto_tasks[g * rpg : (g + 1) * rpg] for g in range(col_groups)]
