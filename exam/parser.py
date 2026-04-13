@@ -376,7 +376,7 @@ class SdamgiaParser:
             idx = raw.find(stop)
             if idx > 0:
                 raw = raw[:idx]
-        raw = raw.rstrip(". \t\n\r").strip()
+        raw = re.sub(r"[\s\-–—.]+$", "", raw).strip()
         # Убираем единицы измерения из числового ответа: "0.4 мм" → "0.4"
         raw = _strip_measurement_unit(raw)
         # Убираем π из ответа: "27π" → "27" (ученик вводит только коэффициент)
