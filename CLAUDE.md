@@ -4,6 +4,7 @@
 - If the task is small — implement it immediately, no clarifying questions.
 - Keep responses short. Do not repeat what has already been done.
 - Communication language: Russian. Code, comments, variable names: English.
+- Never add "Co-Authored-By" lines to commit messages.
 
 ## Tech Stack
 - Python 3.11+, Django 5.2
@@ -16,7 +17,14 @@
 ## Project Structure
 - `manage.py` — entry point
 - `config/` — Django config (settings.py, urls.py, wsgi, asgi)
-- `exam/` — main app (models, views, urls, admin, utils, parsers)
+- `exam/` — main app:
+  - `models.py` — все модели
+  - `views.py` — представления для учеников
+  - `admin_views.py` — хелперы, логин/логаут, дашборд, экспорт
+  - `admin_students.py` — классы, ученики, попытки
+  - `admin_variants.py` — варианты, DOCX-печать, ZIP
+  - `admin_catalog.py` — каталог, импорт (СдамГИА, ФИПИ, PDF)
+  - `urls.py`, `utils.py`, `parsers/`
 - `templates/` — HTML templates
 - `static/` — static files
 - `media/` — user uploads (local dev only)

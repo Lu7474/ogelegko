@@ -89,8 +89,10 @@ EGE/
 ├── exam/
 │   ├── models.py         # Модели: Class, Student, Variant, Task, CatalogTask, Attempt, Answer
 │   ├── views.py          # Представления для учеников
-│   ├── admin_views.py    # Представления для учителя
-│   ├── parser.py         # Парсер СдамГИА (импорт в варианты и каталог)
+│   ├── admin_views.py    # Хелперы, логин/логаут, дашборд, экспорт
+│   ├── admin_students.py # Классы, ученики, попытки
+│   ├── admin_variants.py # Варианты, DOCX-печать, ZIP
+│   ├── admin_catalog.py  # Каталог, импорт (СдамГИА, ФИПИ, PDF)
 │   ├── utils.py          # Проверка ответов, шкалы оценивания
 │   └── urls.py           # Маршруты
 ├── templates/
