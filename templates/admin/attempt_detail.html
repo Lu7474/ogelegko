@@ -28,16 +28,34 @@
     <tbody>
     {% for answer in answers %}
         <tr>
-            <td><strong>{{ answer.task.number }}</strong></td>
-            <td>{{ answer.student_answer|default:"—" }}</td>
-            <td>
+            <td style="vertical-align:top">
+                <strong>{{ answer.task.number }}</strong>
+                {% if answer.task.text or answer.task.image %}
+                <details {% if answer.task.manual_grading %}open{% endif %} style="margin-top:4px">
+                    <summary style="cursor:pointer;font-size:0.78rem;color:var(--text-muted);user-select:none;list-style:none">
+                        {% if answer.task.manual_grading %}▾ задание{% else %}▸ задание{% endif %}
+                    </summary>
+                    <div class="task-text" style="margin-top:6px;font-size:0.85rem;max-width:320px">
+                        {% if answer.task.shared_context %}
+                        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;border-left:2px solid var(--border);padding-left:6px">{{ answer.task.shared_context|safe }}</div>
+                        {% endif %}
+                        {{ answer.task.text|safe }}
+                        {% if answer.task.image %}
+                        <img src="{{ answer.task.image.url }}" style="max-width:300px;margin-top:6px;border-radius:4px">
+                        {% endif %}
+                    </div>
+                </details>
+                {% endif %}
+            </td>
+            <td style="vertical-align:top">{{ answer.student_answer|default:"—" }}</td>
+            <td style="vertical-align:top">
                 {% if answer.task.correct_answer %}
                     {{ answer.task.correct_answer }}
                 {% else %}
                     <em style="color:#aaa">—</em>
                 {% endif %}
             </td>
-            <td>
+            <td style="vertical-align:top">
                 {% if answer.task.manual_grading %}
                     {% if answer.task.points > 1 %}
                         {# Задания с частичным баллом (0/1/2 и т.д.) #}
