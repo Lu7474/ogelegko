@@ -26,7 +26,6 @@ from .models import (
     Student,
     Task,
     TaskSource,
-    TaskTopic,
     Variant,
 )
 from .parser import sanitize_html
@@ -694,7 +693,6 @@ def variant_duplicate(request, variant_id):
             image=task.image,
             correct_answer=task.correct_answer,
             source=task.source,
-            topic=task.topic,
             points=task.points,
             shared_context=task.shared_context,
             shared_context_image=task.shared_context_image,
@@ -1217,7 +1215,6 @@ def catalog_add(request):
         text = sanitize_html(request.POST.get("text", "").strip())
         correct_answer = request.POST.get("correct_answer", "").strip()
         source = request.POST.get("source", TaskSource.MANUAL)
-        topic = request.POST.get("topic", TaskTopic.OTHER)
         points = _safe_int(request.POST.get("points", "1"), 1) or 1
         manual_grading = request.POST.get("manual_grading") == "on"
         image = request.FILES.get("image")
@@ -1237,7 +1234,6 @@ def catalog_add(request):
                 text=text,
                 correct_answer=correct_answer,
                 source=source,
-                topic=topic,
                 points=points,
                 manual_grading=manual_grading,
                 shared_context=shared_context,
@@ -1255,7 +1251,6 @@ def catalog_add(request):
         {
             "exam_types": ExamType.choices,
             "sources": TaskSource.choices,
-            "topics": TaskTopic.choices,
             "error": error,
             "task": None,
         },
@@ -1274,7 +1269,6 @@ def catalog_edit(request, task_id):
         ct.text = sanitize_html(request.POST.get("text", "").strip())
         ct.correct_answer = request.POST.get("correct_answer", "").strip()
         ct.source = request.POST.get("source", ct.source)
-        ct.topic = request.POST.get("topic", ct.topic)
         ct.points = _safe_int(request.POST.get("points", "1"), 1) or 1
         ct.manual_grading = request.POST.get("manual_grading") == "on"
         ct.shared_context = sanitize_html(request.POST.get("shared_context", "").strip())
@@ -1295,7 +1289,6 @@ def catalog_edit(request, task_id):
         {
             "exam_types": ExamType.choices,
             "sources": TaskSource.choices,
-            "topics": TaskTopic.choices,
             "error": error,
             "task": ct,
         },
@@ -1450,7 +1443,6 @@ def api_catalog_tasks(request):
                 "manual_grading": ct.manual_grading,
                 "has_image": bool(ct.image),
                 "image_url": ct.image.url if ct.image else None,
-                "topic": ct.get_topic_display(),
                 "points": ct.points,
             }
         )
@@ -1499,7 +1491,6 @@ def variant_from_catalog(request):
                     text=ct.text,
                     correct_answer=ct.correct_answer,
                     source=ct.source,
-                    topic=ct.topic,
                     points=ct.points,
                     manual_grading=ct.manual_grading,
                     no_student_input=ct.no_student_input,
@@ -1579,7 +1570,6 @@ def variant_auto_generate(request):
                     text=ct.text,
                     correct_answer=ct.correct_answer,
                     source=ct.source,
-                    topic=ct.topic,
                     points=ct.points,
                     manual_grading=ct.manual_grading,
                     no_student_input=ct.no_student_input,

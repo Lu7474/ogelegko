@@ -45,17 +45,6 @@ class TaskSource(models.TextChoices):
     MANUAL = "manual", "Вручную"
 
 
-class TaskTopic(models.TextChoices):
-    ALGEBRA = "algebra", "Алгебра"
-    GEOMETRY = "geometry", "Геометрия"
-    PROBABILITY = "probability", "Вероятность и статистика"
-    FUNCTIONS = "functions", "Функции"
-    EQUATIONS = "equations", "Уравнения и неравенства"
-    NUMBER_THEORY = "number_theory", "Теория чисел"
-    PRACTICAL = "practical", "Практические задачи"
-    OTHER = "other", "Другое"
-
-
 class SchoolClass(models.Model):
     name = models.CharField("Название", max_length=20, unique=True)
     exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
@@ -134,13 +123,6 @@ class Task(models.Model):
     correct_answer = models.CharField("Правильный ответ", max_length=255)
     source = models.CharField(
         "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL
-    )
-    topic = models.CharField(
-        "Тема",
-        max_length=30,
-        choices=TaskTopic.choices,
-        default=TaskTopic.OTHER,
-        blank=True,
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)
@@ -280,13 +262,6 @@ class CatalogTask(models.Model):
     correct_answer = models.CharField("Правильный ответ", max_length=255, blank=True)
     source = models.CharField(
         "Источник", max_length=20, choices=TaskSource.choices, default=TaskSource.MANUAL
-    )
-    topic = models.CharField(
-        "Тема",
-        max_length=30,
-        choices=TaskTopic.choices,
-        default=TaskTopic.OTHER,
-        blank=True,
     )
     points = models.PositiveIntegerField("Баллы", default=1)
     manual_grading = models.BooleanField("Ручная проверка", default=False)

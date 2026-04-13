@@ -19,13 +19,12 @@
 <h2>По заданиям</h2>
 <table class="table">
     <thead>
-        <tr><th>#</th><th>Тема</th><th>Правильных</th><th>Всего</th><th>%</th><th></th></tr>
+        <tr><th>#</th><th>Правильных</th><th>Всего</th><th>%</th><th></th></tr>
     </thead>
     <tbody>
         {% for ts in task_stats %}
         <tr>
             <td>{{ ts.task.number }}</td>
-            <td>{{ ts.task.get_topic_display }}</td>
             <td>{{ ts.correct }}</td>
             <td>{{ ts.total }}</td>
             <td>

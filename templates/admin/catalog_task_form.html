@@ -135,14 +135,6 @@
                    placeholder="Оставьте пустым при ручной проверке">
         </div>
         <div class="form-group">
-            <label for="topic">Тема</label>
-            <select id="topic" name="topic">
-                {% for value, label in topics %}
-                <option value="{{ value }}" {% if task.topic == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group">
             <label for="points">Баллы</label>
             <input type="number" id="points" name="points" value="{{ task.points|default:1 }}" min="1" style="width:80px;">
         </div>
