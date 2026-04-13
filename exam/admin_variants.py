@@ -651,64 +651,63 @@ def _build_variant_docx(variant, include_answers):
             except Exception:
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
-    # ─── Таблица ответов на отдельной странице ───────────────────────────
+    # ─── Таблица ответов на отдельной странице (вертикальная, 3 группы) ──
     auto_tasks = [t for t in tasks if not t.no_student_input]
     if auto_tasks:
         page_break = doc.add_paragraph()
         page_break.add_run().add_break(WD_BREAK.PAGE)
 
         sep = doc.add_paragraph()
-        _set_para_spacing(sep, before=0, after=8)
+        _set_para_spacing(sep, before=0, after=6)
         sr = sep.add_run("Таблица ответов")
         sr.bold = True
-        sr.font.size = Pt(14)
+        sr.font.size = Pt(13)
 
-        chunk_size = 10
-        chunks = [auto_tasks[i : i + chunk_size] for i in range(0, len(auto_tasks), chunk_size)]
+        col_groups = 3
+        n = len(auto_tasks)
+        rows_per_group = (n + col_groups - 1) // col_groups
+        groups = [auto_tasks[g * rows_per_group : (g + 1) * rows_per_group] for g in range(col_groups)]
 
-        for chunk in chunks:
-            cols = len(chunk) + 1
-            tbl = doc.add_table(rows=2, cols=cols)
-            tbl.style = "Table Grid"
+        total_cols = col_groups * 2
+        tbl = doc.add_table(rows=rows_per_group + 1, cols=total_cols)
+        tbl.style = "Table Grid"
 
-            num_row = tbl.rows[0].cells
-            num_row[0].text = "№\nзадания"
-            for i, t in enumerate(chunk):
-                num_row[i + 1].text = str(t.number)
+        # Заголовок
+        hdr = tbl.rows[0].cells
+        for g in range(col_groups):
+            hdr[g * 2].text = "№"
+            hdr[g * 2 + 1].text = "Ответ"
 
-            ans_row = tbl.rows[1].cells
-            ans_row[0].text = "Ответ"
-            for i, t in enumerate(chunk):
-                ans_row[i + 1].text = (t.correct_answer or "") if include_answers else ""
+        # Данные
+        for row_i in range(rows_per_group):
+            row_cells = tbl.rows[row_i + 1].cells
+            for g, grp in enumerate(groups):
+                if row_i < len(grp):
+                    t = grp[row_i]
+                    row_cells[g * 2].text = str(t.number)
+                    row_cells[g * 2 + 1].text = (t.correct_answer or "") if include_answers else ""
 
-            ROW_HEIGHTS = ("480", "600")
-            for row_idx, row in enumerate(tbl.rows):
-                tr_el = row._tr
-                trPr = tr_el.get_or_add_trPr()
-                trH = OxmlElement("w:trHeight")
-                trH.set(qn("w:val"), ROW_HEIGHTS[row_idx])
-                trH.set(qn("w:hRule"), "atLeast")
-                trPr.append(trH)
+        # Форматирование
+        def _shade_cell(cell):
+            tc = cell._tc
+            tcPr = tc.get_or_add_tcPr()
+            shd = OxmlElement("w:shd")
+            shd.set(qn("w:val"), "clear")
+            shd.set(qn("w:color"), "auto")
+            shd.set(qn("w:fill"), "D9D9D9")
+            tcPr.append(shd)
 
-                for c_idx, cell in enumerate(row.cells):
-                    for para in cell.paragraphs:
-                        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        _set_para_spacing(para, before=2, after=2)
-                        for run in para.runs:
-                            run.font.size = Pt(10)
-                            if c_idx == 0 or row_idx == 0:
-                                run.bold = True
-                    if row_idx == 0 or c_idx == 0:
-                        tc = cell._tc
-                        tcPr = tc.get_or_add_tcPr()
-                        shd = OxmlElement("w:shd")
-                        shd.set(qn("w:val"), "clear")
-                        shd.set(qn("w:color"), "auto")
-                        shd.set(qn("w:fill"), "D9D9D9")
-                        tcPr.append(shd)
-
-            sp = doc.add_paragraph()
-            _set_para_spacing(sp, before=0, after=8)
+        for row_idx, row in enumerate(tbl.rows):
+            for c_idx, cell in enumerate(row.cells):
+                for para in cell.paragraphs:
+                    para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    _set_para_spacing(para, before=1, after=1)
+                    for run in para.runs:
+                        run.font.size = Pt(9)
+                        if row_idx == 0 or c_idx % 2 == 0:
+                            run.bold = True
+                if row_idx == 0 or c_idx % 2 == 0:
+                    _shade_cell(cell)
 
     buf = io.BytesIO()
     doc.save(buf)
