@@ -557,7 +557,6 @@ def _save_variant_tasks(variant, request):
         text = sanitize_html(request.POST.get(f"task_{task_index}_text", "").strip())
         answer = request.POST.get(f"task_{task_index}_answer", "").strip()
         source = request.POST.get(f"task_{task_index}_source", "manual")
-        topic = request.POST.get(f"task_{task_index}_topic", "other")
         points = _safe_int(request.POST.get(f"task_{task_index}_points", "1"), default=1)
         manual_grading = bool(request.POST.get(f"task_{task_index}_manual_grading"))
         image = request.FILES.get(f"task_{task_index}_image")
@@ -568,8 +567,6 @@ def _save_variant_tasks(variant, request):
             points = 1
         if source not in dict(TaskSource.choices):
             source = "manual"
-        if topic not in dict(TaskTopic.choices):
-            topic = "other"
 
         # Сохраняем если есть ответ ИЛИ ручная проверка
         if answer or manual_grading:
@@ -579,7 +576,6 @@ def _save_variant_tasks(variant, request):
                 text=text,
                 correct_answer=answer,
                 source=source,
-                topic=topic,
                 points=points,
                 manual_grading=manual_grading,
                 shared_context=shared_context,
@@ -620,7 +616,6 @@ def variant_add(request):
         {
             "exam_types": ExamType.choices,
             "sources": TaskSource.choices,
-            "topics": TaskTopic.choices,
             "error": error,
         },
     )
@@ -661,7 +656,6 @@ def variant_edit(request, variant_id):
             "tasks": tasks,
             "exam_types": ExamType.choices,
             "sources": TaskSource.choices,
-            "topics": TaskTopic.choices,
             "error": error,
         },
     )

@@ -78,14 +78,6 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Тема</label>
-                        <select name="task_{{ task.number }}_topic">
-                            {% for value, label in topics %}
-                            <option value="{{ value }}" {% if task.topic == value %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
                         <label>Баллы</label>
                         <input type="number" name="task_{{ task.number }}_points" value="{{ task.points }}" min="1" style="width:80px;">
                     </div>
@@ -200,7 +192,6 @@
 {% block scripts %}
 <script>
 const sourcesHtml = `{% for value, label in sources %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
-const topicsHtml = `{% for value, label in topics %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
 
 // Используем максимальный существующий номер задания (не количество),
 // чтобы избежать коллизий с нумерацией из каталога (5, 12, 18…)
@@ -241,10 +232,6 @@ document.getElementById('addTask').addEventListener('click', function() {
             <div class="form-group">
                 <label>Источник</label>
                 <select name="task_${taskCount}_source">${sourcesHtml}</select>
-            </div>
-            <div class="form-group">
-                <label>Тема</label>
-                <select name="task_${taskCount}_topic">${topicsHtml}</select>
             </div>
             <div class="form-group">
                 <label>Баллы</label>
