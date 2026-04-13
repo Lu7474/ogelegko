@@ -364,6 +364,8 @@ class SdamgiaParser:
             "Примечание",
             "Решение",
             "Пояснение",
+            "В открытом банке",
+            "Для ознакомления",
         ]
         raw = raw.replace("\u00ad", "").replace("\u202f", " ").replace("&nbsp;", " ")
         raw = raw.replace("&#8239;", " ")

@@ -518,7 +518,8 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                     img_data = _svg_to_png(img_data)
                 if img_data:
                     try:
-                        doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data))
+                        max_w = 5 if is_svg else 12
+                        doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data, max_cm=max_w))
                     except Exception as e:
                         logger.warning("Не удалось вставить изображение: %s", e)
             close()
@@ -603,10 +604,7 @@ def _build_variant_docx(variant, include_answers):
             from bs4 import BeautifulSoup
 
             ctx_plain = BeautifulSoup(task.shared_context or "", "html.parser").get_text()
-            ctx_key = (
-                " ".join(ctx_plain.split()),
-                str(task.shared_context_image) if task.shared_context_image else "",
-            )
+            ctx_key = " ".join(ctx_plain.split()) or str(task.shared_context_image)
             if ctx_key not in printed_ctx:
                 printed_ctx.add(ctx_key)
 
