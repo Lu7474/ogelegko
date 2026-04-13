@@ -54,7 +54,12 @@
                 </details>
                 <div class="form-group">
                     <label>Текст задания</label>
-                    <textarea name="task_{{ task.number }}_text" rows="3">{{ task.text }}</textarea>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start">
+                        <textarea name="task_{{ task.number }}_text" rows="4"
+                                  style="resize:vertical;font-family:monospace;font-size:0.82rem"
+                                  oninput="updatePreview(this)">{{ task.text }}</textarea>
+                        <div class="task-text task-preview" style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);min-height:80px;padding:8px 10px;font-size:0.9rem"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Изображение к заданию</label>
@@ -193,6 +198,16 @@
 <script>
 const sourcesHtml = `{% for value, label in sources %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
 
+function updatePreview(textarea) {
+    const preview = textarea.closest('div').querySelector('.task-preview');
+    if (!preview) return;
+    const val = textarea.value.trim();
+    preview.innerHTML = val || '<span style="color:var(--text-muted);font-size:0.82rem;font-style:italic">Предпросмотр...</span>';
+}
+
+// Инициализация превью для уже существующих заданий
+document.querySelectorAll('textarea[oninput="updatePreview(this)"]').forEach(updatePreview);
+
 // Используем максимальный существующий номер задания (не количество),
 // чтобы избежать коллизий с нумерацией из каталога (5, 12, 18…)
 let taskCount = Math.max(0, ...Array.from(document.querySelectorAll('.task-form-block'))
@@ -218,7 +233,12 @@ document.getElementById('addTask').addEventListener('click', function() {
         </details>
         <div class="form-group">
             <label>Текст задания</label>
-            <textarea name="task_${taskCount}_text" rows="3"></textarea>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start">
+                <textarea name="task_${taskCount}_text" rows="4"
+                          style="resize:vertical;font-family:monospace;font-size:0.82rem"
+                          oninput="updatePreview(this)"></textarea>
+                <div class="task-text task-preview" style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);min-height:80px;padding:8px 10px;font-size:0.9rem"></div>
+            </div>
         </div>
         <div class="form-group">
             <label>Изображение к заданию</label>
