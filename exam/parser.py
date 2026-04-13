@@ -94,16 +94,18 @@ class SdamgiaParser:
             _thread_local.session = s
         return _thread_local.session
 
-    def _get(self, url, _retry=1):
+    def _get(self, url, _retry=3):
         try:
             time.sleep(REQUEST_DELAY)
-            resp = self._session().get(url, timeout=15)
+            resp = self._session().get(url, timeout=20)
             resp.raise_for_status()
             resp.encoding = "utf-8"
             return resp
         except requests.RequestException as e:
             if _retry > 0:
-                time.sleep(2)
+                wait = (4 - _retry) * 3  # 3s, 6s, 9s
+                logger.warning("Ошибка загрузки %s (%s), повтор через %ds...", url, e, wait)
+                time.sleep(wait)
                 return self._get(url, _retry=_retry - 1)
             raise ParserError(f"Не удалось загрузить: {e}")
 
