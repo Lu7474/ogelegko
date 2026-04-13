@@ -1593,23 +1593,158 @@ def variant_auto_generate(request):
 # ===== ПЕЧАТЬ ВАРИАНТА (DOCX) =====
 
 
-def _html_to_text(html):
-    """Конвертирует HTML в plain text, сохраняя переносы строк.
-    Разворачивает <details> (общее условие), убирая текст <summary>."""
-    from bs4 import BeautifulSoup
+def _parse_html_segments(html):
+    """Разбирает HTML на сегменты: ('text', text, bold, italic, sup, sub) | ('image', src) | ('break',)."""
+    from bs4 import BeautifulSoup, NavigableString, Tag
+
+    segments = []
+
+    def walk(node, bold=False, italic=False, sup=False, sub=False):
+        if isinstance(node, NavigableString):
+            text = str(node).replace("\r", "").replace("\n", " ")
+            if text:
+                segments.append(("text", text, bold, italic, sup, sub))
+            return
+        if not isinstance(node, Tag):
+            return
+        tag = node.name.lower()
+        if tag == "img":
+            src = node.get("src", "")
+            if src:
+                segments.append(("image", src))
+            return
+        if tag == "br":
+            segments.append(("break",))
+            return
+        if tag in ("p", "div", "li"):
+            for c in node.children:
+                walk(c, bold, italic, sup, sub)
+            segments.append(("break",))
+            return
+        if tag in ("td", "th"):
+            for c in node.children:
+                walk(c, bold, italic, sup, sub)
+            segments.append(("text", "  ", False, False, False, False))
+            return
+        if tag == "tr":
+            for c in node.children:
+                walk(c, bold, italic, sup, sub)
+            segments.append(("break",))
+            return
+        if tag in ("b", "strong"):
+            for c in node.children:
+                walk(c, True, italic, sup, sub)
+        elif tag in ("i", "em"):
+            for c in node.children:
+                walk(c, bold, True, sup, sub)
+        elif tag == "sup":
+            for c in node.children:
+                walk(c, bold, italic, True, False)
+        elif tag == "sub":
+            for c in node.children:
+                walk(c, bold, italic, False, True)
+        elif tag == "span":
+            classes = node.get("class", [])
+            if isinstance(classes, str):
+                classes = classes.split()
+            if "math-frac" in classes:
+                spans = list(node.find_all("span", recursive=False))
+                if len(spans) >= 2:
+                    num = spans[0].get_text(strip=True)
+                    den = spans[1].get_text(strip=True)
+                    segments.append(("text", f"({num})/({den})", bold, italic, sup, sub))
+                else:
+                    for c in node.children:
+                        walk(c, bold, italic, sup, sub)
+            else:
+                for c in node.children:
+                    walk(c, bold, italic, sup, sub)
+        else:
+            for c in node.children:
+                walk(c, bold, italic, sup, sub)
 
     soup = BeautifulSoup(html or "", "html.parser")
-    # Убираем <summary> (там текст типа "Общее условие (нажмите, чтобы развернуть)")
-    for summary in soup.find_all("summary"):
-        summary.decompose()
-    # Содержимое <details> оставляем, сам тег убираем
-    for details in soup.find_all("details"):
-        details.unwrap()
-    for br in soup.find_all("br"):
-        br.replace_with("\n")
-    for p in soup.find_all(["p", "div", "tr"]):
-        p.insert_after("\n")
-    return soup.get_text(" ").strip()
+    for child in soup.children:
+        walk(child)
+    while segments and segments[-1][0] == "break":
+        segments.pop()
+    return segments
+
+
+def _get_image_bytes(src):
+    """Загружает изображение по src (/media/... или http...) и возвращает bytes или None."""
+    import os
+
+    import requests as _req
+    from django.conf import settings as dj_settings
+
+    try:
+        if src.startswith("http://") or src.startswith("https://"):
+            r = _req.get(src, timeout=15)
+            if r.status_code == 200:
+                return r.content
+        elif src.startswith("/media/"):
+            rel = src[len("/media/") :]
+            local = os.path.join(str(getattr(dj_settings, "MEDIA_ROOT", "")), rel.replace("/", os.sep))
+            if os.path.exists(local):
+                with open(local, "rb") as f:
+                    return f.read()
+            from django.core.files.storage import default_storage
+
+            try:
+                with default_storage.open(rel) as f:
+                    return f.read()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning("Не удалось загрузить изображение %s: %s", src, e)
+    return None
+
+
+def _render_segments(doc, segments, indent=None, font_size=None):
+    """Рендерит сегменты в документ, создавая параграфы по мере нужды."""
+    import io
+
+    from docx.shared import Cm, Pt
+
+    current = [None]
+
+    def get_para():
+        if current[0] is None:
+            p = doc.add_paragraph()
+            if indent:
+                p.paragraph_format.left_indent = indent
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(2)
+            current[0] = p
+        return current[0]
+
+    def close():
+        current[0] = None
+
+    for seg in segments:
+        if seg[0] == "text":
+            _, text, bold, italic, sup, sub = seg
+            run = get_para().add_run(text)
+            if bold:
+                run.bold = True
+            if italic:
+                run.italic = True
+            run.font.superscript = sup
+            run.font.subscript = sub
+            if font_size:
+                run.font.size = font_size
+        elif seg[0] == "break":
+            close()
+        elif seg[0] == "image":
+            close()
+            img_data = _get_image_bytes(seg[1])
+            if img_data:
+                try:
+                    doc.add_picture(io.BytesIO(img_data), width=Cm(14))
+                except Exception as e:
+                    logger.warning("Не удалось вставить изображение: %s", e)
+            close()
 
 
 def _build_variant_docx(variant, include_answers):
@@ -1619,94 +1754,161 @@ def _build_variant_docx(variant, include_answers):
     import requests as _req
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
     from docx.shared import Cm, Pt, RGBColor
 
     doc = Document()
 
-    # Поля страницы
+    # Компактные поля
     for section in doc.sections:
-        section.top_margin = Cm(2)
-        section.bottom_margin = Cm(2)
-        section.left_margin = Cm(2.5)
-        section.right_margin = Cm(2)
+        section.top_margin = Cm(1.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2)
+        section.right_margin = Cm(1.5)
+
+    FS = Pt(11)  # основной размер шрифта
+
+    def _set_para_spacing(p, before=0, after=2):
+        p.paragraph_format.space_before = Pt(before)
+        p.paragraph_format.space_after = Pt(after)
 
     # Заголовок
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run(f"Вариант {variant.number}")
-    run.bold = True
-    run.font.size = Pt(16)
+    _set_para_spacing(title, before=0, after=2)
+    r = title.add_run(f"Вариант {variant.number}")
+    r.bold = True
+    r.font.size = Pt(14)
 
-    subtitle = doc.add_paragraph()
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    subtitle.add_run(variant.get_exam_type_display()).font.size = Pt(12)
+    sub = doc.add_paragraph()
+    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _set_para_spacing(sub, before=0, after=4)
+    sub.add_run(variant.get_exam_type_display()).font.size = Pt(11)
 
     if include_answers:
-        label_p = doc.add_paragraph()
-        label_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r = label_p.add_run("(с ответами — для учителя)")
-        r.font.color.rgb = RGBColor(0x7F, 0x8C, 0x8D)
-        r.font.size = Pt(10)
+        lp = doc.add_paragraph()
+        lp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _set_para_spacing(lp, before=0, after=6)
+        r2 = lp.add_run("(с ответами — для учителя)")
+        r2.font.color.rgb = RGBColor(0x7F, 0x8C, 0x8D)
+        r2.font.size = Pt(9)
 
-    doc.add_paragraph()  # отступ
+    tasks = list(variant.tasks.order_by("id"))
+    printed_ctx = set()  # ключи уже напечатанных общих условий
 
-    tasks = variant.tasks.order_by("id")
     for task in tasks:
-        # Заголовок задания
-        heading = doc.add_paragraph()
-        h_run = heading.add_run(f"Задание {task.number}")
-        h_run.bold = True
-        h_run.font.size = Pt(12)
+        # Общее условие — печатаем ОДИН раз перед первым заданием группы
+        has_ctx = task.shared_context or task.shared_context_image
+        if has_ctx:
+            ctx_key = (
+                task.shared_context or "",
+                str(task.shared_context_image) if task.shared_context_image else "",
+            )
+            if ctx_key not in printed_ctx:
+                printed_ctx.add(ctx_key)
 
-        # Общее условие (если есть)
-        if task.shared_context or task.shared_context_image:
-            ctx_p = doc.add_paragraph()
-            ctx_p.paragraph_format.left_indent = Cm(0.5)
-            ctx_run = ctx_p.add_run("Общее условие:")
-            ctx_run.bold = True
-            ctx_run.font.size = Pt(10)
-            ctx_run.font.color.rgb = RGBColor(0x55, 0x6B, 0x82)
-            if task.shared_context_image:
-                try:
-                    with task.shared_context_image.open("rb") as f:
-                        ctx_img_data = f.read()
-                    doc.add_picture(io.BytesIO(ctx_img_data), width=Cm(14))
-                except Exception:
-                    logger.warning("Не удалось вставить картинку условия задания %s", task.number)
-            if task.shared_context:
-                ctx_text = _html_to_text(task.shared_context)
-                if ctx_text:
-                    p = doc.add_paragraph(ctx_text)
-                    p.paragraph_format.left_indent = Cm(0.5)
+                ctx_h = doc.add_paragraph()
+                _set_para_spacing(ctx_h, before=6, after=2)
+                cr = ctx_h.add_run("Общее условие")
+                cr.bold = True
+                cr.font.size = Pt(11)
+                cr.font.color.rgb = RGBColor(0x33, 0x66, 0x99)
+
+                if task.shared_context_image:
+                    try:
+                        ci_url = task.shared_context_image.url
+                        if ci_url.startswith("http"):
+                            ci_data = _req.get(ci_url, timeout=15).content
+                        else:
+                            with task.shared_context_image.open("rb") as f:
+                                ci_data = f.read()
+                        doc.add_picture(io.BytesIO(ci_data), width=Cm(15))
+                    except Exception:
+                        logger.warning("Не удалось вставить изображение общего условия")
+
+                if task.shared_context:
+                    _render_segments(doc, _parse_html_segments(task.shared_context), font_size=FS)
+
+        # Заголовок задания
+        th = doc.add_paragraph()
+        _set_para_spacing(th, before=5, after=1)
+        hr = th.add_run(f"Задание {task.number}")
+        hr.bold = True
+        hr.font.size = Pt(11)
 
         # Текст задания
-        text = _html_to_text(task.text)
-        if text:
-            p = doc.add_paragraph(text)
-            p.paragraph_format.left_indent = Cm(0.5)
+        if task.text:
+            _render_segments(doc, _parse_html_segments(task.text), font_size=FS)
 
-        # Картинка
+        # Основное изображение задания
         if task.image:
             try:
                 img_url = task.image.url
                 if img_url.startswith("http"):
-                    img_data = _req.get(img_url, timeout=10).content
+                    img_data = _req.get(img_url, timeout=15).content
                 else:
-                    with task.image.open("rb") as img_file:
-                        img_data = img_file.read()
-                img_io = io.BytesIO(img_data)
-                doc.add_picture(img_io, width=Cm(14))
+                    with task.image.open("rb") as f:
+                        img_data = f.read()
+                doc.add_picture(io.BytesIO(img_data), width=Cm(14))
             except Exception:
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
-        # Ответ (только для учительского варианта)
-        if include_answers:
-            ans_p = doc.add_paragraph()
-            ans_p.paragraph_format.left_indent = Cm(0.5)
-            ans_run = ans_p.add_run("Ответ: " + (task.correct_answer or "(ручная проверка)"))
-            ans_run.bold = True
-            ans_run.font.color.rgb = RGBColor(0x27, 0xAE, 0x60)
-        doc.add_paragraph()  # отступ между заданиями
+        # Ответ для учителя (строчкой под заданием)
+        if include_answers and task.correct_answer:
+            ap = doc.add_paragraph()
+            _set_para_spacing(ap, before=0, after=0)
+            ar = ap.add_run("Ответ: " + task.correct_answer)
+            ar.bold = True
+            ar.font.color.rgb = RGBColor(0x27, 0xAE, 0x60)
+            ar.font.size = Pt(10)
+
+    # ─── Таблица ответов в конце ──────────────────────────────────────────
+    auto_tasks = [t for t in tasks if not t.no_student_input]
+    if auto_tasks:
+        sep = doc.add_paragraph()
+        _set_para_spacing(sep, before=10, after=4)
+        sr = sep.add_run("Таблица ответов")
+        sr.bold = True
+        sr.font.size = Pt(12)
+
+        chunk_size = 13
+        chunks = [auto_tasks[i : i + chunk_size] for i in range(0, len(auto_tasks), chunk_size)]
+
+        for chunk in chunks:
+            cols = len(chunk) + 1
+            tbl = doc.add_table(rows=2, cols=cols)
+            tbl.style = "Table Grid"
+
+            # Строка с номерами заданий
+            num_row = tbl.rows[0].cells
+            num_row[0].text = "№"
+            for i, t in enumerate(chunk):
+                num_row[i + 1].text = str(t.number)
+
+            # Строка с ответами
+            ans_row = tbl.rows[1].cells
+            ans_row[0].text = "Ответ"
+            for i, t in enumerate(chunk):
+                ans_row[i + 1].text = (t.correct_answer or "—") if include_answers else ""
+
+            # Форматирование ячеек: мелкий шрифт, компактная высота, центр
+            for row in tbl.rows:
+                tr_el = row._tr
+                trPr = tr_el.get_or_add_trPr()
+                trH = OxmlElement("w:trHeight")
+                trH.set(qn("w:val"), "320")
+                trH.set(qn("w:hRule"), "exact")
+                trPr.append(trH)
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        _set_para_spacing(para, before=0, after=0)
+                        for run in para.runs:
+                            run.font.size = Pt(9)
+
+            sp = doc.add_paragraph()
+            _set_para_spacing(sp, before=0, after=4)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -1717,20 +1919,19 @@ def _build_variant_docx(variant, include_answers):
 @admin_required
 def variant_print_docx(request, variant_id, mode):
     """Скачать docx: mode='teacher' (с ответами) или 'student' (без)."""
-    import io
-
     variant = get_object_or_404(Variant, id=variant_id)
-    safe_name = variant.number.replace(" ", "_").replace("/", "-")
+    safe_num = variant.number.replace("/", "-")
     include_answers = mode == "teacher"
-    suffix = "с_ответами" if include_answers else "задания"
+    suffix = " (ответы)" if include_answers else ""
 
     buf = _build_variant_docx(variant, include_answers=include_answers)
 
+    fname = f"{safe_num} вариант{suffix}.docx"
     response = HttpResponse(
         buf,
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
-    response["Content-Disposition"] = f'attachment; filename="variant_{safe_name}_{suffix}.docx"'
+    response["Content-Disposition"] = f'attachment; filename="{fname}"'
     return response
 
 
