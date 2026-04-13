@@ -27,6 +27,11 @@
         <div id="bulkIds"></div>
         <button type="submit" class="btn btn-primary btn-sm">Скачать ZIP</button>
     </form>
+    <form method="post" action="{% url 'admin_variants_bulk_delete' %}" id="bulkDeleteForm" onsubmit="return confirmBulkDelete()">
+        {% csrf_token %}
+        <div id="bulkDeleteIds"></div>
+        <button type="submit" class="btn btn-danger btn-sm">Удалить выбранные</button>
+    </form>
     <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()">Снять выбор</button>
 </div>
 
@@ -138,9 +143,15 @@ function updateBulkBar() {
     }
     bar.style.display = 'flex';
     countEl.textContent = 'Выбрано: ' + checked.length;
-    idsEl.innerHTML = checked.map(c => `<input type="hidden" name="ids" value="${c.value}">`).join('');
+    const hiddens = checked.map(c => `<input type="hidden" name="ids" value="${c.value}">`).join('');
+    idsEl.innerHTML = hiddens;
+    document.getElementById('bulkDeleteIds').innerHTML = hiddens;
 }
 
+function confirmBulkDelete() {
+    const n = document.querySelectorAll('.row-check:checked').length;
+    return confirm('Удалить ' + n + ' вариант(ов)? Это действие необратимо.');
+}
 function clearSelection() {
     document.querySelectorAll('.row-check').forEach(c => c.checked = false);
     document.getElementById('selectAll').checked = false;

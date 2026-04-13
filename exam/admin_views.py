@@ -1963,6 +1963,16 @@ def variants_print_zip(request):
     return response
 
 
+@admin_required
+@require_POST
+def variants_bulk_delete(request):
+    """Массовое удаление вариантов."""
+    ids = request.POST.getlist("ids")
+    if ids:
+        Variant.objects.filter(id__in=ids).delete()
+    return redirect("admin_variants")
+
+
 # ===== ФИПИ ИМПОРТ =====
 
 
