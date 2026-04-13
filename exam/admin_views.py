@@ -1706,11 +1706,6 @@ def _build_variant_docx(variant, include_answers):
             ans_run = ans_p.add_run("Ответ: " + (task.correct_answer or "(ручная проверка)"))
             ans_run.bold = True
             ans_run.font.color.rgb = RGBColor(0x27, 0xAE, 0x60)
-        else:
-            # Строка для ответа ученика
-            ans_p = doc.add_paragraph("Ответ: _______________________")
-            ans_p.paragraph_format.left_indent = Cm(0.5)
-
         doc.add_paragraph()  # отступ между заданиями
 
     buf = io.BytesIO()
