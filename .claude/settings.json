@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(env/Scripts/python.exe:*)",
+      "Bash(env/Scripts/pip.exe:*)",
+      "Bash(env/Scripts/ruff.exe:*)",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git show:*)",
+      "Bash(ls:*)",
+      "Bash(dir:*)",
+      "Bash(mkdir:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(db.sqlite3)",
+      "Read(**/*.log)"
+    ]
+  },
+  "env": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "language": "russian",
+  "respectGitignore": true
+}
