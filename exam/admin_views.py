@@ -1965,6 +1965,17 @@ def variants_print_zip(request):
 
 @admin_required
 @require_POST
+def variants_bulk_toggle(request):
+    """Массовая активация / скрытие вариантов."""
+    ids = request.POST.getlist("ids")
+    action = request.POST.get("action")
+    if ids and action in ("activate", "hide"):
+        Variant.objects.filter(id__in=ids).update(is_active=(action == "activate"))
+    return redirect("admin_variants")
+
+
+@admin_required
+@require_POST
 def variants_bulk_delete(request):
     """Массовое удаление вариантов."""
     ids = request.POST.getlist("ids")

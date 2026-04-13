@@ -94,6 +94,7 @@ urlpatterns = [
     ),
     path("admin/variants/print-zip/", admin_views.variants_print_zip, name="admin_variants_print_zip"),
     path("admin/variants/bulk-delete/", admin_views.variants_bulk_delete, name="admin_variants_bulk_delete"),
+    path("admin/variants/bulk-toggle/", admin_views.variants_bulk_toggle, name="admin_variants_bulk_toggle"),
     # Админ — API
     path("admin/api/catalog/", admin_views.api_catalog_tasks, name="admin_api_catalog"),
     path("admin/api/new-attempts/", admin_views.api_new_attempts, name="admin_api_new_attempts"),

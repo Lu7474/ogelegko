@@ -27,6 +27,18 @@
         <div id="bulkIds"></div>
         <button type="submit" class="btn btn-primary btn-sm">Скачать ZIP</button>
     </form>
+    <form method="post" action="{% url 'admin_variants_bulk_toggle' %}" id="bulkActivateForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="activate">
+        <div id="bulkToggleIds1"></div>
+        <button type="submit" class="btn btn-secondary btn-sm">Активировать</button>
+    </form>
+    <form method="post" action="{% url 'admin_variants_bulk_toggle' %}" id="bulkHideForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="hide">
+        <div id="bulkToggleIds2"></div>
+        <button type="submit" class="btn btn-secondary btn-sm">Скрыть</button>
+    </form>
     <form method="post" action="{% url 'admin_variants_bulk_delete' %}" id="bulkDeleteForm" onsubmit="return confirmBulkDelete()">
         {% csrf_token %}
         <div id="bulkDeleteIds"></div>
@@ -146,6 +158,8 @@ function updateBulkBar() {
     const hiddens = checked.map(c => `<input type="hidden" name="ids" value="${c.value}">`).join('');
     idsEl.innerHTML = hiddens;
     document.getElementById('bulkDeleteIds').innerHTML = hiddens;
+    document.getElementById('bulkToggleIds1').innerHTML = hiddens;
+    document.getElementById('bulkToggleIds2').innerHTML = hiddens;
 }
 
 function confirmBulkDelete() {
