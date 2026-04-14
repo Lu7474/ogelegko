@@ -412,7 +412,23 @@ def _parse_html_segments(html):
         walk(child)
     while segments and segments[-1][0] == "break":
         segments.pop()
-    return segments
+
+    # Переставляем image_right в конец каждой группы (до break),
+    # чтобы картинка шла после текста, а не перед ним.
+    reordered, group_text, group_imgs = [], [], []
+    for seg in segments:
+        if seg[0] == "break":
+            reordered.extend(group_text)
+            reordered.extend(group_imgs)
+            reordered.append(seg)
+            group_text, group_imgs = [], []
+        elif seg[0] == "image_right":
+            group_imgs.append(seg)
+        else:
+            group_text.append(seg)
+    reordered.extend(group_text)
+    reordered.extend(group_imgs)
+    return reordered
 
 
 def _get_image_bytes(src):
@@ -506,8 +522,6 @@ def _render_segments(doc, segments, indent=None, font_size=None, initial_para=No
         current[0] = None
 
     def _apply(run):
-        if font_size:
-            run.font.size = font_size
         if default_font:
             run.font.name = default_font
 
@@ -535,19 +549,24 @@ def _render_segments(doc, segments, indent=None, font_size=None, initial_para=No
                 if img_data:
                     try:
                         if is_svg:
-                            # Формула — вставляем inline в текущий параграф
+                            # Формулы (URL содержит "formula") — мелко inline,
+                            # прочие SVG-картинки (чертежи) — крупнее.
+                            is_formula = "formula" in img_src.lower()
+                            max_svg = 2 if is_formula else 6
+                            if is_right:
+                                max_svg = min(max_svg, 3)
                             get_para().add_run().add_picture(
-                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=2)
+                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=max_svg)
                             )
                         elif is_right:
-                            # float:right — компактное изображение (до 3 см)
+                            # float:right PNG/JPEG — компактное (до 3 см)
                             get_para().add_run().add_picture(
                                 io.BytesIO(img_data), width=_image_width(img_data, max_cm=3)
                             )
                         else:
-                            # Обычное изображение — отдельным блоком
+                            # Обычное изображение — отдельным блоком (до 6 см)
                             close()
-                            doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data, max_cm=12))
+                            doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data, max_cm=6))
                             close()
                     except Exception as e:
                         logger.warning("Не удалось вставить изображение: %s", e)
@@ -676,10 +695,11 @@ def _build_variant_docx(variant, include_answers):
         p.paragraph_format.space_after = Pt(after)
 
     def _run(para, text, bold=False, size=None):
-        """Добавляет run с Times New Roman и нужным размером."""
+        """Добавляет run с Times New Roman; size ставится только если передан явно."""
         r = para.add_run(text)
         r.font.name = FONT
-        r.font.size = size or FS
+        if size:
+            r.font.size = size
         if bold:
             r.bold = True
         return r
@@ -742,7 +762,7 @@ def _build_variant_docx(variant, include_answers):
                             if ci_url.startswith("http")
                             else task.shared_context_image.open("rb").read()
                         )
-                        doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data))
+                        doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data, max_cm=5))
                     except Exception:
                         logger.warning("Не удалось вставить изображение общего условия")
                 if task.shared_context:
