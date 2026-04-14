@@ -486,11 +486,11 @@ def _image_width(img_data, max_cm=14):
         return Cm(max_cm)
 
 
-def _render_segments(doc, segments, indent=None, font_size=None):
+def _render_segments(doc, segments, indent=None, font_size=None, initial_para=None, default_font=None):
     """Рендерит сегменты в документ, создавая параграфы по мере нужды."""
-    from docx.shared import Cm, Pt
+    from docx.shared import Pt
 
-    current = [None]
+    current = [initial_para]
 
     def get_para():
         if current[0] is None:
@@ -505,6 +505,12 @@ def _render_segments(doc, segments, indent=None, font_size=None):
     def close():
         current[0] = None
 
+    def _apply(run):
+        if font_size:
+            run.font.size = font_size
+        if default_font:
+            run.font.name = default_font
+
     for seg in segments:
         if seg[0] == "text":
             _, text, bold, italic, sup, sub = seg
@@ -515,8 +521,7 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                 run.italic = True
             run.font.superscript = sup
             run.font.subscript = sub
-            if font_size:
-                run.font.size = font_size
+            _apply(run)
         elif seg[0] == "break":
             close()
         elif seg[0] in ("image", "image_right"):
@@ -532,12 +537,12 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                         if is_svg:
                             # Формула — вставляем inline в текущий параграф
                             get_para().add_run().add_picture(
-                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=3)
+                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=2)
                             )
                         elif is_right:
-                            # float:right — компактное изображение inline (до 5 см)
+                            # float:right — компактное изображение (до 3 см)
                             get_para().add_run().add_picture(
-                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=5)
+                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=3)
                             )
                         else:
                             # Обычное изображение — отдельным блоком
@@ -574,8 +579,7 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                                 run.italic = True
                             run.font.superscript = seg2[4]
                             run.font.subscript = seg2[5]
-                            if font_size:
-                                run.font.size = font_size
+                            _apply(run)
                         elif seg2[0] == "break":
                             p = cell.add_paragraph()
                             p.paragraph_format.space_before = Pt(0)
@@ -639,6 +643,24 @@ def _build_variant_docx(variant, include_answers):
 
     doc = Document()
 
+    # Дефолтный шрифт документа — Times New Roman 12pt
+    from docx.oxml.ns import qn as _qn
+
+    style_normal = doc.styles["Normal"]
+    style_normal.font.name = "Times New Roman"
+    style_normal.font.size = Pt(12)
+    # Для восточных/азиатских шрифтов тоже
+    rPr = style_normal.element.get_or_add_rPr()
+    rFonts = rPr.find(_qn("w:rFonts"))
+    if rFonts is None:
+        from docx.oxml import OxmlElement as _OE
+
+        rFonts = _OE("w:rFonts")
+        rPr.insert(0, rFonts)
+    rFonts.set(_qn("w:ascii"), "Times New Roman")
+    rFonts.set(_qn("w:hAnsi"), "Times New Roman")
+    rFonts.set(_qn("w:cs"), "Times New Roman")
+
     # A4 книжная, узкие поля
     section = doc.sections[0]
     section.top_margin = Cm(1.5)
@@ -646,11 +668,21 @@ def _build_variant_docx(variant, include_answers):
     section.left_margin = Cm(2.0)
     section.right_margin = Cm(1.5)
 
-    FS = Pt(11)
+    FS = Pt(12)
+    FONT = "Times New Roman"
 
     def _sp(p, before=0, after=1):
         p.paragraph_format.space_before = Pt(before)
         p.paragraph_format.space_after = Pt(after)
+
+    def _run(para, text, bold=False, size=None):
+        """Добавляет run с Times New Roman и нужным размером."""
+        r = para.add_run(text)
+        r.font.name = FONT
+        r.font.size = size or FS
+        if bold:
+            r.bold = True
+        return r
 
     def _shade_cell(cell, fill="D9D9D9"):
         tc = cell._tc
@@ -665,14 +697,12 @@ def _build_variant_docx(variant, include_answers):
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _sp(title, before=0, after=1)
-    r = title.add_run(f"Вариант {variant.number}")
-    r.bold = True
-    r.font.size = Pt(13)
+    _run(title, f"Вариант {variant.number}", bold=True, size=Pt(13))
 
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _sp(sub, before=0, after=3)
-    sub.add_run(variant.get_exam_type_display()).font.size = Pt(10)
+    _run(sub, variant.get_exam_type_display(), size=Pt(10))
 
     tasks = sorted(
         variant.tasks.all(),
@@ -685,19 +715,19 @@ def _build_variant_docx(variant, include_answers):
     part2_printed = False
 
     for task in tasks:
+        task_num = int(task.number) if task.number.isdigit() else 0
+
         # ─── Заголовок "Часть 1." / "Часть 2." ──────────────────────────
-        if task.no_student_input and not part2_printed:
+        if task_num >= 20 and not part2_printed:
             part2_printed = True
             p2 = doc.add_paragraph()
             _sp(p2, before=6, after=2)
-            p2.add_run("Часть 2.").bold = True
-            p2.runs[0].font.size = Pt(12)
-        elif not part1_printed and not task.no_student_input:
+            _run(p2, "Часть 2.", bold=True)
+        elif not part1_printed and task_num < 20:
             part1_printed = True
             p1 = doc.add_paragraph()
             _sp(p1, before=0, after=2)
-            p1.add_run("Часть 1.").bold = True
-            p1.runs[0].font.size = Pt(12)
+            _run(p1, "Часть 1.", bold=True)
 
         # ─── Общее условие из task.shared_context (legacy) ──────────────
         if task.shared_context or task.shared_context_image:
@@ -716,7 +746,12 @@ def _build_variant_docx(variant, include_answers):
                     except Exception:
                         logger.warning("Не удалось вставить изображение общего условия")
                 if task.shared_context:
-                    _render_segments(doc, _parse_html_segments(task.shared_context), font_size=FS)
+                    _render_segments(
+                        doc,
+                        _parse_html_segments(task.shared_context),
+                        font_size=FS,
+                        default_font=FONT,
+                    )
 
         # ─── Общее условие из <details class="shared-context"> в task.text ─
         ctx_html, body_html = _extract_task_parts(task.text or "")
@@ -724,19 +759,28 @@ def _build_variant_docx(variant, include_answers):
             ctx_key = hash(ctx_html.strip())
             if ctx_key not in printed_ctx_hashes:
                 printed_ctx_hashes.add(ctx_key)
-                _render_segments(doc, _parse_html_segments(ctx_html), font_size=FS)
+                _render_segments(
+                    doc,
+                    _parse_html_segments(ctx_html),
+                    font_size=FS,
+                    default_font=FONT,
+                )
 
-        # ─── Номер задания ───────────────────────────────────────────────
+        # ─── Номер задания + текст в одном параграфе ────────────────────
         th = doc.add_paragraph()
         _sp(th, before=3, after=1)
-        hr = th.add_run(f"{task.number}.")
-        hr.bold = True
-        hr.font.size = Pt(12)
+        _run(th, f"{task.number}. ", bold=True)
 
-        # ─── Текст задания (без «Ответ: ___») ───────────────────────────
+        # ─── Текст задания (без «Ответ: ___»), продолжает th ────────────
         body_html = _strip_answer_placeholder(body_html)
         if body_html.strip():
-            _render_segments(doc, _parse_html_segments(body_html), font_size=FS)
+            _render_segments(
+                doc,
+                _parse_html_segments(body_html),
+                font_size=FS,
+                default_font=FONT,
+                initial_para=th,
+            )
 
         # ─── Картинка задания (legacy) ───────────────────────────────────
         if task.image:
@@ -752,14 +796,15 @@ def _build_variant_docx(variant, include_answers):
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
     # ─── Таблица ответов (только для учителя, на отдельной странице) ────
-    auto_tasks = [t for t in tasks if not t.no_student_input]
+    auto_tasks = [t for t in tasks if int(t.number) < 20 if t.number.isdigit()]
+    if not auto_tasks:
+        auto_tasks = tasks  # fallback если номера нестандартные
     if auto_tasks and include_answers:
         doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
         sep = doc.add_paragraph()
         _sp(sep, before=0, after=6)
-        sep.add_run("Таблица ответов").bold = True
-        sep.runs[0].font.size = Pt(13)
+        _run(sep, "Таблица ответов", bold=True, size=Pt(13))
 
         col_groups = 1
         n = len(auto_tasks)
@@ -791,6 +836,7 @@ def _build_variant_docx(variant, include_answers):
                     para.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     _sp(para, before=1, after=1)
                     for run in para.runs:
+                        run.font.name = FONT
                         run.font.size = Pt(9)
                         if row_idx == 0 or c_idx % 2 == 0:
                             run.bold = True
