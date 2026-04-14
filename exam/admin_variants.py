@@ -323,7 +323,11 @@ def _parse_html_segments(html):
 
     segments = []
 
+    from bs4 import Comment
+
     def walk(node, bold=False, italic=False, sup=False, sub=False):
+        if isinstance(node, Comment):
+            return  # пропускаем HTML-комментарии
         if isinstance(node, NavigableString):
             text = str(node).replace("\r", "").replace("\n", " ")
             if text:
@@ -335,7 +339,14 @@ def _parse_html_segments(html):
         if tag == "img":
             src = node.get("src", "")
             if src:
-                segments.append(("image", src))
+                style = node.get("style", "")
+                if "float:right" in style or "float: right" in style:
+                    segments.append(("image_right", src))
+                else:
+                    segments.append(("image", src))
+            return
+        if tag in ("details", "summary"):
+            # <details class="shared-context"> извлекается до вызова этой функции
             return
         if tag == "br":
             segments.append(("break",))
@@ -487,7 +498,7 @@ def _render_segments(doc, segments, indent=None, font_size=None):
             if indent:
                 p.paragraph_format.left_indent = indent
             p.paragraph_format.space_before = Pt(0)
-            p.paragraph_format.space_after = Pt(2)
+            p.paragraph_format.space_after = Pt(1)
             current[0] = p
         return current[0]
 
@@ -508,8 +519,9 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                 run.font.size = font_size
         elif seg[0] == "break":
             close()
-        elif seg[0] == "image":
+        elif seg[0] in ("image", "image_right"):
             img_src = seg[1]
+            is_right = seg[0] == "image_right"
             img_data = _get_image_bytes(img_src)
             if img_data:
                 is_svg = img_src.lower().endswith(".svg") or img_data[:5] in (b"<svg ", b"<?xml")
@@ -521,6 +533,11 @@ def _render_segments(doc, segments, indent=None, font_size=None):
                             # Формула — вставляем inline в текущий параграф
                             get_para().add_run().add_picture(
                                 io.BytesIO(img_data), width=_image_width(img_data, max_cm=3)
+                            )
+                        elif is_right:
+                            # float:right — компактное изображение inline (до 5 см)
+                            get_para().add_run().add_picture(
+                                io.BytesIO(img_data), width=_image_width(img_data, max_cm=5)
                             )
                         else:
                             # Обычное изображение — отдельным блоком
@@ -566,6 +583,48 @@ def _render_segments(doc, segments, indent=None, font_size=None):
             close()
 
 
+def _extract_task_parts(html):
+    """Делит task.text на (ctx_html, body_html).
+
+    Ищет <details class="shared-context"> → возвращает содержимое .shared-context-body
+    как ctx_html (или None если нет <details>), а остаток без <details> — как body_html.
+    """
+    import re
+
+    from bs4 import BeautifulSoup
+
+    if not html or "shared-context" not in html:
+        return None, html
+
+    soup = BeautifulSoup(html, "html.parser")
+    details = soup.find("details", class_="shared-context")
+    if not details:
+        return None, html
+
+    body_div = details.find("div", class_="shared-context-body")
+    ctx_html = str(body_div) if body_div else ""
+    details.decompose()
+
+    body_html = re.sub(r"^(\s*<br\s*/?>)+", "", str(soup)).strip()
+    return ctx_html, body_html
+
+
+def _strip_answer_placeholder(html):
+    """Удаляет строки 'Ответ: ___' из HTML задания."""
+    import re
+
+    from bs4 import BeautifulSoup
+
+    if not html:
+        return html
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup.find_all(["p", "div", "span"]):
+        text = tag.get_text()
+        if re.search(r"Ответ\s*:\s*[_\s]{3,}", text):
+            tag.decompose()
+    return str(soup)
+
+
 def _build_variant_docx(variant, include_answers):
     """Строит docx-документ для варианта. Возвращает BytesIO.
 
@@ -587,9 +646,9 @@ def _build_variant_docx(variant, include_answers):
     section.left_margin = Cm(2.0)
     section.right_margin = Cm(1.5)
 
-    FS = Pt(12)
+    FS = Pt(11)
 
-    def _sp(p, before=0, after=2):
+    def _sp(p, before=0, after=1):
         p.paragraph_format.space_before = Pt(before)
         p.paragraph_format.space_after = Pt(after)
 
@@ -602,63 +661,84 @@ def _build_variant_docx(variant, include_answers):
         shd.set(qn("w:fill"), fill)
         tcPr.append(shd)
 
-    # Заголовок
+    # ─── Заголовок варианта ──────────────────────────────────────────────
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _sp(title, before=0, after=1)
     r = title.add_run(f"Вариант {variant.number}")
     r.bold = True
-    r.font.size = Pt(14)
+    r.font.size = Pt(13)
 
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _sp(sub, before=0, after=4)
-    sub.add_run(variant.get_exam_type_display()).font.size = Pt(11)
+    _sp(sub, before=0, after=3)
+    sub.add_run(variant.get_exam_type_display()).font.size = Pt(10)
 
-    tasks = list(variant.tasks.order_by("id"))
-    # Флаг: было ли уже напечатано условие для текущей группы заданий.
-    # Группа — непрерывная последовательность заданий с has_ctx=True.
-    # Сбрасываем флаг при переходе от «нет условия» к «есть условие».
-    ctx_group_printed = False
-    prev_had_ctx = False
+    tasks = sorted(
+        variant.tasks.all(),
+        key=lambda t: int(t.number) if t.number.isdigit() else 0,
+    )
+
+    # Хэши уже напечатанных общих условий (дедупликация)
+    printed_ctx_hashes: set = set()
+    part1_printed = False
+    part2_printed = False
 
     for task in tasks:
-        has_ctx = bool(task.shared_context or task.shared_context_image)
+        # ─── Заголовок "Часть 1." / "Часть 2." ──────────────────────────
+        if task.no_student_input and not part2_printed:
+            part2_printed = True
+            p2 = doc.add_paragraph()
+            _sp(p2, before=6, after=2)
+            p2.add_run("Часть 2.").bold = True
+            p2.runs[0].font.size = Pt(12)
+        elif not part1_printed and not task.no_student_input:
+            part1_printed = True
+            p1 = doc.add_paragraph()
+            _sp(p1, before=0, after=2)
+            p1.add_run("Часть 1.").bold = True
+            p1.runs[0].font.size = Pt(12)
 
-        # Начало новой группы → сбросить флаг
-        if has_ctx and not prev_had_ctx:
-            ctx_group_printed = False
+        # ─── Общее условие из task.shared_context (legacy) ──────────────
+        if task.shared_context or task.shared_context_image:
+            ctx_key = hash(task.shared_context or "")
+            if ctx_key not in printed_ctx_hashes:
+                printed_ctx_hashes.add(ctx_key)
+                if task.shared_context_image:
+                    try:
+                        ci_url = task.shared_context_image.url
+                        ci_data = (
+                            _req.get(ci_url, timeout=15).content
+                            if ci_url.startswith("http")
+                            else task.shared_context_image.open("rb").read()
+                        )
+                        doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data))
+                    except Exception:
+                        logger.warning("Не удалось вставить изображение общего условия")
+                if task.shared_context:
+                    _render_segments(doc, _parse_html_segments(task.shared_context), font_size=FS)
 
-        if has_ctx and not ctx_group_printed:
-            ctx_group_printed = True
-            if task.shared_context_image:
-                try:
-                    ci_url = task.shared_context_image.url
-                    ci_data = (
-                        _req.get(ci_url, timeout=15).content
-                        if ci_url.startswith("http")
-                        else task.shared_context_image.open("rb").read()
-                    )
-                    doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data))
-                except Exception:
-                    logger.warning("Не удалось вставить изображение общего условия")
-            if task.shared_context:
-                _render_segments(doc, _parse_html_segments(task.shared_context), font_size=FS)
+        # ─── Общее условие из <details class="shared-context"> в task.text ─
+        ctx_html, body_html = _extract_task_parts(task.text or "")
+        if ctx_html:
+            ctx_key = hash(ctx_html.strip())
+            if ctx_key not in printed_ctx_hashes:
+                printed_ctx_hashes.add(ctx_key)
+                _render_segments(doc, _parse_html_segments(ctx_html), font_size=FS)
 
-        prev_had_ctx = has_ctx
-
-        # Номер задания
+        # ─── Номер задания ───────────────────────────────────────────────
         th = doc.add_paragraph()
-        _sp(th, before=4, after=1)
+        _sp(th, before=3, after=1)
         hr = th.add_run(f"{task.number}.")
         hr.bold = True
-        hr.font.size = Pt(14)
+        hr.font.size = Pt(12)
 
-        # Текст задания
-        if task.text:
-            _render_segments(doc, _parse_html_segments(task.text), font_size=FS)
+        # ─── Текст задания (без «Ответ: ___») ───────────────────────────
+        body_html = _strip_answer_placeholder(body_html)
+        if body_html.strip():
+            _render_segments(doc, _parse_html_segments(body_html), font_size=FS)
 
-        # Картинка задания
+        # ─── Картинка задания (legacy) ───────────────────────────────────
         if task.image:
             try:
                 img_url = task.image.url
@@ -671,7 +751,7 @@ def _build_variant_docx(variant, include_answers):
             except Exception:
                 logger.warning("Не удалось вставить картинку задания %s", task.number)
 
-    # ─── Таблица ответов (только для учителя, на отдельной странице) ──────
+    # ─── Таблица ответов (только для учителя, на отдельной странице) ────
     auto_tasks = [t for t in tasks if not t.no_student_input]
     if auto_tasks and include_answers:
         doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
@@ -688,6 +768,10 @@ def _build_variant_docx(variant, include_answers):
 
         tbl = doc.add_table(rows=rpg + 1, cols=col_groups * 2)
         tbl.style = "Table Grid"
+        # Узкие колонки: № — 1 cm, Ответ — 3 cm
+        for row in tbl.rows:
+            row.cells[0].width = Cm(1)
+            row.cells[1].width = Cm(3)
 
         hdr = tbl.rows[0].cells
         for g in range(col_groups):
@@ -732,7 +816,7 @@ def variant_print_docx(request, variant_id, mode):
     buf = _build_variant_docx(variant, include_answers=include_answers)
 
     fname = f"{safe_num}_variant{suffix}.docx"
-    fname_utf8 = quote(f"{safe_num} вариант{' (ответы)' if include_answers else ''}.docx")
+    fname_utf8 = quote(f"{safe_num} вариант.docx")
     response = HttpResponse(
         buf,
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
