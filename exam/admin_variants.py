@@ -513,7 +513,6 @@ def _render_segments(doc, segments, indent=None, font_size=None, initial_para=No
             p = doc.add_paragraph()
             if indent:
                 p.paragraph_format.left_indent = indent
-            p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(1)
             current[0] = p
         return current[0]
@@ -522,8 +521,7 @@ def _render_segments(doc, segments, indent=None, font_size=None, initial_para=No
         current[0] = None
 
     def _apply(run):
-        if default_font:
-            run.font.name = default_font
+        pass  # font inherited from Normal style
 
     for seg in segments:
         if seg[0] == "text":
@@ -549,10 +547,8 @@ def _render_segments(doc, segments, indent=None, font_size=None, initial_para=No
                 if img_data:
                     try:
                         if is_svg:
-                            # Формулы (URL содержит "formula") — мелко inline,
-                            # прочие SVG-картинки (чертежи) — крупнее.
-                            is_formula = "formula" in img_src.lower()
-                            max_svg = 2 if is_formula else 6
+                            # SVG inline — до 5 см (формулы и чертежи одинаково).
+                            max_svg = 5
                             if is_right:
                                 max_svg = min(max_svg, 3)
                             get_para().add_run().add_picture(
@@ -564,9 +560,9 @@ def _render_segments(doc, segments, indent=None, font_size=None, initial_para=No
                                 io.BytesIO(img_data), width=_image_width(img_data, max_cm=3)
                             )
                         else:
-                            # Обычное изображение — отдельным блоком (до 6 см)
+                            # Обычное изображение — отдельным блоком (до 4 см)
                             close()
-                            doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data, max_cm=6))
+                            doc.add_picture(io.BytesIO(img_data), width=_image_width(img_data, max_cm=4))
                             close()
                     except Exception as e:
                         logger.warning("Не удалось вставить изображение: %s", e)
@@ -691,13 +687,13 @@ def _build_variant_docx(variant, include_answers):
     FONT = "Times New Roman"
 
     def _sp(p, before=0, after=1):
-        p.paragraph_format.space_before = Pt(before)
+        if before:
+            p.paragraph_format.space_before = Pt(before)
         p.paragraph_format.space_after = Pt(after)
 
     def _run(para, text, bold=False, size=None):
-        """Добавляет run с Times New Roman; size ставится только если передан явно."""
+        """Добавляет run; size ставится только если передан явно."""
         r = para.add_run(text)
-        r.font.name = FONT
         if size:
             r.font.size = size
         if bold:
