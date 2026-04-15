@@ -171,6 +171,7 @@ def class_stats(request, class_id):
 @admin_required
 def student_list(request):
     class_filter = request.GET.get("class", "")
+    has_pending = request.GET.get("has_pending", "")
     students = Student.objects.select_related("school_class").annotate(
         attempts_count=Count("attempts", filter=Q(attempts__is_finished=True))
     )
@@ -178,6 +179,11 @@ def student_list(request):
         filter_id = _safe_int(class_filter)
         if filter_id:
             students = students.filter(school_class_id=filter_id)
+    if has_pending:
+        students = students.filter(
+            attempts__is_finished=True,
+            attempts__answers__is_correct__isnull=True,
+        ).distinct()
 
     classes = SchoolClass.objects.all()
     return render(
@@ -187,6 +193,7 @@ def student_list(request):
             "students": students,
             "classes": classes,
             "class_filter": class_filter,
+            "has_pending": has_pending,
         },
     )
 

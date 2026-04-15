@@ -15,7 +15,15 @@
             <option value="{{ cls.id }}" {% if class_filter == cls.id|stringformat:"d" %}selected{% endif %}>{{ cls.name }}</option>
             {% endfor %}
         </select>
+        {% if has_pending %}
+        <input type="hidden" name="has_pending" value="1">
+        {% endif %}
     </form>
+    {% if has_pending %}
+    <a href="?{% if class_filter %}class={{ class_filter }}{% endif %}" class="btn btn-secondary">Все ученики</a>
+    {% else %}
+    <a href="?has_pending=1{% if class_filter %}&class={{ class_filter }}{% endif %}" class="btn btn-secondary">Только с незачтёнными</a>
+    {% endif %}
 </div>
 
 <table class="table">
