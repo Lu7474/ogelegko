@@ -29,6 +29,13 @@ jobs:
           DATABASE_URL: ""
         run: python manage.py test exam --verbosity=2
 
+      - name: Check migrations
+        env:
+          DJANGO_SECRET_KEY: ci-test-secret-key
+          DJANGO_DEBUG: "True"
+          DATABASE_URL: ""
+        run: python manage.py migrate --check
+
   deploy:
     runs-on: ubuntu-latest
     needs: test
