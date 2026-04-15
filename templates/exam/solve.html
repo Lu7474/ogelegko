@@ -148,6 +148,23 @@ let remaining = {{ remaining_seconds }};
 const timerEl = document.getElementById('timer');
 let timerSubmitted = false;
 let warningPlayed = false;
+const notifiedAt = new Set();
+
+// === Браузерные уведомления ===
+const ATTEMPT_ID = '{{ attempt.id }}';
+const LS_PREFIX = 'exam_' + ATTEMPT_ID + '_';
+
+function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function sendNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body: body, icon: '/favicon.ico' });
+    }
+}
 
 function updateTimer() {
     if (remaining <= 0 && !timerSubmitted) {
@@ -161,9 +178,9 @@ function updateTimer() {
     const s = remaining % 60;
     timerEl.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 
-    // Предупреждение за 5 минут (#12)
     if (remaining < 300) {
         timerEl.classList.add('warning');
+        // Звук за 5 минут
         if (!warningPlayed && remaining <= 300 && remaining > 297) {
             warningPlayed = true;
             try {
@@ -176,9 +193,22 @@ function updateTimer() {
             } catch(e) {}
         }
     }
+
+    // Браузерные уведомления за 15, 10, 5 минут
+    const minutes = [15, 10, 5];
+    for (const min of minutes) {
+        const threshold = min * 60;
+        if (!notifiedAt.has(min) && remaining <= threshold && remaining > threshold - 3) {
+            notifiedAt.add(min);
+            sendNotification('Экзамен', `Осталось ${min} минут`);
+        }
+    }
 }
 updateTimer();
 setInterval(updateTimer, 1000);
+
+// Запросить разрешение при старте
+requestNotificationPermission();
 
 // === Прогресс (#23) ===
 const answerInputs = document.querySelectorAll('.answer-input');
@@ -195,6 +225,20 @@ function updateProgress() {
 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 const answerMap = JSON.parse('{{ answer_map_json|escapejs }}');
 
+// === localStorage: восстановление ответов при загрузке ===
+answerInputs.forEach(input => {
+    const taskNumber = input.dataset.taskNumber;
+    if (!input.value.trim()) {
+        const saved = localStorage.getItem(LS_PREFIX + taskNumber);
+        if (saved) {
+            input.value = saved;
+            const navEl = document.getElementById('nav-' + taskNumber);
+            if (navEl) navEl.classList.add('answered');
+        }
+    }
+});
+updateProgress();
+
 answerInputs.forEach(input => {
     let saveTimeout;
     input.addEventListener('input', function() {
@@ -203,6 +247,13 @@ answerInputs.forEach(input => {
         const answerId = answerMap[taskNumber];
         const value = this.value;
         const indicator = document.getElementById('save-' + taskNumber);
+
+        // Сохранить в localStorage
+        if (value.trim()) {
+            localStorage.setItem(LS_PREFIX + taskNumber, value);
+        } else {
+            localStorage.removeItem(LS_PREFIX + taskNumber);
+        }
 
         // Навигация
         const navEl = document.getElementById('nav-' + taskNumber);
@@ -286,12 +337,11 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Инициализация
+// Инициализация навигации для полей, заполненных сервером (не localStorage)
 answerInputs.forEach(input => {
     const taskNumber = input.dataset.taskNumber;
     const navEl = document.getElementById('nav-' + taskNumber);
     if (navEl && input.value.trim()) navEl.classList.add('answered');
 });
-updateProgress();
 </script>
 {% endblock %}
