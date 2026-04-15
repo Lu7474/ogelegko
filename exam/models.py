@@ -60,7 +60,7 @@ class SchoolClass(models.Model):
 
 
 class Student(models.Model):
-    full_name = models.CharField("ФИО", max_length=255, unique=True)
+    full_name = models.CharField("ФИО", max_length=255)
     password_hash = models.CharField("Пароль (хэш)", max_length=255)
     school_class = models.ForeignKey(
         SchoolClass, on_delete=models.CASCADE, verbose_name="Класс", related_name="students"
@@ -72,6 +72,7 @@ class Student(models.Model):
         verbose_name = "Ученик"
         verbose_name_plural = "Ученики"
         ordering = ["school_class", "full_name"]
+        unique_together = [("school_class", "full_name")]
 
     def __str__(self):
         return f"{self.full_name} ({self.school_class.name})"

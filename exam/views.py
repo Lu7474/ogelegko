@@ -100,8 +100,7 @@ def login_view(request):
             password = request.POST.get("password", "").strip()
 
             if full_name and password:
-                try:
-                    student = Student.objects.get(full_name=full_name)
+                for student in Student.objects.filter(full_name=full_name):
                     if student.check_password(password):
                         _clear_login_fails(request, "student_login")
                         request.session.cycle_key()
@@ -111,8 +110,6 @@ def login_view(request):
                         student.save(update_fields=["session_key"])
                         logger.info("Вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
                         return redirect("choose_variant")
-                except Student.DoesNotExist:
-                    pass
 
             _record_failed_login(request, "student_login")
             logger.warning("Неудачный вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
