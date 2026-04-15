@@ -189,6 +189,8 @@ def variant_duplicate(request, variant_id):
             correct_answer=task.correct_answer,
             source=task.source,
             points=task.points,
+            manual_grading=task.manual_grading,
+            no_student_input=task.no_student_input,
             shared_context=task.shared_context,
             shared_context_image=task.shared_context_image,
         )
