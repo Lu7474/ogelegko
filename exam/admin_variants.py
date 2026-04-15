@@ -697,24 +697,24 @@ def _strip_answer_placeholder(html):
 def _build_variant_docx(variant, include_answers):
     """Строит docx-документ для варианта. Возвращает BytesIO.
 
-    Формат: A4 книжная, компактные отступы, формулы inline.
+    Формат: US Letter, узкие поля — параметры эталонного «33 вариант.docx».
     """
     import requests as _req
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
-    from docx.shared import Cm, Pt
+    from docx.shared import Cm, Inches, Pt
 
     doc = Document()
 
-    # Дефолтный шрифт документа — Times New Roman 12pt
+    # Шрифт: Calibri 11pt — соответствует эталону (нет явного шрифта → тема Word = Calibri,
+    # sz=22 в docDefaults = 11pt)
     from docx.oxml.ns import qn as _qn
 
     style_normal = doc.styles["Normal"]
-    style_normal.font.name = "Times New Roman"
-    style_normal.font.size = Pt(12)
-    # Для восточных/азиатских шрифтов тоже
+    style_normal.font.name = "Calibri"
+    style_normal.font.size = Pt(11)
     rPr = style_normal.element.get_or_add_rPr()
     rFonts = rPr.find(_qn("w:rFonts"))
     if rFonts is None:
@@ -722,19 +722,22 @@ def _build_variant_docx(variant, include_answers):
 
         rFonts = _OE("w:rFonts")
         rPr.insert(0, rFonts)
-    rFonts.set(_qn("w:ascii"), "Times New Roman")
-    rFonts.set(_qn("w:hAnsi"), "Times New Roman")
-    rFonts.set(_qn("w:cs"), "Times New Roman")
+    rFonts.set(_qn("w:ascii"), "Calibri")
+    rFonts.set(_qn("w:hAnsi"), "Calibri")
+    rFonts.set(_qn("w:cs"), "Calibri")
 
-    # A4 книжная, узкие поля
+    # Размер страницы US Letter + поля — как в эталоне
+    # (12240 × 15840 twips = 8.5 × 11 дюймов)
     section = doc.sections[0]
+    section.page_width = Inches(8.5)
+    section.page_height = Inches(11)
     section.top_margin = Cm(1.5)
     section.bottom_margin = Cm(1.5)
     section.left_margin = Cm(2.0)
     section.right_margin = Cm(1.5)
 
-    FS = Pt(12)
-    FONT = "Times New Roman"
+    FS = Pt(11)
+    FONT = "Calibri"
 
     def _sp(p, before=0, after=1):
         if before:
@@ -808,7 +811,7 @@ def _build_variant_docx(variant, include_answers):
                             if ci_url.startswith("http")
                             else task.shared_context_image.open("rb").read()
                         )
-                        doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data, max_cm=5))
+                        doc.add_picture(io.BytesIO(ci_data), width=_image_width(ci_data, max_cm=12))
                     except Exception:
                         logger.warning("Не удалось вставить изображение общего условия")
                 if task.shared_context:
