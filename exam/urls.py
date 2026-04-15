@@ -28,6 +28,11 @@ urlpatterns = [
     path("admin/classes/<int:class_id>/delete/", admin_students.class_delete, name="admin_class_delete"),
     path("admin/classes/<int:class_id>/toggle/", admin_students.class_toggle, name="admin_class_toggle"),
     path("admin/classes/<int:class_id>/stats/", admin_students.class_stats, name="admin_class_stats"),
+    path(
+        "admin/classes/<int:class_id>/stats/excel/",
+        admin_students.class_stats_excel,
+        name="admin_class_stats_excel",
+    ),
     # Админ — ученики
     path("admin/students/", admin_students.student_list, name="admin_students"),
     path("admin/students/add/", admin_students.student_add, name="admin_student_add"),

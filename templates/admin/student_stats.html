@@ -60,6 +60,38 @@
 </table>
 {% endif %}
 
+{% if task_perf_list %}
+<h2 style="margin-top:32px;">Аналитика по заданиям</h2>
+<table class="table" style="max-width:600px;">
+    <thead>
+        <tr><th>Задание</th><th>Попыток</th><th>Верно</th><th>%</th></tr>
+    </thead>
+    <tbody>
+        {% for t in task_perf_list %}
+        <tr {% if t.percentage < 50 %}style="background:#fff5f5;"{% endif %}>
+            <td>{{ t.number }}</td>
+            <td>{{ t.tried }}</td>
+            <td>{{ t.correct }}</td>
+            <td>
+                <span style="font-weight:600;color:{% if t.percentage >= 70 %}#27ae60{% elif t.percentage >= 50 %}#f39c12{% else %}#e74c3c{% endif %}">
+                    {{ t.percentage }}%
+                </span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if weak_tasks %}
+<div style="margin-top:12px;padding:12px 16px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;max-width:600px;">
+    <strong>Задания для повторения (меньше 50%):</strong>
+    {% for t in weak_tasks %}
+    <span style="margin-left:6px;padding:2px 8px;background:#ffe69c;border-radius:4px;font-size:0.9rem;">{{ t.number }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
 <a href="{% url 'admin_students' %}" class="btn btn-secondary" style="margin-top:20px; display:inline-block;">← Назад к ученикам</a>
 {% endblock %}
 

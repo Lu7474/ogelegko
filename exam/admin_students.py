@@ -153,6 +153,36 @@ def class_stats(request, class_id):
 
     class_avg = round(sum(all_percentages) / len(all_percentages)) if all_percentages else None
 
+    # Аналитика по номерам заданий для всего класса
+    class_task_stats = {}
+    for answer in (
+        Answer.objects.filter(attempt__student__school_class=school_class, attempt__is_finished=True)
+        .select_related("task")
+        .exclude(task__isnull=True)
+    ):
+        num = answer.task.number
+        if num not in class_task_stats:
+            class_task_stats[num] = {"tried": 0, "correct": 0}
+        class_task_stats[num]["tried"] += 1
+        if answer.is_correct is True:
+            class_task_stats[num]["correct"] += 1
+
+    def _sort_key(n):
+        try:
+            return (0, int(str(n).split(".")[0]), str(n))
+        except (ValueError, IndexError):
+            return (1, 0, str(n))
+
+    class_task_perf = [
+        {
+            "number": num,
+            "tried": data["tried"],
+            "correct": data["correct"],
+            "percentage": round(data["correct"] / data["tried"] * 100) if data["tried"] else 0,
+        }
+        for num, data in sorted(class_task_stats.items(), key=lambda x: _sort_key(x[0]))
+    ]
+
     return render(
         request,
         "admin/class_stats.html",
@@ -161,8 +191,73 @@ def class_stats(request, class_id):
             "student_stats": student_stats_list,
             "total_attempts": total_attempts,
             "class_avg": class_avg,
+            "class_task_perf": class_task_perf,
         },
     )
+
+
+@admin_required
+def class_stats_excel(request, class_id):
+    """Экспорт аналитики класса в Excel."""
+    try:
+        import openpyxl
+        from openpyxl.styles import Alignment, Font, PatternFill
+    except ImportError:
+        return HttpResponse("openpyxl не установлен", status=500)
+
+    school_class = get_object_or_404(SchoolClass, id=class_id)
+
+    class_task_stats = {}
+    for answer in (
+        Answer.objects.filter(attempt__student__school_class=school_class, attempt__is_finished=True)
+        .select_related("task")
+        .exclude(task__isnull=True)
+    ):
+        num = answer.task.number
+        if num not in class_task_stats:
+            class_task_stats[num] = {"tried": 0, "correct": 0}
+        class_task_stats[num]["tried"] += 1
+        if answer.is_correct is True:
+            class_task_stats[num]["correct"] += 1
+
+    def _sort_key(n):
+        try:
+            return (0, int(str(n).split(".")[0]), str(n))
+        except (ValueError, IndexError):
+            return (1, 0, str(n))
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Аналитика класса"
+
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    center = Alignment(horizontal="center")
+
+    headers = ["Номер задания", "Попыток", "Верно", "%"]
+    ws.append(headers)
+    for col, _ in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center
+
+    for num, data in sorted(class_task_stats.items(), key=lambda x: _sort_key(x[0])):
+        pct = round(data["correct"] / data["tried"] * 100) if data["tried"] else 0
+        ws.append([num, data["tried"], data["correct"], pct])
+        if pct < 50:
+            for col in range(1, 5):
+                ws.cell(row=ws.max_row, column=col).fill = PatternFill(
+                    start_color="FFCCCC", end_color="FFCCCC", fill_type="solid"
+                )
+
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = 18
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="analytics_{school_class.name}.xlsx"'
+    wb.save(response)
+    return response
 
 
 # ===== УЧЕНИКИ =====
@@ -351,28 +446,64 @@ def student_import(request):
 @admin_required
 def student_stats(request, student_id):
     student = get_object_or_404(Student.objects.select_related("school_class"), id=student_id)
-    attempts = (
+    attempts = list(
         Attempt.objects.filter(student=student, is_finished=True)
+        .annotate(
+            correct_count_db=Count("answers", filter=Q(answers__is_correct=True)),
+            total_count_db=Count("variant__tasks", distinct=True),
+        )
         .select_related("variant")
         .order_by("-finished_at")
     )
 
     avg_percentage = None
-    if attempts.exists():
-        percentages = [a.percentage for a in attempts]
+    if attempts:
+        percentages = [
+            round(a.correct_count_db / a.total_count_db * 100) if a.total_count_db else 0 for a in attempts
+        ]
         avg_percentage = round(sum(percentages) / len(percentages))
 
-    chart_data = []
-    for a in reversed(list(attempts)):
-        chart_data.append(
-            {
-                "date": a.finished_at.strftime("%d.%m.%Y"),
-                "variant": a.variant.number,
-                "score": a.score,
-                "max_score": a.max_score,
-                "percentage": a.percentage,
-            }
-        )
+    chart_data = [
+        {
+            "date": a.finished_at.strftime("%d.%m.%Y"),
+            "variant": a.variant.number,
+            "score": a.score,
+            "max_score": a.max_score,
+            "percentage": round(a.correct_count_db / a.total_count_db * 100) if a.total_count_db else 0,
+        }
+        for a in reversed(attempts)
+    ]
+
+    # Аналитика по номерам заданий
+    task_stats = {}
+    for answer in (
+        Answer.objects.filter(attempt__student=student, attempt__is_finished=True)
+        .select_related("task")
+        .exclude(task__isnull=True)
+    ):
+        num = answer.task.number
+        if num not in task_stats:
+            task_stats[num] = {"tried": 0, "correct": 0}
+        task_stats[num]["tried"] += 1
+        if answer.is_correct is True:
+            task_stats[num]["correct"] += 1
+
+    def _sort_key(n):
+        try:
+            return (0, int(str(n).split(".")[0]), str(n))
+        except (ValueError, IndexError):
+            return (1, 0, str(n))
+
+    task_perf_list = [
+        {
+            "number": num,
+            "tried": data["tried"],
+            "correct": data["correct"],
+            "percentage": round(data["correct"] / data["tried"] * 100) if data["tried"] else 0,
+        }
+        for num, data in sorted(task_stats.items(), key=lambda x: _sort_key(x[0]))
+    ]
+    weak_tasks = [t for t in task_perf_list if t["percentage"] < 50 and t["tried"] > 0]
 
     return render(
         request,
@@ -382,6 +513,8 @@ def student_stats(request, student_id):
             "attempts": attempts,
             "avg_percentage": avg_percentage,
             "chart_data": json.dumps(chart_data),
+            "task_perf_list": task_perf_list,
+            "weak_tasks": weak_tasks,
         },
     )
 

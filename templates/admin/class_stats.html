@@ -37,5 +37,31 @@
     </tbody>
 </table>
 
+{% if class_task_perf %}
+<div style="display:flex;align-items:center;gap:12px;margin-top:32px;margin-bottom:8px;">
+    <h2 style="margin:0;">Аналитика по заданиям</h2>
+    <a href="{% url 'admin_class_stats_excel' school_class.id %}" class="btn btn-secondary" style="font-size:0.85rem;">Экспорт в Excel</a>
+</div>
+<table class="table" style="max-width:600px;">
+    <thead>
+        <tr><th>Задание</th><th>Попыток</th><th>Верно</th><th>%</th></tr>
+    </thead>
+    <tbody>
+        {% for t in class_task_perf %}
+        <tr {% if t.percentage < 50 %}style="background:#fff5f5;"{% endif %}>
+            <td>{{ t.number }}</td>
+            <td>{{ t.tried }}</td>
+            <td>{{ t.correct }}</td>
+            <td>
+                <span style="font-weight:600;color:{% if t.percentage >= 70 %}#27ae60{% elif t.percentage >= 50 %}#f39c12{% else %}#e74c3c{% endif %}">
+                    {{ t.percentage }}%
+                </span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
 <a href="{% url 'admin_classes' %}" class="btn btn-secondary" style="margin-top:12px;">Назад к классам</a>
 {% endblock %}
