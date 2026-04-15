@@ -227,6 +227,7 @@ def start_exam(request, variant_id):
         # select_for_update блокирует строку студента, предотвращая создание дубликатов попыток
         Student.objects.select_for_update().filter(id=student.id).exists()
         attempt = Attempt.objects.filter(student=student, variant=variant, is_finished=False).first()
+        resumed = attempt is not None
 
         if not attempt:
             limit_error = _check_attempt_limit(student, variant)
@@ -289,6 +290,7 @@ def start_exam(request, variant_id):
             "answers": answers,
             "remaining_seconds": int(remaining),
             "answer_map_json": json.dumps(answer_map),
+            "resumed": resumed,
         },
     )
 

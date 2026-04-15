@@ -63,6 +63,12 @@
     Записывайте ответ в формате, указанном в задании. Десятичные дроби — через запятую.
 </p>
 
+{% if resumed %}
+<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:0.9rem;color:#92400e;">
+    Продолжаете предыдущую попытку — ответы сохранены
+</div>
+{% endif %}
+
 <form id="examForm">
     {% csrf_token %}
     {% for task in tasks %}
