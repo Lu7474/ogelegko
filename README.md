@@ -38,7 +38,7 @@
 
 | Слой          | Технология                                  |
 |---------------|---------------------------------------------|
-| Backend       | Python 3 · Django 6                         |
+| Backend       | Python 3 · Django 5.2                       |
 | База данных   | SQLite (локально) · PostgreSQL (продакшн)   |
 | Frontend      | HTML · CSS · Vanilla JS · Django-шаблоны    |
 | Парсинг       | requests · BeautifulSoup4                   |
