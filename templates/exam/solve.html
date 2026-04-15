@@ -97,6 +97,11 @@
             <img src="{{ task.image.url }}" alt="Задание {{ task.number }}">
         </div>
         {% endif %}
+        {% for extra in task.extra_images.all %}
+        <div class="task-image">
+            <img src="{{ extra.image.url }}" alt="Задание {{ task.number }}">
+        </div>
+        {% endfor %}
         <div class="form-group">
             {% if task.no_student_input %}
             <div class="answer-hint" style="font-style:italic;padding:6px 0;">Задание решается на листе бумаги — учитель проверит и выставит баллы</div>

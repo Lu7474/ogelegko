@@ -314,6 +314,36 @@ class CatalogTask(models.Model):
         return hashlib.md5(plain.encode("utf-8")).hexdigest() if plain else None
 
 
+class TaskImage(models.Model):
+    """Дополнительные изображения к заданию варианта."""
+
+    task = models.ForeignKey(
+        Task, on_delete=models.CASCADE, related_name="extra_images", verbose_name="Задание"
+    )
+    image = models.ImageField("Изображение", upload_to="tasks/", validators=[validate_image_size])
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Доп. изображение"
+        verbose_name_plural = "Доп. изображения"
+        ordering = ["order"]
+
+
+class CatalogTaskImage(models.Model):
+    """Дополнительные изображения к заданию каталога."""
+
+    task = models.ForeignKey(
+        CatalogTask, on_delete=models.CASCADE, related_name="extra_images", verbose_name="Задание каталога"
+    )
+    image = models.ImageField("Изображение", upload_to="catalog/", validators=[validate_image_size])
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Доп. изображение каталога"
+        verbose_name_plural = "Доп. изображения каталога"
+        ordering = ["order"]
+
+
 class Answer(models.Model):
     attempt = models.ForeignKey(
         Attempt, on_delete=models.CASCADE, verbose_name="Попытка", related_name="answers"

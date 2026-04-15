@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .admin_views import _paginate, _safe_int, admin_required
-from .models import CatalogImportSession, CatalogTask, ExamType, Task, TaskSource, Variant
+from .models import CatalogImportSession, CatalogTask, CatalogTaskImage, ExamType, Task, TaskSource, Variant
 from .parser import sanitize_html
 
 logger = logging.getLogger(__name__)
@@ -145,6 +145,8 @@ def catalog_add(request):
             if shared_context_image:
                 ct.shared_context_image = shared_context_image
             ct.save()
+            for i, f in enumerate(request.FILES.getlist("extra_images")):
+                CatalogTaskImage.objects.create(task=ct, image=f, order=i)
             return redirect("admin_catalog")
 
     return render(
@@ -183,6 +185,11 @@ def catalog_edit(request, task_id):
             error = "Выберите тип экзамена"
         else:
             ct.save()
+            extra = request.FILES.getlist("extra_images")
+            if extra:
+                start_order = ct.extra_images.count()
+                for i, f in enumerate(extra):
+                    CatalogTaskImage.objects.create(task=ct, image=f, order=start_order + i)
             return redirect("admin_catalog")
 
     return render(

@@ -44,6 +44,9 @@
     {% if answer.task.image %}
     <div class="task-image"><img src="{{ answer.task.image.url }}" alt="Задание {{ answer.task.number }}"></div>
     {% endif %}
+    {% for extra in answer.task.extra_images.all %}
+    <div class="task-image"><img src="{{ extra.image.url }}" alt="Задание {{ answer.task.number }}"></div>
+    {% endfor %}
     <div class="answer-compare">
         <span class="your-answer">Ваш ответ: <strong>{{ answer.student_answer|default:"—" }}</strong></span>
         <span class="correct-answer">Правильный: <strong>{{ answer.task.correct_answer }}</strong></span>
