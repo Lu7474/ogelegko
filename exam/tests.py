@@ -6,10 +6,13 @@ from django.test import Client, TestCase
 from .models import (
     Answer,
     Attempt,
+    CatalogTask,
+    CatalogTaskImage,
     ExamType,
     SchoolClass,
     Student,
     Task,
+    TaskImage,
     TaskSource,
     Variant,
 )
@@ -286,6 +289,107 @@ class ExamFlowTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Attempt.objects.filter(student=self.student, is_finished=True).count(), 2)
         self.assertEqual(Attempt.objects.filter(student=self.student, is_finished=False).count(), 0)
+
+
+class RetryMistakesTests(TestCase):
+    """Проверяет, что «Повторить ошибки» создаёт доступный вариант."""
+
+    def setUp(self):
+        self.client = Client()
+        self.school_class = SchoolClass.objects.create(name="9В", exam_type=ExamType.OGE)
+        self.student = Student(full_name="Ошибков Ошибка", school_class=self.school_class)
+        self.student.set_password("pass")
+        self.student.save()
+
+        self.variant = Variant.objects.create(number="retry_base", exam_type=ExamType.OGE)
+        self.task = Task.objects.create(
+            variant=self.variant, number=1, text="1+1=?", correct_answer="2", points=1
+        )
+
+        self.client.post("/login/", {"full_name": "Ошибков Ошибка", "password": "pass"})
+
+        # Создаём завершённую попытку с неверным ответом
+        self.client.get(f"/exam/{self.variant.id}/")
+        attempt = Attempt.objects.get(student=self.student)
+        answer = Answer.objects.get(attempt=attempt, task=self.task)
+        answer.student_answer = "99"
+        answer.save()
+        self.client.post(f"/exam/finish/{attempt.id}/")
+        self.attempt = Attempt.objects.get(student=self.student, is_finished=True)
+
+    def test_retry_variant_is_active(self):
+        resp = self.client.get(f"/attempt/{self.attempt.id}/retry/")
+        self.assertEqual(resp.status_code, 302)
+
+        review_number = f"ошибки_{self.variant.number}_{self.attempt.id}"
+        review_variant = Variant.objects.get(number=review_number)
+        self.assertTrue(review_variant.is_active)
+
+    def test_retry_start_exam_accessible(self):
+        self.client.get(f"/attempt/{self.attempt.id}/retry/")
+
+        review_number = f"ошибки_{self.variant.number}_{self.attempt.id}"
+        review_variant = Variant.objects.get(number=review_number)
+
+        resp = self.client.get(f"/exam/{review_variant.id}/")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_retry_excluded_from_random(self):
+        # Если единственный активный вариант — retry-вариант, choose_variant не должен его вернуть
+        self.client.get(f"/attempt/{self.attempt.id}/retry/")
+        # Деактивируем оригинальный вариант
+        self.variant.is_active = False
+        self.variant.save()
+
+        # Все активные варианты — только retry; случайный выбор должен вернуть ошибку «нет вариантов»
+        resp = self.client.post("/choose/", {"action": "random"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Нет доступных вариантов")
+
+
+class VariantFromCatalogImageTests(TestCase):
+    """Проверяет, что CatalogTaskImage копируются в TaskImage при создании варианта из каталога."""
+
+    def setUp(self):
+        self.client = Client()
+        from django.contrib.auth.models import User
+
+        self.admin = User.objects.create_user("admin2", password="admin123", is_staff=True)
+        self.client.post("/admin/", {"username": "admin2", "password": "admin123"})
+
+    def test_extra_images_copied(self):
+        from django.core.files.base import ContentFile
+
+        ct = CatalogTask.objects.create(
+            task_number=1,
+            exam_type=ExamType.OGE,
+            text="задание",
+            correct_answer="1",
+            source=TaskSource.MANUAL,
+        )
+        # Создаём CatalogTaskImage с минимальным PNG (1×1 пиксель)
+        minimal_png = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00"
+            b"\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        ci = CatalogTaskImage(task=ct, order=0)
+        ci.image.save("test.png", ContentFile(minimal_png), save=True)
+
+        resp = self.client.post(
+            "/admin/variants/from-catalog/",
+            {
+                "variant_number": "from_catalog_img_test",
+                "exam_type": "oge",
+                "selected_tasks": json.dumps({"1": ct.id}),
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertTrue(data.get("ok"))
+
+        task = Task.objects.get(variant__number="from_catalog_img_test")
+        self.assertEqual(task.extra_images.count(), 1)
 
 
 class AdminTests(TestCase):
