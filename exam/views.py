@@ -223,25 +223,27 @@ def start_exam(request, variant_id):
             },
         )
 
-    attempt = Attempt.objects.filter(student=student, variant=variant, is_finished=False).first()
+    with transaction.atomic():
+        # select_for_update блокирует строку студента, предотвращая создание дубликатов попыток
+        Student.objects.select_for_update().filter(id=student.id).exists()
+        attempt = Attempt.objects.filter(student=student, variant=variant, is_finished=False).first()
 
-    if not attempt:
-        limit_error = _check_attempt_limit(student, variant)
-        if limit_error:
-            return render(
-                request,
-                "exam/choose_variant.html",
-                {
-                    "student": student,
-                    "past_attempts": Attempt.objects.filter(student=student, is_finished=True).select_related(
-                        "variant"
-                    ),
-                    "error": limit_error,
-                },
-            )
+        if not attempt:
+            limit_error = _check_attempt_limit(student, variant)
+            if limit_error:
+                return render(
+                    request,
+                    "exam/choose_variant.html",
+                    {
+                        "student": student,
+                        "past_attempts": Attempt.objects.filter(
+                            student=student, is_finished=True
+                        ).select_related("variant"),
+                        "error": limit_error,
+                    },
+                )
 
-        max_score = variant.tasks.aggregate(total=Sum("points"))["total"] or 0
-        with transaction.atomic():
+            max_score = variant.tasks.aggregate(total=Sum("points"))["total"] or 0
             attempt = Attempt.objects.create(
                 student=student,
                 variant=variant,
