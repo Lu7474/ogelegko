@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import threading
 import uuid
 
@@ -624,6 +625,196 @@ def catalog_fipi_status(request, job_id):
         "admin/catalog_import_fipi_status.html",
         {"job_id": job_id, "job": job, "session": session_obj},
     )
+
+
+def _run_pdf_import_job(job_id, file_paths, exam_type, mode, fmt, session_id):
+    """Фоновый поток: парсит загруженные PDF файлы."""
+    from pathlib import Path
+
+    from django.core.files.base import ContentFile
+    from django.db import connection
+
+    try:
+        from .management.commands.import_pdfs import Command as PdfCommand
+
+        class _FakeStdout:
+            def write(self, msg):
+                logger.info("[PDF] %s", msg.strip())
+
+            def style(self):
+                return self
+
+        cmd = PdfCommand()
+        cmd.stdout = _FakeStdout()
+        cmd.stderr = _FakeStdout()
+        cmd.style = type(
+            "S",
+            (),
+            {
+                "ERROR": staticmethod(lambda x: x),
+                "SUCCESS": staticmethod(lambda x: x),
+                "WARNING": staticmethod(lambda x: x),
+            },
+        )()
+
+        session = CatalogImportSession.objects.get(id=session_id)
+        do_catalog = mode in ("catalog", "both")
+        do_variants = mode in ("variants", "both")
+
+        total_added = total_dupl = total_errors = 0
+
+        for file_path in file_paths:
+            path = Path(file_path)
+            if not path.exists():
+                continue
+            try:
+                if fmt == "universal":
+                    added = _process_pdf_universal(cmd, path, exam_type, session, ContentFile)
+                    total_added += added
+                else:
+                    cat_added, cat_skipped, _vc, _vs = cmd._process_pdf(
+                        path, exam_type, False, do_catalog, do_variants, session
+                    )
+                    total_added += cat_added
+                    total_dupl += cat_skipped
+            except Exception:
+                logger.exception("Ошибка парсинга PDF: %s", file_path)
+                total_errors += 1
+            finally:
+                path.unlink(missing_ok=True)
+
+        session.tasks_added = total_added
+        session.tasks_duplicate = total_dupl
+        session.status = "done" if total_errors == 0 else "error"
+        if total_errors:
+            session.notes = f"Ошибок: {total_errors}"
+        session.save(update_fields=["tasks_added", "tasks_duplicate", "status", "notes"])
+
+        cache.set(
+            f"pjob:{job_id}",
+            {"status": "done", "session_id": session_id, "added": total_added},
+            _JOB_TTL,
+        )
+    except Exception as e:
+        logger.exception("Ошибка PDF-импорта")
+        cache.set(f"pjob:{job_id}", {"status": "error", "session_id": session_id, "error": str(e)}, _JOB_TTL)
+        try:
+            CatalogImportSession.objects.filter(id=session_id).update(status="error", notes=str(e))
+        except Exception:
+            pass
+    finally:
+        connection.close()
+
+
+def _process_pdf_universal(cmd, pdf_path, exam_type, session, ContentFile):
+    """Универсальный режим: каждая страница PDF = одно задание (рендер + текст)."""
+    import fitz
+    import pdfplumber
+
+    added = 0
+    fitz_doc = fitz.open(str(pdf_path))
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        for page_num, page in enumerate(pdf.pages):
+            text = (page.extract_text() or "").strip()
+            page_bytes = cmd._render_page(fitz_doc, page_num)
+
+            obj = CatalogTask(
+                task_number=None,
+                exam_type=exam_type,
+                text=text,
+                correct_answer="",
+                source=TaskSource.PRINT_SOLVE,
+                manual_grading=True,
+                import_session=session,
+            )
+            if page_bytes:
+                fname = f"catalog/pdf_{pdf_path.stem}_p{page_num + 1}.png"
+                obj.image.save(fname, ContentFile(page_bytes), save=False)
+            obj.save()
+            added += 1
+
+            # Обновляем счётчик в сессии для live-прогресса
+            session.tasks_added = added
+            session.save(update_fields=["tasks_added"])
+
+    fitz_doc.close()
+    return added
+
+
+@admin_required
+def catalog_pdf_import(request):
+    """Загрузка и парсинг PDF файлов через сайт."""
+    errors = []
+    if request.method == "POST":
+        exam_type = request.POST.get("exam_type", "")
+        mode = request.POST.get("mode", "catalog")
+        fmt = request.POST.get("format", "print_solve")
+        files = request.FILES.getlist("pdf_files")
+
+        if exam_type not in dict(ExamType.choices):
+            errors.append("Выберите тип экзамена")
+        if not files:
+            errors.append("Выберите PDF файл(ы)")
+        if not errors:
+            from django.conf import settings
+
+            upload_dir = os.path.join(settings.MEDIA_ROOT, "pdf_uploads")
+            os.makedirs(upload_dir, exist_ok=True)
+
+            file_paths = []
+            for f in files:
+                if not f.name.lower().endswith(".pdf"):
+                    errors.append(f"Файл '{f.name}' не является PDF")
+                    continue
+                dest = os.path.join(upload_dir, f"{uuid.uuid4()}_{f.name}")
+                with open(dest, "wb") as out:
+                    for chunk in f.chunks():
+                        out.write(chunk)
+                file_paths.append(dest)
+
+        if not errors and file_paths:
+            sess = CatalogImportSession.objects.create(
+                source=TaskSource.PRINT_SOLVE,
+                url=", ".join(f.name for f in files),
+                status="running",
+            )
+            job_id = str(uuid.uuid4())
+            cache.set(
+                f"pjob:{job_id}",
+                {"status": "running", "session_id": sess.id, "added": 0},
+                _JOB_TTL,
+            )
+            threading.Thread(
+                target=_run_pdf_import_job,
+                args=(job_id, file_paths, exam_type, mode, fmt, sess.id),
+                daemon=True,
+            ).start()
+            return redirect("admin_pdf_import_status", job_id=job_id)
+
+    return render(
+        request,
+        "admin/catalog_pdf_import.html",
+        {"exam_types": ExamType.choices, "errors": errors},
+    )
+
+
+@admin_required
+def catalog_pdf_import_status(request, job_id):
+    job = cache.get(f"pjob:{job_id}") or {"status": "unknown", "session_id": None, "added": 0}
+
+    if job.get("session_id") and job["status"] == "running":
+        try:
+            sess = CatalogImportSession.objects.get(id=job["session_id"])
+            job = dict(
+                job, added=sess.tasks_added, status=sess.status if sess.status != "running" else "running"
+            )
+        except CatalogImportSession.DoesNotExist:
+            pass
+
+    if request.GET.get("json"):
+        return JsonResponse(job)
+
+    return render(request, "admin/catalog_pdf_import_status.html", {"job_id": job_id, "job": job})
 
 
 @admin_required

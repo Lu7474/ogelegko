@@ -107,6 +107,12 @@ urlpatterns = [
         admin_catalog.catalog_fipi_status,
         name="admin_fipi_import_status",
     ),
+    path("admin/catalog/import-pdf/", admin_catalog.catalog_pdf_import, name="admin_pdf_import"),
+    path(
+        "admin/catalog/import-pdf/<str:job_id>/status/",
+        admin_catalog.catalog_pdf_import_status,
+        name="admin_pdf_import_status",
+    ),
     path("admin/catalog/imports/", admin_catalog.catalog_import_list, name="admin_import_list"),
     path(
         "admin/catalog/imports/<int:session_id>/delete/",
