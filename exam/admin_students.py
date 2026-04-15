@@ -295,6 +295,7 @@ def student_import(request):
                 wb = openpyxl.load_workbook(uploaded_file)
                 ws = wb.active
 
+                seen_in_file = {}  # (class_name, full_name) -> row_num
                 for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                     if not row or not row[0]:
                         continue
@@ -308,6 +309,15 @@ def student_import(request):
                         full_name = str(row[0]).strip()
                         password = str(row[1]).strip()
                         class_name = str(row[2]).strip()
+
+                        dup_key = (class_name, full_name)
+                        if dup_key in seen_in_file:
+                            errors.append(
+                                f"Строка {row_num}: дубль — '{full_name}' ({class_name}) "
+                                f"уже есть в строке {seen_in_file[dup_key]}"
+                            )
+                            continue
+                        seen_in_file[dup_key] = row_num
 
                         school_class = SchoolClass.objects.get(name=class_name)
                         student = Student(full_name=full_name, school_class=school_class)
