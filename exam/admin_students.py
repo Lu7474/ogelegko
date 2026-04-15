@@ -112,10 +112,12 @@ def class_stats(request, class_id):
         .annotate(
             correct_count_db=Count("answers", filter=Q(answers__is_correct=True)),
             total_count_db=Count("variant__tasks", distinct=True),
+            pending_count=Count("answers", filter=Q(answers__is_correct__isnull=True)),
         )
         .select_related("variant", "student")
         .order_by("-finished_at")
     )
+    pending_attempts = [a for a in all_attempts if a.pending_count > 0]
 
     attempts_by_student = defaultdict(list)
     for attempt in all_attempts:
@@ -192,6 +194,7 @@ def class_stats(request, class_id):
             "total_attempts": total_attempts,
             "class_avg": class_avg,
             "class_task_perf": class_task_perf,
+            "pending_attempts": pending_attempts,
         },
     )
 
@@ -615,3 +618,72 @@ def attempt_delete(request, attempt_id):
     student_id = attempt.student_id
     attempt.delete()
     return redirect("admin_student_stats", student_id=student_id)
+
+
+@admin_required
+def bulk_grade_attempts(request, class_id):
+    """Массовая проверка ручных заданий для выбранных попыток."""
+    from .views import _recalculate_attempt_score
+
+    school_class = get_object_or_404(SchoolClass, id=class_id)
+
+    if request.method == "POST" and "attempt_ids" in request.POST:
+        attempt_ids = request.POST.getlist("attempt_ids")
+
+        # Сохраняем баллы по каждому ответу
+        for key, value in request.POST.items():
+            if key.startswith("answer_"):
+                try:
+                    answer_id = int(key.split("_")[1])
+                    pts = int(value)
+                    answer = Answer.objects.select_related("task", "attempt").get(
+                        id=answer_id,
+                        task__manual_grading=True,
+                        attempt__student__school_class=school_class,
+                    )
+                    pts = max(0, min(pts, answer.task.points))
+                    answer.awarded_points = pts
+                    answer.is_correct = pts > 0
+                    answer.save(update_fields=["awarded_points", "is_correct"])
+                except (ValueError, Answer.DoesNotExist):
+                    pass
+
+        # Пересчитываем баллы для всех затронутых попыток
+        for attempt in Attempt.objects.filter(id__in=attempt_ids):
+            _recalculate_attempt_score(attempt)
+
+        return redirect("admin_class_stats", class_id=class_id)
+
+    # GET: выбор попыток
+    selected_ids = request.GET.getlist("ids")
+    if not selected_ids:
+        return redirect("admin_class_stats", class_id=class_id)
+
+    attempts = (
+        Attempt.objects.filter(
+            id__in=selected_ids,
+            is_finished=True,
+            student__school_class=school_class,
+        )
+        .select_related("student", "variant")
+        .prefetch_related("answers__task")
+    )
+
+    # Собираем все pending-ответы выбранных попыток
+    pending_answers = []
+    for attempt in attempts:
+        for answer in attempt.answers.select_related("task").filter(
+            task__manual_grading=True, is_correct__isnull=True
+        ):
+            pending_answers.append({"attempt": attempt, "answer": answer})
+
+    return render(
+        request,
+        "admin/bulk_grade.html",
+        {
+            "school_class": school_class,
+            "attempts": attempts,
+            "pending_answers": pending_answers,
+            "selected_ids": selected_ids,
+        },
+    )

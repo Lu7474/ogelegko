@@ -29,6 +29,11 @@ urlpatterns = [
     path("admin/classes/<int:class_id>/toggle/", admin_students.class_toggle, name="admin_class_toggle"),
     path("admin/classes/<int:class_id>/stats/", admin_students.class_stats, name="admin_class_stats"),
     path(
+        "admin/classes/<int:class_id>/bulk-grade/",
+        admin_students.bulk_grade_attempts,
+        name="admin_bulk_grade",
+    ),
+    path(
         "admin/classes/<int:class_id>/stats/excel/",
         admin_students.class_stats_excel,
         name="admin_class_stats_excel",

@@ -19,6 +19,33 @@
     </div>
 </div>
 
+{% if pending_attempts %}
+<h2>Ожидают проверки ({{ pending_attempts|length }})</h2>
+<form method="get" action="{% url 'admin_bulk_grade' school_class.id %}" id="bulkGradeForm">
+    <table class="table">
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="selectAll" title="Выбрать все"></th>
+                <th>Ученик</th><th>Вариант</th><th>Дата</th><th>Ожидает</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for attempt in pending_attempts %}
+            <tr>
+                <td><input type="checkbox" name="ids" value="{{ attempt.id }}" class="attempt-cb"></td>
+                <td>{{ attempt.student.full_name }}</td>
+                <td>{{ attempt.variant.number }}</td>
+                <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
+                <td><span style="color:#e67e22;font-weight:600;">{{ attempt.pending_count }} зад.</span></td>
+                <td><a href="{% url 'admin_attempt_detail' attempt.id %}" class="btn btn-sm btn-secondary">Проверить</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-primary" id="bulkBtn" disabled>Массовая проверка выбранных</button>
+</form>
+{% endif %}
+
 <h2>Ученики</h2>
 <table class="table">
     <thead>
@@ -64,4 +91,21 @@
 {% endif %}
 
 <a href="{% url 'admin_classes' %}" class="btn btn-secondary" style="margin-top:12px;">Назад к классам</a>
+
+{% if pending_attempts %}
+<script>
+var cbs = document.querySelectorAll('.attempt-cb');
+var bulkBtn = document.getElementById('bulkBtn');
+var selectAll = document.getElementById('selectAll');
+function updateBtn() {
+    var checked = document.querySelectorAll('.attempt-cb:checked').length;
+    bulkBtn.disabled = checked === 0;
+}
+cbs.forEach(function(cb) { cb.addEventListener('change', updateBtn); });
+selectAll.addEventListener('change', function() {
+    cbs.forEach(function(cb) { cb.checked = selectAll.checked; });
+    updateBtn();
+});
+</script>
+{% endif %}
 {% endblock %}
