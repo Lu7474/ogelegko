@@ -45,7 +45,7 @@ def variant_list(request):
 
 
 def _save_variant_tasks(variant, request):
-    """Сохраняет задания варианта из POST-данных."""
+    """Сохраняет задания варианта из POST-данных (для новых вариантов)."""
     import re as _re
 
     indices = sorted(
@@ -82,6 +82,55 @@ def _save_variant_tasks(variant, request):
             if shared_context_image:
                 task.shared_context_image = shared_context_image
             task.save()
+
+
+def _update_variant_tasks(variant, request):
+    """Обновляет задания существующего варианта без удаления (сохраняет ответы учеников)."""
+    import re as _re
+
+    indices = sorted(
+        {int(m.group(1)) for key in request.POST for m in [_re.match(r"^task_(\d+)_answer$", key)] if m}
+    )
+    task_numbers_in_form = set()
+    for task_index in indices:
+        text = sanitize_html(request.POST.get(f"task_{task_index}_text", "").strip())
+        answer = request.POST.get(f"task_{task_index}_answer", "").strip()
+        source = request.POST.get(f"task_{task_index}_source", "manual")
+        points = _safe_int(request.POST.get(f"task_{task_index}_points", "1"), default=1)
+        manual_grading = bool(request.POST.get(f"task_{task_index}_manual_grading"))
+        image = request.FILES.get(f"task_{task_index}_image")
+        shared_context = sanitize_html(request.POST.get(f"task_{task_index}_shared_context", "").strip())
+        shared_context_image = request.FILES.get(f"task_{task_index}_shared_context_image")
+
+        if points < 1:
+            points = 1
+        if source not in dict(TaskSource.choices):
+            source = "manual"
+
+        if answer or manual_grading:
+            number_str = str(task_index)
+            task_numbers_in_form.add(number_str)
+            task, _ = Task.objects.update_or_create(
+                variant=variant,
+                number=number_str,
+                defaults={
+                    "text": text,
+                    "correct_answer": answer,
+                    "source": source,
+                    "points": points,
+                    "manual_grading": manual_grading,
+                    "shared_context": shared_context,
+                },
+            )
+            if image:
+                task.image = image
+                task.save(update_fields=["image"])
+            if shared_context_image:
+                task.shared_context_image = shared_context_image
+                task.save(update_fields=["shared_context_image"])
+
+    # Удалить задания, которых больше нет в форме (каскадно удаляет их ответы)
+    variant.tasks.exclude(number__in=task_numbers_in_form).delete()
 
 
 @admin_required
@@ -137,8 +186,7 @@ def variant_edit(request, variant_id):
                 variant.max_attempts = max_attempts
                 variant.save()
 
-                variant.tasks.all().delete()
-                _save_variant_tasks(variant, request)
+                _update_variant_tasks(variant, request)
                 return redirect("admin_variants")
             except IntegrityError:
                 error = f"Вариант с номером '{number}' уже существует"
