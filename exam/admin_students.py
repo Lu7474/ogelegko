@@ -1,5 +1,6 @@
 import json
 import logging
+from collections import defaultdict
 from datetime import timedelta
 
 from django.contrib.auth.hashers import make_password
@@ -103,26 +104,40 @@ def class_toggle(request, class_id):
 @admin_required
 def class_stats(request, class_id):
     school_class = get_object_or_404(SchoolClass, id=class_id)
-    students = school_class.students.all()
+    students = list(school_class.students.all())
+
+    # Одним запросом получаем все завершённые попытки класса с кол-вом верных ответов
+    all_attempts = list(
+        Attempt.objects.filter(student__school_class=school_class, is_finished=True)
+        .annotate(
+            correct_count_db=Count("answers", filter=Q(answers__is_correct=True)),
+            total_count_db=Count("variant__tasks", distinct=True),
+        )
+        .select_related("variant", "student")
+        .order_by("-finished_at")
+    )
+
+    attempts_by_student = defaultdict(list)
+    for attempt in all_attempts:
+        attempts_by_student[attempt.student_id].append(attempt)
 
     student_stats_list = []
     total_attempts = 0
     all_percentages = []
 
     for student in students:
-        attempts = (
-            Attempt.objects.filter(student=student, is_finished=True)
-            .select_related("variant")
-            .order_by("-finished_at")
-        )
-        count = attempts.count()
+        student_attempts = attempts_by_student[student.id]
+        count = len(student_attempts)
         total_attempts += count
 
         if count > 0:
-            percentages = [a.percentage for a in attempts]
+            percentages = [
+                round(a.correct_count_db / a.total_count_db * 100) if a.total_count_db else 0
+                for a in student_attempts
+            ]
             avg_pct = round(sum(percentages) / len(percentages))
             all_percentages.extend(percentages)
-            last_attempt = attempts.first()
+            last_attempt = student_attempts[0]
         else:
             avg_pct = None
             last_attempt = None
