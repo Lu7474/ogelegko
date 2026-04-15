@@ -97,6 +97,9 @@
 
 <div class="results-actions">
     <button class="btn btn-secondary" id="toggleWrong">Посмотреть неправильные ({{ wrong_answers|length }})</button>
+    {% if wrong_answers %}
+    <a href="{% url 'retry_mistakes' attempt.id %}" class="btn btn-secondary">Повторить ошибки ({{ wrong_answers|length }})</a>
+    {% endif %}
     <a href="{% url 'view_attempt' attempt.id %}" class="btn btn-secondary">Весь вариант</a>
     <a href="{% url 'choose_variant' %}" class="btn btn-primary">Решить ещё →</a>
 </div>

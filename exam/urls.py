@@ -13,6 +13,7 @@ urlpatterns = [
     path("exam/finish/<int:attempt_id>/", views.finish_exam, name="finish_exam"),
     path("results/<int:attempt_id>/", views.results_view, name="results"),
     path("attempt/<int:attempt_id>/", views.view_attempt, name="view_attempt"),
+    path("attempt/<int:attempt_id>/retry/", views.retry_mistakes, name="retry_mistakes"),
     path("profile/", views.profile_view, name="profile"),
     # Админ — вход / дашборд / экспорт
     path("admin/", admin_views.admin_login, name="admin_login"),

@@ -424,6 +424,54 @@ def results_view(request, attempt_id):
     )
 
 
+# --- Повтор ошибок ---
+
+
+@student_required
+def retry_mistakes(request, attempt_id):
+    student = request.student
+    attempt = get_object_or_404(Attempt, id=attempt_id, student=student, is_finished=True)
+
+    wrong_tasks = list(
+        Task.objects.filter(
+            answers__attempt=attempt,
+            answers__is_correct=False,
+        ).order_by("id")
+    )
+
+    if not wrong_tasks:
+        return redirect("results", attempt_id=attempt.id)
+
+    # Создаём временный вариант только с неверно решёнными заданиями
+    review_number = f"ошибки_{attempt.variant.number}_{attempt.id}"
+    review_variant, created = Variant.objects.get_or_create(
+        number=review_number,
+        defaults={
+            "exam_type": attempt.variant.exam_type,
+            "is_active": False,
+            "max_attempts": 0,
+        },
+    )
+
+    if created:
+        for i, task in enumerate(wrong_tasks, start=1):
+            Task.objects.create(
+                variant=review_variant,
+                number=i,
+                text=task.text,
+                image=task.image,
+                correct_answer=task.correct_answer,
+                source=task.source,
+                points=task.points,
+                manual_grading=task.manual_grading,
+                no_student_input=task.no_student_input,
+                shared_context=task.shared_context,
+                shared_context_image=task.shared_context_image,
+            )
+
+    return redirect("start_exam", variant_id=review_variant.id)
+
+
 # --- Профиль / Статистика ---
 
 
