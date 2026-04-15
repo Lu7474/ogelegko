@@ -34,7 +34,7 @@ jobs:
           DJANGO_SECRET_KEY: ci-test-secret-key
           DJANGO_DEBUG: "True"
           DATABASE_URL: ""
-        run: python manage.py migrate --check
+        run: python manage.py makemigrations --check --dry-run
 
   deploy:
     runs-on: ubuntu-latest
