@@ -10,23 +10,6 @@
     <div class="auth-logo">📝</div>
     <h1>Пробные ОГЭ / ЕГЭ</h1>
     <h2>Введите свои данные для входа</h2>
-    {% if class_choices %}
-    <p style="margin-bottom:16px;color:#374151;">Несколько учеников с таким ФИО. Выберите свой класс:</p>
-    <form method="post">
-        {% csrf_token %}
-        <div class="form-group">
-            <label for="class_id">Класс</label>
-            <select id="class_id" name="class_id" required autofocus>
-                <option value="">Выберите класс…</option>
-                {% for sid, cname in class_choices %}
-                <option value="{{ sid }}">{{ cname }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% if error %}<div class="error-message">{{ error }}</div>{% endif %}
-        <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:4px">Войти →</button>
-    </form>
-    {% else %}
     <form method="post">
         {% csrf_token %}
         <div class="form-group">
@@ -42,6 +25,5 @@
         {% endif %}
         <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:4px">Войти →</button>
     </form>
-    {% endif %}
 </div>
 {% endblock %}
