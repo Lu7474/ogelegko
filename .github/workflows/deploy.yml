@@ -61,10 +61,11 @@ jobs:
           password: ${{ secrets.SERVER_PASS }}
           script: |
             cd /var/www/ege
+            echo "=== Deploying commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'no git') ==="
             mkdir -p cache
             venv/bin/pip install -r requirements.txt -q
             venv/bin/python manage.py migrate --noinput
             venv/bin/python manage.py collectstatic --noinput
             venv/bin/python manage.py create_admin
             systemctl restart ege
-            echo "=== Deploy OK ==="
+            echo "=== Deploy OK: $(git rev-parse --short HEAD 2>/dev/null) ==="
