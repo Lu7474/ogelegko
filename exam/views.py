@@ -86,36 +86,71 @@ def student_required(view_func):
 # --- Вход / Выход ---
 
 
+def _do_login(request, student):
+    _clear_login_fails(request, "student_login")
+    request.session.pop("login_candidates", None)
+    request.session.cycle_key()
+    request.session["student_id"] = student.id
+    request.session.save()
+    student.session_key = request.session.session_key
+    student.save(update_fields=["session_key"])
+    logger.info("Вход ученика: %s (IP: %s)", student.full_name, _get_client_ip(request))
+
+
 def login_view(request):
     if get_student(request):
         return redirect("choose_variant")
 
     error = ""
+    class_choices = None
+
     if request.method == "POST":
         rate_error = _check_rate_limit(request, "student_login")
         if rate_error:
             error = rate_error
         else:
-            full_name = request.POST.get("full_name", "").strip()
-            password = request.POST.get("password", "").strip()
+            class_id = request.POST.get("class_id", "").strip()
 
-            if full_name and password:
-                for student in Student.objects.filter(full_name=full_name):
-                    if student.check_password(password):
-                        _clear_login_fails(request, "student_login")
-                        request.session.cycle_key()
-                        request.session["student_id"] = student.id
-                        request.session.save()
-                        student.session_key = request.session.session_key
-                        student.save(update_fields=["session_key"])
-                        logger.info("Вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
+            if class_id:
+                # Шаг 2: ученик выбрал класс из предложенных вариантов
+                candidate_ids = request.session.get("login_candidates", [])
+                if class_id in [str(cid) for cid in candidate_ids]:
+                    try:
+                        student = Student.objects.select_related("school_class").get(id=class_id)
+                        _do_login(request, student)
+                        return redirect("choose_variant")
+                    except Student.DoesNotExist:
+                        pass
+                error = "Неверный выбор класса"
+            else:
+                # Шаг 1: обычный вход по ФИО + пароль
+                full_name = request.POST.get("full_name", "").strip()
+                password = request.POST.get("password", "").strip()
+
+                if full_name and password:
+                    candidates = [
+                        s
+                        for s in Student.objects.filter(full_name=full_name).select_related("school_class")
+                        if s.check_password(password)
+                    ]
+
+                    if len(candidates) == 1:
+                        _do_login(request, candidates[0])
                         return redirect("choose_variant")
 
-            _record_failed_login(request, "student_login")
-            logger.warning("Неудачный вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
-            error = "Неверное ФИО или пароль"
+                    if len(candidates) > 1:
+                        # Несколько учеников с одинаковым ФИО и паролем — предлагаем выбрать класс
+                        request.session["login_candidates"] = [s.id for s in candidates]
+                        class_choices = [
+                            (str(s.id), s.school_class.name if s.school_class else "—") for s in candidates
+                        ]
+                        return render(request, "exam/login.html", {"class_choices": class_choices})
 
-    return render(request, "exam/login.html", {"error": error})
+                _record_failed_login(request, "student_login")
+                logger.warning("Неудачный вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
+                error = "Неверное ФИО или пароль"
+
+    return render(request, "exam/login.html", {"error": error, "class_choices": class_choices})
 
 
 @require_POST
@@ -147,7 +182,10 @@ def choose_variant(request):
 
         if action == "random":
             variant = (
-                Variant.objects.filter(exam_type=student.exam_type, is_active=True).order_by("?").first()
+                Variant.objects.filter(exam_type=student.exam_type, is_active=True)
+                .exclude(number__startswith="ошибки_")
+                .order_by("?")
+                .first()
             )
             if variant:
                 limit_error = _check_attempt_limit(student, variant)
@@ -442,13 +480,15 @@ def retry_mistakes(request, attempt_id):
     if not wrong_tasks:
         return redirect("results", attempt_id=attempt.id)
 
-    # Создаём временный вариант только с неверно решёнными заданиями
+    # Создаём временный вариант только с неверно решёнными заданиями.
+    # is_active=True нужно, чтобы start_exam мог его открыть;
+    # число начинается с "ошибки_" — choose_variant исключает такие из случайного выбора.
     review_number = f"ошибки_{attempt.variant.number}_{attempt.id}"
     review_variant, created = Variant.objects.get_or_create(
         number=review_number,
         defaults={
             "exam_type": attempt.variant.exam_type,
-            "is_active": False,
+            "is_active": True,
             "max_attempts": 0,
         },
     )

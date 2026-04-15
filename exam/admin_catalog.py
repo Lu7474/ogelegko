@@ -12,7 +12,16 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .admin_views import _paginate, _safe_int, admin_required
-from .models import CatalogImportSession, CatalogTask, CatalogTaskImage, ExamType, Task, TaskSource, Variant
+from .models import (
+    CatalogImportSession,
+    CatalogTask,
+    CatalogTaskImage,
+    ExamType,
+    Task,
+    TaskImage,
+    TaskSource,
+    Variant,
+)
 from .parser import sanitize_html
 
 logger = logging.getLogger(__name__)
@@ -409,6 +418,14 @@ def variant_from_catalog(request):
                 if ct.shared_context_image:
                     task.__dict__["shared_context_image"] = ct.shared_context_image.name
                 task.save()
+                for ci in ct.extra_images.order_by("order"):
+                    try:
+                        with ci.image.open("rb") as f:
+                            ti = TaskImage(task=task, order=ci.order)
+                            ti.image.save(ci.image.name.split("/")[-1], _CF(f.read()), save=False)
+                            ti.save()
+                    except Exception:
+                        pass
     except IntegrityError as e:
         return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
 
@@ -476,6 +493,14 @@ def variant_auto_generate(request):
                 if ct.shared_context_image:
                     task.__dict__["shared_context_image"] = ct.shared_context_image.name
                 task.save()
+                for ci in ct.extra_images.order_by("order"):
+                    try:
+                        with ci.image.open("rb") as f:
+                            ti = TaskImage(task=task, order=ci.order)
+                            ti.image.save(ci.image.name.split("/")[-1], _CF(f.read()), save=False)
+                            ti.save()
+                    except Exception:
+                        pass
     except IntegrityError as e:
         return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
 

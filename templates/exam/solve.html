@@ -304,6 +304,37 @@ answerInputs.forEach(input => {
     });
 });
 
+// === Сброс localStorage на сервер перед финальной отправкой ===
+// Перехватывает submit формы завершения и синхронизирует все ответы с БД,
+// чтобы восстановленные из localStorage значения не потерялись.
+let finishing = false;
+document.getElementById('finishForm').addEventListener('submit', async function(e) {
+    if (finishing) return; // уже сбрасываем — пропускаем рекурсию от .submit()
+    e.preventDefault();
+    finishing = true;
+
+    const saves = [];
+    answerInputs.forEach(input => {
+        const taskNumber = input.dataset.taskNumber;
+        const answerId = answerMap[taskNumber];
+        if (answerId) {
+            saves.push(
+                fetch('{% url "save_answer" %}', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({answer_id: answerId, value: input.value})
+                }).catch(() => {})
+            );
+        }
+    });
+    try { await Promise.all(saves); } catch (_) {}
+
+    // Чистим localStorage для этой попытки
+    answerInputs.forEach(input => localStorage.removeItem(LS_PREFIX + input.dataset.taskNumber));
+
+    this.submit(); // HTMLFormElement.submit() не вызывает событие submit повторно
+});
+
 // === Подтверждение завершения с превью (#11) ===
 document.getElementById('finishBtn').addEventListener('click', function() {
     let unanswered = 0;
