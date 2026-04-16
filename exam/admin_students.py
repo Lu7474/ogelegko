@@ -252,8 +252,12 @@ def class_stats_excel(request, class_id):
     for col in ws.columns:
         ws.column_dimensions[col[0].column_letter].width = 18
 
+    from urllib.parse import quote
+
+    fname_ascii = f"analytics_{school_class.id}.xlsx"
+    fname_utf8 = quote(f"analytics_{school_class.name}.xlsx")
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = f'attachment; filename="analytics_{school_class.name}.xlsx"'
+    response["Content-Disposition"] = f"attachment; filename=\"{fname_ascii}\"; filename*=UTF-8''{fname_utf8}"
     wb.save(response)
     return response
 
