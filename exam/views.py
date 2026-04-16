@@ -459,8 +459,12 @@ def retry_mistakes(request, attempt_id):
     )
 
     if created:
+        from django.core.files.base import ContentFile as _CF
+
+        from .models import TaskImage
+
         for i, task in enumerate(wrong_tasks, start=1):
-            Task.objects.create(
+            new_task = Task.objects.create(
                 variant=review_variant,
                 number=i,
                 text=task.text,
@@ -473,6 +477,14 @@ def retry_mistakes(request, attempt_id):
                 shared_context=task.shared_context,
                 shared_context_image=task.shared_context_image,
             )
+            for ci in task.extra_images.order_by("order"):
+                try:
+                    with ci.image.open("rb") as f:
+                        ti = TaskImage(task=new_task, order=ci.order)
+                        ti.image.save(ci.image.name.split("/")[-1], _CF(f.read()), save=False)
+                        ti.save()
+                except Exception:
+                    pass
 
     return redirect("start_exam", variant_id=review_variant.id)
 
