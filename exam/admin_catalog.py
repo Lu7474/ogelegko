@@ -283,6 +283,7 @@ def catalog_import_status(request, job_id):
 def catalog_unclassified(request):
     """Задания требующие внимания: без номера ИЛИ без ответа (не ручная проверка)."""
     exam_type_filter = request.GET.get("exam_type", "oge")
+    source_filter = request.GET.get("source", "")
     tab = request.GET.get("tab", "no_number")
     if tab == "no_answer":
         tasks = CatalogTask.objects.filter(correct_answer="", manual_grading=False)
@@ -291,6 +292,8 @@ def catalog_unclassified(request):
         tasks = CatalogTask.objects.filter(task_number__isnull=True)
     if exam_type_filter:
         tasks = tasks.filter(exam_type=exam_type_filter)
+    if source_filter:
+        tasks = tasks.filter(source=source_filter)
     tasks = tasks.order_by("-created_at")
     page = _paginate(request, tasks, per_page=20)
     no_number_count = CatalogTask.objects.filter(task_number__isnull=True).count()
@@ -301,7 +304,9 @@ def catalog_unclassified(request):
         {
             "page": page,
             "exam_types": ExamType.choices,
+            "sources": TaskSource.choices,
             "exam_type_filter": exam_type_filter,
+            "source_filter": source_filter,
             "task_numbers": list(range(1, 26)),
             "tab": tab,
             "no_number_count": no_number_count,

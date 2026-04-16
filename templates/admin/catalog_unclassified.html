@@ -9,12 +9,12 @@
 
 <!-- Вкладки -->
 <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
-    <a href="?tab=no_number{% if exam_type_filter %}&exam_type={{ exam_type_filter }}{% endif %}"
+    <a href="?tab=no_number{% if exam_type_filter %}&exam_type={{ exam_type_filter }}{% endif %}{% if source_filter %}&source={{ source_filter }}{% endif %}"
        style="padding:10px 20px;font-weight:600;font-size:0.9rem;text-decoration:none;border-bottom:3px solid {% if tab == 'no_number' %}var(--primary){% else %}transparent{% endif %};color:{% if tab == 'no_number' %}var(--primary){% else %}var(--text-muted){% endif %};">
         Без номера задания
         {% if no_number_count %}<span class="notif-badge" style="position:static;display:inline-flex;margin-left:4px;">{{ no_number_count }}</span>{% endif %}
     </a>
-    <a href="?tab=no_answer{% if exam_type_filter %}&exam_type={{ exam_type_filter }}{% endif %}"
+    <a href="?tab=no_answer{% if exam_type_filter %}&exam_type={{ exam_type_filter }}{% endif %}{% if source_filter %}&source={{ source_filter }}{% endif %}"
        style="padding:10px 20px;font-weight:600;font-size:0.9rem;text-decoration:none;border-bottom:3px solid {% if tab == 'no_answer' %}var(--primary){% else %}transparent{% endif %};color:{% if tab == 'no_answer' %}var(--primary){% else %}var(--text-muted){% endif %};">
         Без правильного ответа
         {% if no_answer_count %}<span class="notif-badge" style="position:static;display:inline-flex;margin-left:4px;">{{ no_answer_count }}</span>{% endif %}
@@ -31,8 +31,8 @@
 </p>
 {% endif %}
 
-<!-- Фильтр по типу экзамена -->
-<form method="get" style="margin-bottom:16px;display:flex;gap:10px;align-items:center;">
+<!-- Фильтры -->
+<form method="get" style="margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
     <input type="hidden" name="tab" value="{{ tab }}">
     <select name="exam_type" onchange="this.form.submit()" style="width:auto;">
         <option value="">Все типы</option>
@@ -40,7 +40,13 @@
         <option value="{{ value }}" {% if exam_type_filter == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
-    {% if exam_type_filter %}
+    <select name="source" onchange="this.form.submit()" style="width:auto;">
+        <option value="">Все источники</option>
+        {% for value, label in sources %}
+        <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% if exam_type_filter or source_filter %}
     <a href="?tab={{ tab }}" class="btn btn-secondary" style="height:38px;line-height:38px;padding:0 12px;">✕</a>
     {% endif %}
 </form>
