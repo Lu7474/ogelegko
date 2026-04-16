@@ -952,9 +952,12 @@ def variants_print_zip(request):
     if not variants.exists():
         return HttpResponse("Варианты не найдены", status=404)
 
+    from urllib.parse import quote
+
     numbers = [v.number for v in variants]
     safe_numbers = ", ".join(n.replace("/", "-") for n in numbers)
-    zip_name = f"Варианты {safe_numbers}.zip"
+    zip_name_ascii = f"{safe_numbers}.zip"
+    zip_name_utf8 = quote(f"{', '.join(numbers)}.zip")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -965,7 +968,9 @@ def variants_print_zip(request):
 
     buf.seek(0)
     response = HttpResponse(buf, content_type="application/zip")
-    response["Content-Disposition"] = f'attachment; filename="{zip_name}"'
+    response["Content-Disposition"] = (
+        f"attachment; filename=\"{zip_name_ascii}\"; filename*=UTF-8''{zip_name_utf8}"
+    )
     return response
 
 
