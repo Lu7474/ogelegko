@@ -135,7 +135,10 @@ def dashboard(request):
         attempts_qs = Attempt.objects.filter(student__school_class=sc, is_finished=True)
         attempts_count = attempts_qs.count()
         if attempts_count > 0:
-            percentages = [a.percentage for a in attempts_qs]
+            percentages = [
+                round(a.score / a.max_score * 100) if a.max_score else 0
+                for a in attempts_qs.only("score", "max_score")
+            ]
             avg_pct = round(sum(percentages) / len(percentages))
         else:
             avg_pct = None

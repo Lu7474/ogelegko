@@ -106,12 +106,10 @@ def class_stats(request, class_id):
     school_class = get_object_or_404(SchoolClass, id=class_id)
     students = list(school_class.students.all())
 
-    # Одним запросом получаем все завершённые попытки класса с кол-вом верных ответов
+    # Одним запросом получаем все завершённые попытки класса
     all_attempts = list(
         Attempt.objects.filter(student__school_class=school_class, is_finished=True)
         .annotate(
-            correct_count_db=Count("answers", filter=Q(answers__is_correct=True)),
-            total_count_db=Count("variant__tasks", distinct=True),
             pending_count=Count("answers", filter=Q(answers__is_correct__isnull=True)),
         )
         .select_related("variant", "student")
@@ -133,10 +131,7 @@ def class_stats(request, class_id):
         total_attempts += count
 
         if count > 0:
-            percentages = [
-                round(a.correct_count_db / a.total_count_db * 100) if a.total_count_db else 0
-                for a in student_attempts
-            ]
+            percentages = [round(a.score / a.max_score * 100) if a.max_score else 0 for a in student_attempts]
             avg_pct = round(sum(percentages) / len(percentages))
             all_percentages.extend(percentages)
             last_attempt = student_attempts[0]
@@ -451,19 +446,13 @@ def student_stats(request, student_id):
     student = get_object_or_404(Student.objects.select_related("school_class"), id=student_id)
     attempts = list(
         Attempt.objects.filter(student=student, is_finished=True)
-        .annotate(
-            correct_count_db=Count("answers", filter=Q(answers__is_correct=True)),
-            total_count_db=Count("variant__tasks", distinct=True),
-        )
         .select_related("variant")
         .order_by("-finished_at")
     )
 
     avg_percentage = None
     if attempts:
-        percentages = [
-            round(a.correct_count_db / a.total_count_db * 100) if a.total_count_db else 0 for a in attempts
-        ]
+        percentages = [round(a.score / a.max_score * 100) if a.max_score else 0 for a in attempts]
         avg_percentage = round(sum(percentages) / len(percentages))
 
     chart_data = [
@@ -472,7 +461,7 @@ def student_stats(request, student_id):
             "variant": a.variant.number,
             "score": a.score,
             "max_score": a.max_score,
-            "percentage": round(a.correct_count_db / a.total_count_db * 100) if a.total_count_db else 0,
+            "percentage": round(a.score / a.max_score * 100) if a.max_score else 0,
         }
         for a in reversed(attempts)
     ]
