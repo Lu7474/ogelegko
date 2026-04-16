@@ -11,8 +11,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
-from .utils import check_answer, get_grade, get_grade_display, get_grade_for_attempt
+from .models import Answer, Attempt, Student, Task, Variant
+from .utils import check_answer, get_grade_display, get_grade_for_attempt
 
 logger = logging.getLogger(__name__)
 

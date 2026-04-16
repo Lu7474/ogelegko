@@ -1,15 +1,13 @@
 import logging
-from datetime import timedelta
 from functools import wraps
 
 from django.conf import settings as django_settings
 from django.contrib.auth import authenticate, login, logout
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import Attempt, SchoolClass, Student, Variant

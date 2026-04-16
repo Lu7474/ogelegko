@@ -16,7 +16,7 @@ import urllib3
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 
-from .models import CatalogImportSession, CatalogTask, ExamType, TaskSource
+from .models import CatalogImportSession, CatalogTask, TaskSource
 from .parser import ParserError, sanitize_html
 
 logger = logging.getLogger(__name__)

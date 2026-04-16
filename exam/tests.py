@@ -12,7 +12,6 @@ from .models import (
     SchoolClass,
     Student,
     Task,
-    TaskImage,
     TaskSource,
     Variant,
 )

@@ -31,7 +31,6 @@ from django.db import transaction
 from exam.models import (
     CatalogImportSession,
     CatalogTask,
-    ExamType,
     Task,
     TaskSource,
     Variant,
@@ -81,13 +80,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
-            import pdfplumber
+            import pdfplumber  # noqa: F401
         except ImportError:
             self.stderr.write(self.style.ERROR("Установите pdfplumber: pip install pdfplumber"))
             return
 
         try:
-            import fitz  # PyMuPDF
+            import fitz  # noqa: F401  # PyMuPDF
         except ImportError:
             self.stderr.write(self.style.ERROR("Установите PyMuPDF: pip install PyMuPDF"))
             return

@@ -3,7 +3,6 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 
-from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
@@ -11,8 +10,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .admin_views import _paginate, _safe_int, admin_required
-from .models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
+from .admin_views import _safe_int, admin_required
+from .models import Answer, Attempt, ExamType, SchoolClass, Student
 
 logger = logging.getLogger(__name__)
 
