@@ -1,10 +1,13 @@
 # Гайд по управлению сервером ogelegko.ru
 
+> **Безопасность:** реальные IP, пароли и ключи хранятся в `.env` и GitHub Secrets.
+> Перед публичным релизом репозитория — сменить пароли/ключи.
+
 ## Подключение по SSH
 
 ```bash
-ssh root@85.239.51.213
-# Пароль: qLtpM*.UzsU1nE
+ssh root@<SERVER_IP>
+# Пароль хранится в GitHub Secret SERVER_PASS
 ```
 
 ---
@@ -15,20 +18,20 @@ ssh root@85.239.51.213
 
 **Шаг 1.** Подключись к серверу и создай дамп:
 ```bash
-ssh root@85.239.51.213
+ssh root@<SERVER_IP>
 pg_dump -U egeuser -d egedb > /tmp/egedb_backup.sql
 ```
 
 **Шаг 2.** Скачай файл на компьютер (в cmd/PowerShell на своём компе):
 ```bash
-scp root@85.239.51.213:/tmp/egedb_backup.sql C:\Users\Махач\Desktop\egedb_backup.sql
+scp root@<SERVER_IP>:/tmp/egedb_backup.sql C:\Users\<USERNAME>\Desktop\egedb_backup.sql
 ```
 
 ### Загрузить дамп на сервер
 
 ```bash
-scp C:\Users\Махач\Desktop\egedb_backup.sql root@85.239.51.213:/tmp/egedb_backup.sql
-ssh root@85.239.51.213
+scp C:\Users\<USERNAME>\Desktop\egedb_backup.sql root@<SERVER_IP>:/tmp/egedb_backup.sql
+ssh root@<SERVER_IP>
 psql -U egeuser -d egedb < /tmp/egedb_backup.sql
 ```
 
@@ -87,15 +90,15 @@ cat /var/www/ege/.env
 nano /var/www/ege/.env
 ```
 
-Содержимое файла:
+Пример структуры файла (реальные значения — в GitHub Secrets и .env на сервере):
 ```
-DJANGO_SECRET_KEY=<секретный ключ>
+DJANGO_SECRET_KEY=<SECRET_KEY>
 DJANGO_DEBUG=False
-DATABASE_URL=postgres://egeuser:EgePass2024!@localhost:5432/egedb
-ALLOWED_HOSTS=85.239.51.213,localhost,127.0.0.1,ogelegko.ru,www.ogelegko.ru
+DATABASE_URL=postgres://egeuser:<DB_PASSWORD>@localhost:5432/egedb
+ALLOWED_HOSTS=<SERVER_IP>,localhost,127.0.0.1,ogelegko.ru,www.ogelegko.ru
 HTTPS_ENABLED=True
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin
+ADMIN_USERNAME=<ADMIN_USERNAME>
+ADMIN_PASSWORD=<ADMIN_PASSWORD>
 ```
 
 После изменения .env — перезапустить сайт:
@@ -132,9 +135,9 @@ certbot certificates
 5. Сайт перезапускается (`systemctl restart ege`)
 
 GitHub Secrets (настроены в репозитории):
-- `SERVER_HOST` = `85.239.51.213`
-- `SERVER_USER` = `root`
-- `SERVER_PASS` = `qLtpM*.UzsU1nE`
+- `SERVER_HOST` — IP-адрес сервера
+- `SERVER_USER` — пользователь SSH (обычно `root`)
+- `SERVER_PASS` — пароль SSH
 
 ---
 
