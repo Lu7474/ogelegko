@@ -5,9 +5,10 @@
 <h1>Дашборд</h1>
 
 {% if pending_grading %}
-<div class="info-box" style="background:#fff3cd;border-color:#ffc107;margin-bottom:20px">
-    ⚠ <strong>Требуют проверки:</strong> {{ pending_grading }} попыт{{ pending_grading|pluralize:"ка,ки,ок" }} с незачтёнными заданиями.
-    Зайдите в <a href="{% url 'admin_students' %}">Ученики</a> → выберите ученика → нажмите <strong>Проверить</strong>.
+<div class="info-box" style="background:#fff3cd;border-color:#ffc107;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+    <span>⚠ Есть {{ pending_grading }} попытк{{ pending_grading|pluralize:"а,и," }} с заданиями, ожидающими ручной проверки.
+    Откройте <a href="{% url 'admin_students' %}">статистику класса</a> или перейдите к ученику, чтобы выставить баллы.</span>
+    <a href="{% url 'admin_students' %}?has_pending=1" class="btn btn-primary" style="white-space:nowrap;">Перейти к проверке</a>
 </div>
 {% endif %}
 
