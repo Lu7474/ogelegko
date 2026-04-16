@@ -648,23 +648,26 @@ def bulk_grade_attempts(request, class_id):
     if not selected_ids:
         return redirect("admin_class_stats", class_id=class_id)
 
-    attempts = (
+    attempts = list(
         Attempt.objects.filter(
             id__in=selected_ids,
             is_finished=True,
             student__school_class=school_class,
-        )
-        .select_related("student", "variant")
-        .prefetch_related("answers__task")
+        ).select_related("student", "variant")
     )
 
-    # Собираем все pending-ответы выбранных попыток
-    pending_answers = []
-    for attempt in attempts:
-        for answer in attempt.answers.select_related("task").filter(
-            task__manual_grading=True, is_correct__isnull=True
-        ):
-            pending_answers.append({"attempt": attempt, "answer": answer})
+    # Собираем все pending-ответы одним запросом
+    attempts_by_id = {a.id: a for a in attempts}
+    raw_answers = (
+        Answer.objects.filter(
+            attempt_id__in=attempts_by_id,
+            task__manual_grading=True,
+            is_correct__isnull=True,
+        )
+        .select_related("task", "attempt", "attempt__student", "attempt__variant")
+        .order_by("attempt_id", "task__id")
+    )
+    pending_answers = [{"attempt": attempts_by_id[ans.attempt_id], "answer": ans} for ans in raw_answers]
 
     return render(
         request,
