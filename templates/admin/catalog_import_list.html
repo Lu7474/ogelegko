@@ -13,15 +13,29 @@
 .status-running { background: #cce5ff; color: #004085; }
 .status-error { background: #f8d7da; color: #721c24; }
 .url-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 0.8rem; }
-.del-dropdown { position: relative; display: inline-block; }
-.del-dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.12); z-index: 100; min-width: 220px; overflow: hidden; }
-.del-dropdown-menu.open-up { top: auto; bottom: 100%; }
-.del-dropdown-menu.open { display: block; }
-.del-dropdown-menu form { margin: 0; }
-.del-dropdown-menu button { width: 100%; text-align: left; padding: 10px 14px; border: none; background: none; cursor: pointer; font-size: 0.875rem; display: block; }
-.del-dropdown-menu button:hover { background: #f5f5f5; }
-.del-dropdown-menu button.danger { color: #e74c3c; }
-.del-dropdown-menu .sep { border-top: 1px solid #f0f0f0; }
+
+/* Модальное окно удаления */
+.del-modal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+.del-modal-backdrop.open { display: flex; }
+.del-modal {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.18);
+    padding: 28px 28px 20px;
+    max-width: 420px;
+    width: 90%;
+}
+.del-modal h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.del-modal .del-meta { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; }
+.del-modal .del-actions { display: flex; flex-direction: column; gap: 8px; }
+.del-modal .btn-cancel { margin-top: 6px; text-align: center; }
 </style>
 {% endblock %}
 
@@ -67,26 +81,10 @@
                 <td style="text-align:center;color:var(--text-muted);">{{ s.tasks_skipped }}</td>
                 <td style="text-align:center;color:#f39c12;">{{ s.tasks_duplicate }}</td>
                 <td>
-                    <div class="del-dropdown" id="dd{{ s.id }}">
-                        <button class="btn btn-secondary" style="padding:4px 10px;font-size:0.8rem;"
-                                onclick="toggleDd('{{ s.id }}')">Удалить ▾</button>
-                        <div class="del-dropdown-menu" id="ddm{{ s.id }}">
-                            <form method="post" action="{% url 'admin_import_session_delete' session_id=s.id %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="delete_tasks" value="0">
-                                <button type="submit">Удалить запись (задания сохранятся)</button>
-                            </form>
-                            <div class="sep"></div>
-                            <form method="post" action="{% url 'admin_import_session_delete' session_id=s.id %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="delete_tasks" value="1">
-                                <button type="submit" class="danger"
-                                        onclick="return confirm('Удалить запись И все {{ s.tasks_added }} заданий из каталога?')">
-                                    Удалить вместе с заданиями ({{ s.tasks_added }})
-                                </button>
-                            </form>
-                        </div>
-                    </div>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:0.8rem;"
+                            onclick="openDelModal('{{ s.id }}', '{{ s.get_source_display }}', '{{ s.created_at|date:'d.m.Y H:i' }}', {{ s.tasks_added }})">
+                        Удалить
+                    </button>
                 </td>
             </tr>
             {% endfor %}
@@ -100,35 +98,58 @@
     <a href="{% url 'admin_fipi_import' %}" class="btn btn-primary">Импортировать из ФИПИ</a>
 </div>
 {% endif %}
+
+<!-- Модальное окно удаления -->
+<div class="del-modal-backdrop" id="delModalBackdrop" onclick="closeDelModal(event)">
+    <div class="del-modal" onclick="event.stopPropagation()">
+        <h3>Удалить запись импорта?</h3>
+        <div class="del-meta" id="delModalMeta"></div>
+        <div class="del-actions">
+            <form method="post" id="delFormKeep" action="">
+                {% csrf_token %}
+                <input type="hidden" name="delete_tasks" value="0">
+                <button type="submit" class="btn btn-secondary" style="width:100%;">
+                    Удалить только запись <span style="color:var(--text-muted);font-size:0.85rem;">(задания сохранятся)</span>
+                </button>
+            </form>
+            <form method="post" id="delFormWithTasks" action="">
+                {% csrf_token %}
+                <input type="hidden" name="delete_tasks" value="1">
+                <button type="submit" class="btn" style="width:100%;background:#e74c3c;color:#fff;" id="delBtnWithTasks">
+                    Удалить запись и все задания
+                </button>
+            </form>
+        </div>
+        <div class="btn-cancel">
+            <button type="button" class="btn btn-secondary" onclick="closeDelModal()" style="width:100%;margin-top:4px;">Отмена</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function toggleDd(id) {
-    var menu = document.getElementById('ddm' + id);
-    var isOpen = menu.classList.contains('open');
-    // Закрыть все
-    document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){
-        m.classList.remove('open', 'open-up');
-    });
-    if (!isOpen) {
-        // Определяем направление по позиции кнопки-триггера (до открытия)
-        var btn = menu.previousElementSibling;
-        var btnRect = btn.getBoundingClientRect();
-        var menuHeight = 110; // приблизительная высота двух пунктов
-        var spaceBelow = window.innerHeight - btnRect.bottom;
-        if (spaceBelow < menuHeight) {
-            menu.classList.add('open-up');
-        }
-        menu.classList.add('open');
+var _delUrls = {
+{% for s in sessions %}
+    '{{ s.id }}': '{% url 'admin_import_session_delete' session_id=s.id %}',
+{% endfor %}
+};
+
+function openDelModal(id, source, date, count) {
+    var url = _delUrls[id];
+    document.getElementById('delFormKeep').action = url;
+    document.getElementById('delFormWithTasks').action = url;
+    document.getElementById('delBtnWithTasks').textContent = 'Удалить запись и все задания (' + count + ')';
+    document.getElementById('delModalMeta').textContent = source + ' — ' + date + ', заданий: ' + count;
+    document.getElementById('delModalBackdrop').classList.add('open');
+}
+function closeDelModal(e) {
+    if (!e || e.target === document.getElementById('delModalBackdrop')) {
+        document.getElementById('delModalBackdrop').classList.remove('open');
     }
 }
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.del-dropdown')) {
-        document.querySelectorAll('.del-dropdown-menu.open').forEach(function(m){
-            m.classList.remove('open', 'open-up');
-        });
-    }
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeDelModal();
 });
 </script>
 {% endblock %}
