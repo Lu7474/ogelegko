@@ -5,32 +5,37 @@
 <h1>Массовая проверка — {{ school_class.name }}</h1>
 
 {% if not pending_answers %}
-<div class="card" style="padding:32px;text-align:center;color:var(--text-muted);">
+<div class="card" style="padding:40px;text-align:center;color:var(--text-muted);">
+    <div style="font-size:2rem;margin-bottom:8px;">✓</div>
     <p>В выбранных попытках нет заданий, ожидающих проверки.</p>
-    <a href="{% url 'admin_class_stats' school_class.id %}" class="btn btn-secondary">← Назад</a>
+    <a href="{% url 'admin_class_stats' school_class.id %}" class="btn btn-secondary" style="margin-top:8px;">← Назад</a>
 </div>
 {% else %}
+<p style="color:var(--text-muted);margin-bottom:16px;font-size:0.9rem;">
+    Ожидают оценки: <strong>{{ pending_answers|length }}</strong> ответ{{ pending_answers|length|pluralize:",,ов" }}
+</p>
 <form method="post">
     {% csrf_token %}
     {% for aid in selected_ids %}
     <input type="hidden" name="attempt_ids" value="{{ aid }}">
     {% endfor %}
 
-    <table class="table">
+    <div class="card" style="overflow-x:auto;margin-bottom:16px;">
+    <table class="table" style="margin:0;">
         <thead>
-            <tr><th>Ученик</th><th>Вариант / Задание</th><th>Ответ ученика</th><th>Макс. балл</th><th>Выставить</th></tr>
+            <tr><th>Ученик</th><th>Вариант / Задание</th><th>Ответ ученика</th><th style="text-align:center;">Макс.</th><th>Выставить</th></tr>
         </thead>
         <tbody>
         {% for item in pending_answers %}
         <tr>
-            <td>{{ item.attempt.student.full_name }}</td>
-            <td>В{{ item.attempt.variant.number }} / №{{ item.answer.task.number }}</td>
-            <td style="max-width:280px;word-break:break-word;white-space:pre-wrap;">{{ item.answer.student_answer|default:"—" }}</td>
-            <td>{{ item.answer.task.points }}</td>
+            <td style="white-space:nowrap;font-weight:500;">{{ item.attempt.student.full_name }}</td>
+            <td style="white-space:nowrap;color:var(--text-muted);">В{{ item.attempt.variant.number }} / №{{ item.answer.task.number }}</td>
+            <td style="max-width:280px;word-break:break-word;white-space:pre-wrap;font-size:0.9rem;">{{ item.answer.student_answer|default:"—" }}</td>
+            <td style="text-align:center;">{{ item.answer.task.points }}</td>
             <td>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                     {% for pts in item.answer.task.points|get_points_range %}
-                    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;">
+                    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:4px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:0.85rem;transition:border-color .15s;">
                         <input type="radio" name="answer_{{ item.answer.id }}" value="{{ pts }}"
                                {% if pts == 0 %}checked{% endif %}
                                style="margin:0;">
@@ -43,8 +48,9 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
 
-    <div style="display:flex;gap:12px;margin-top:16px;">
+    <div style="display:flex;gap:12px;margin-top:4px;">
         <button type="submit" class="btn btn-primary">Сохранить все оценки</button>
         <a href="{% url 'admin_class_stats' school_class.id %}" class="btn btn-secondary">Отмена</a>
     </div>

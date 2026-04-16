@@ -46,41 +46,54 @@
 </form>
 {% endif %}
 
-<h2>Ученики</h2>
-<table class="table">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+    <h2 style="margin:0;">Ученики</h2>
+</div>
+<div class="card" style="overflow-x:auto;margin-bottom:24px;">
+<table class="table" style="margin:0;">
     <thead>
         <tr><th>ФИО</th><th>Попыток</th><th>Средний %</th><th>Последняя попытка</th><th></th></tr>
     </thead>
     <tbody>
         {% for s in student_stats %}
         <tr>
-            <td>{{ s.student.full_name }}</td>
+            <td><a href="{% url 'admin_student_stats' s.student.id %}">{{ s.student.full_name }}</a></td>
             <td>{{ s.attempts_count }}</td>
-            <td>{% if s.avg_percentage is not None %}{{ s.avg_percentage }}%{% else %}—{% endif %}</td>
-            <td>{% if s.last_attempt %}{{ s.last_attempt.finished_at|date:"d.m.Y" }} — {{ s.last_attempt.grade }}{% else %}—{% endif %}</td>
-            <td><a href="{% url 'admin_student_stats' s.student.id %}" class="btn btn-sm">Подробнее</a></td>
+            <td>
+                {% if s.avg_percentage is not None %}
+                <span style="font-weight:600;color:{% if s.avg_percentage >= 70 %}#27ae60{% elif s.avg_percentage >= 50 %}#f39c12{% else %}#e74c3c{% endif %}">
+                    {{ s.avg_percentage }}%
+                </span>
+                {% else %}—{% endif %}
+            </td>
+            <td style="color:var(--text-muted);font-size:0.9rem;">{% if s.last_attempt %}{{ s.last_attempt.finished_at|date:"d.m.Y" }} — <strong>{{ s.last_attempt.grade }}</strong>{% else %}—{% endif %}</td>
+            <td><a href="{% url 'admin_student_stats' s.student.id %}" class="btn btn-sm btn-secondary">Подробнее</a></td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 
 {% if class_task_perf %}
-<div style="display:flex;align-items:center;gap:12px;margin-top:32px;margin-bottom:8px;">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
     <h2 style="margin:0;">Аналитика по заданиям</h2>
-    <a href="{% url 'admin_class_stats_excel' school_class.id %}" class="btn btn-secondary" style="font-size:0.85rem;">Экспорт в Excel</a>
+    <a href="{% url 'admin_class_stats_excel' school_class.id %}" class="btn btn-secondary" style="font-size:0.85rem;">⬇ Excel</a>
 </div>
-<table class="table" style="max-width:600px;">
+<div class="card" style="overflow-x:auto;margin-bottom:24px;">
+<table class="table" style="margin:0;max-width:600px;">
     <thead>
         <tr><th>Задание</th><th>Попыток</th><th>Верно</th><th>%</th></tr>
     </thead>
     <tbody>
         {% for t in class_task_perf %}
-        <tr {% if t.percentage < 50 %}style="background:#fff5f5;"{% endif %}>
-            <td>{{ t.number }}</td>
+        <tr>
+            <td><strong>{{ t.number }}</strong></td>
             <td>{{ t.tried }}</td>
             <td>{{ t.correct }}</td>
             <td>
-                <span style="font-weight:600;color:{% if t.percentage >= 70 %}#27ae60{% elif t.percentage >= 50 %}#f39c12{% else %}#e74c3c{% endif %}">
+                <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.8rem;font-weight:600;
+                    background:{% if t.percentage >= 70 %}#d4edda{% elif t.percentage >= 50 %}#fff3cd{% else %}#f8d7da{% endif %};
+                    color:{% if t.percentage >= 70 %}#155724{% elif t.percentage >= 50 %}#856404{% else %}#721c24{% endif %};">
                     {{ t.percentage }}%
                 </span>
             </td>
@@ -88,6 +101,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}
 
 <a href="{% url 'admin_classes' %}" class="btn btn-secondary" style="margin-top:12px;">Назад к классам</a>

@@ -5,14 +5,18 @@
 {% block content %}
 <h1>Проверка попытки</h1>
 
-<div class="info-box" style="margin-bottom:20px">
-    <strong>Ученик:</strong> {{ attempt.student.full_name }}<br>
-    <strong>Вариант:</strong> {{ attempt.variant.number }}<br>
-    <strong>Дата:</strong> {{ attempt.finished_at|date:"d.m.Y H:i" }}<br>
-    <strong>Балл:</strong> {{ attempt.score }} / {{ attempt.max_score }}<br>
-    <strong>Оценка:</strong> {{ attempt.grade }}
+<div class="card" style="margin-bottom:20px;padding:16px 20px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px 20px;">
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Ученик</span><br><strong>{{ attempt.student.full_name }}</strong></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Вариант</span><br><strong>{{ attempt.variant.number }}</strong></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Дата</span><br>{{ attempt.finished_at|date:"d.m.Y H:i" }}</div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Балл</span><br><strong>{{ attempt.score }} / {{ attempt.max_score }}</strong></div>
+        <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Оценка</span><br><strong style="font-size:1.1rem;">{{ attempt.grade }}</strong></div>
+    </div>
     {% if has_pending %}
-    <br><span style="color:#e67e22">⚠ Есть задания, ожидающие проверки</span>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);color:#e67e22;font-size:0.9rem;">
+        ⚠ Есть задания, ожидающие ручной проверки
+    </div>
     {% endif %}
 </div>
 
