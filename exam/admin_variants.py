@@ -402,9 +402,12 @@ def _parse_html_segments(html):
             segments.append(("break",))
             return
         if tag in ("p", "div", "li"):
+            if segments and segments[-1][0] != "break":
+                segments.append(("break",))
             for c in node.children:
                 walk(c, bold, italic, sup, sub)
-            segments.append(("break",))
+            if segments and segments[-1][0] != "break":
+                segments.append(("break",))
             return
         if tag == "table":
             rows = []
