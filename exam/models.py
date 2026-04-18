@@ -89,7 +89,7 @@ class Student(models.Model):
 
 
 class Variant(models.Model):
-    number = models.CharField("Номер варианта", max_length=20, unique=True)
+    number = models.CharField("Номер варианта", max_length=100, unique=True)
     exam_type = models.CharField("Тип экзамена", max_length=20, choices=ExamType.choices)
     is_active = models.BooleanField("Активен", default=True)
     max_attempts = models.PositiveIntegerField(
