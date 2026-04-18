@@ -30,6 +30,10 @@
 - `media/` — user uploads (local dev only)
 - `env/` — virtual environment (do not touch)
 
+## Commit workflow
+ruff-format pre-commit hook reformats files but does not stage them, causing the first commit to fail.
+Always do two `git add` calls before committing: once to stage, then after ruff runs — `git add` again, then commit.
+
 ## Commands
 - Run: `env/Scripts/python.exe manage.py runserver`
 - Migrations: `env/Scripts/python.exe manage.py makemigrations && env/Scripts/python.exe manage.py migrate`
