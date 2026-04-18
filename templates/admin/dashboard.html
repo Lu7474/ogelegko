@@ -6,7 +6,7 @@
 
 {% if pending_grading %}
 <div class="info-box" style="background:#fff3cd;border-color:#ffc107;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
-    <span>⚠ Есть {{ pending_grading }} попытк{{ pending_grading|pluralize:"а,и," }} с заданиями, ожидающими ручной проверки.
+    <span>⚠ Есть {{ pending_grading }} попытк{{ pending_grading|pluralize:"а,и,ок" }} с заданиями, ожидающими ручной проверки.
     Откройте <a href="{% url 'admin_students' %}">статистику класса</a> или перейдите к ученику, чтобы выставить баллы.</span>
     <a href="{% url 'admin_students' %}?has_pending=1" class="btn btn-primary" style="white-space:nowrap;">Перейти к проверке</a>
 </div>
