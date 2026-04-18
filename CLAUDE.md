@@ -25,6 +25,7 @@
   - `admin_variants.py` — варианты, DOCX-печать, ZIP
   - `admin_catalog.py` — каталог, импорт (СдамГИА, ФИПИ, PDF)
   - `urls.py`, `utils.py`, `parsers/`
+  - `services/variant_archive.py` — экспорт/импорт вариантов в ZIP
 - `templates/` — HTML templates
 - `static/` — static files
 - `media/` — user uploads (local dev only)
