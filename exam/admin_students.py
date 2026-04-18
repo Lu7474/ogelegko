@@ -561,7 +561,23 @@ def attempt_grade_answer(request, answer_id):
             answer.awarded_points = None
 
     answer.save(update_fields=["is_correct", "awarded_points"])
-    _recalculate_attempt_score(answer.attempt)
+    attempt = answer.attempt
+    _recalculate_attempt_score(attempt)
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        from django.http import JsonResponse
+
+        attempt.refresh_from_db()
+        return JsonResponse(
+            {
+                "awarded_points": answer.awarded_points,
+                "is_correct": answer.is_correct,
+                "score": attempt.score,
+                "max_score": attempt.max_score,
+                "grade": attempt.grade,
+            }
+        )
+
     return redirect("admin_attempt_detail", attempt_id=answer.attempt_id)
 
 
