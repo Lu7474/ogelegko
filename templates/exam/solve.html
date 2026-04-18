@@ -4,7 +4,7 @@
 
 {% block extra_head %}
 <style>
-    .sticky-panel { position: sticky; top: 0; z-index: 100; background: var(--card-bg, #fff); border-bottom: 2px solid var(--border, #e0e0e0); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+    .sticky-panel { position: sticky; top: 0; z-index: 100; background: var(--card-bg, #fff); border-bottom: 2px solid var(--border, #e0e0e0); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; overflow: hidden; }
     .timer { font-size: 1.2rem; font-weight: bold; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
     .timer.warning { color: #e74c3c; animation: pulse 1s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -17,7 +17,7 @@
     .progress-bar-wrap { height: 3px; background: var(--border, #e0e0e0); border-radius: 3px; margin-top: 3px; }
     .progress-bar-fill { height: 100%; background: #27ae60; border-radius: 3px; transition: width 0.3s; }
     .progress-text { font-size: 0.7rem; color: var(--text-muted, #7f8c8d); white-space: nowrap; }
-    .panel-right { white-space: nowrap; flex-shrink: 0; font-size: 0.82rem; }
+    .panel-right { white-space: nowrap; flex-shrink: 0; font-size: 0.82rem; min-width: 0; }
     .save-indicator { font-size: 0.75rem; color: #27ae60; opacity: 0; transition: opacity 0.3s; margin-left: 4px; }
     .save-indicator.show { opacity: 1; }
     .save-indicator.error { color: #e74c3c; }
@@ -27,11 +27,14 @@
     .answer-preview td { padding: 4px 8px; border-bottom: 1px solid var(--border, #eee); font-size: 0.9rem; }
     .answer-preview .empty { color: #e74c3c; }
     @media (max-width: 600px) {
-        .sticky-panel { padding: 6px 10px; gap: 8px; }
+        .sticky-panel { padding: 6px 8px; gap: 6px; }
         .timer { font-size: 1rem; }
-        .task-nav a { width: 28px; height: 28px; font-size: 0.7rem; }
+        .task-nav a { width: 28px !important; height: 28px !important; font-size: 0.7rem !important; }
         .task-block { scroll-margin-top: 60px; }
-        .panel-right { display: flex; }
+        .panel-right { display: flex; flex-shrink: 1; overflow: hidden; }
+        .panel-right .panel-separator,
+        .panel-right .nav-profile { display: none; }
+        .panel-right { gap: 0; }
         /* Минимум 16px чтобы iOS не зумировал при тапе на поле ввода */
         .answer-input { font-size: 16px !important; }
     }
@@ -53,7 +56,7 @@
     </div>
     <div class="panel-right">
         <span class="progress-text" id="progressText">0/{{ tasks|length }}</span>
-        &nbsp;·&nbsp;
+        <span class="panel-separator">&nbsp;·&nbsp;</span>
         <span class="nav-profile" style="font-size:0.82rem">{{ student.full_name }}</span>
     </div>
 </div>
@@ -121,7 +124,6 @@
                    class="answer-input"
                    data-task-number="{{ task.number }}"
                    value="{% with answer=answers|get_answer:task.id %}{{ answer.student_answer }}{% endwith %}"
-                   inputmode="numeric"
                    autocomplete="off">
             {% if task.answer_hint %}
             <div class="answer-hint">{{ task.answer_hint }}</div>
