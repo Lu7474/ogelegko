@@ -8,6 +8,7 @@
     <a href="{% url 'admin_variant_add' %}" class="btn btn-primary">Создать вариант</a>
     <button type="button" class="btn btn-primary" onclick="openAutoGenModal()">Автогенерация из каталога</button>
     <a href="{% url 'admin_variant_import' %}" class="btn btn-secondary">Импорт с sdamgia.ru</a>
+    <button type="button" class="btn btn-secondary" onclick="openArchiveModal()">Архив ZIP</button>
 
     <form method="get" class="filter-form">
         <select name="exam_type" onchange="this.form.submit()">
@@ -98,6 +99,43 @@
 </table>
 {% include "includes/pagination.html" %}
 
+<!-- Модалка архива ZIP -->
+<div class="modal-overlay" id="archiveModal" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal" style="max-width:460px;width:100%">
+        <h3>Архив вариантов</h3>
+
+        <p style="margin-bottom:16px;font-size:0.9rem;color:var(--text-muted)">
+            Архив содержит варианты, задания и изображения.<br>
+            Ответы учеников и попытки не экспортируются.
+        </p>
+
+        <h4 style="margin-bottom:8px">Экспорт</h4>
+        <form method="post" action="{% url 'admin_variants_archive_export' %}" id="archiveExportForm">
+            {% csrf_token %}
+            <div id="archiveExportIds"></div>
+            <div style="display:flex;gap:10px;margin-bottom:20px">
+                <button type="button" id="archiveBtnSelected" class="btn btn-primary" onclick="submitArchiveSelected()" disabled>
+                    Скачать выбранные
+                </button>
+                <button type="submit" class="btn btn-secondary">Скачать все</button>
+            </div>
+        </form>
+
+        <h4 style="margin-bottom:8px">Импорт</h4>
+        <form method="post" action="{% url 'admin_variants_archive_import' %}" enctype="multipart/form-data" id="archiveImportForm">
+            {% csrf_token %}
+            <div style="display:flex;gap:10px;align-items:center">
+                <input type="file" name="archive" accept=".zip" id="archiveFileInput" style="flex:1;min-width:0">
+                <button type="submit" class="btn btn-primary" id="archiveImportBtn" disabled>Импортировать</button>
+            </div>
+        </form>
+
+        <div style="margin-top:16px;text-align:right">
+            <button type="button" class="btn btn-secondary" onclick="closeArchiveModal()">Закрыть</button>
+        </div>
+    </div>
+</div>
+
 <!-- Модалка автогенерации -->
 <div class="modal-overlay" id="autoGenModal" style="display:none;" role="dialog" aria-modal="true">
     <div class="modal" style="max-width:420px;width:100%">
@@ -172,6 +210,34 @@ function clearSelection() {
     updateBulkBar();
 }
 
+function openArchiveModal() {
+    const checked = Array.from(document.querySelectorAll('.row-check:checked'));
+    const btn = document.getElementById('archiveBtnSelected');
+    const idsContainer = document.getElementById('archiveExportIds');
+
+    if (checked.length > 0) {
+        btn.disabled = false;
+        btn.textContent = 'Скачать выбранные (' + checked.length + ')';
+        idsContainer.innerHTML = checked.map(c => `<input type="hidden" name="ids" value="${c.value}">`).join('');
+    } else {
+        btn.disabled = true;
+        btn.textContent = 'Скачать выбранные';
+        idsContainer.innerHTML = '';
+    }
+
+    document.getElementById('archiveModal').style.display = 'flex';
+}
+function closeArchiveModal() {
+    document.getElementById('archiveModal').style.display = 'none';
+}
+function submitArchiveSelected() {
+    document.getElementById('archiveExportForm').submit();
+}
+
+document.getElementById('archiveFileInput').addEventListener('change', function() {
+    document.getElementById('archiveImportBtn').disabled = !this.files.length;
+});
+
 function openAutoGenModal() {
     document.getElementById('autoGenModal').style.display = 'flex';
     document.getElementById('autoGenNumber').focus();
@@ -181,7 +247,7 @@ function closeAutoGenModal() {
     document.getElementById('autoGenModal').style.display = 'none';
 }
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeAutoGenModal();
+    if (e.key === 'Escape') { closeAutoGenModal(); closeArchiveModal(); }
 });
 function submitAutoGen() {
     const number = document.getElementById('autoGenNumber').value.trim();

@@ -979,6 +979,65 @@ def variants_print_zip(request):
 
 @admin_required
 @require_POST
+def variants_archive_export(request):
+    """Скачать переносимый ZIP-архив выбранных (или всех) вариантов."""
+    from datetime import datetime
+
+    from django.contrib import messages
+    from django.http import FileResponse
+
+    from .services.variant_archive import export_variants_to_zip
+
+    ids = request.POST.getlist("ids")
+    if ids:
+        variants = Variant.objects.filter(id__in=ids)
+    else:
+        variants = Variant.objects.all()
+
+    if not variants.exists():
+        messages.error(request, "Нет вариантов для экспорта.")
+        return redirect("admin_variants")
+
+    buf = export_variants_to_zip(variants)
+    filename = f"variants_archive_{datetime.now():%Y-%m-%d_%H-%M}.zip"
+    return FileResponse(buf, as_attachment=True, filename=filename, content_type="application/zip")
+
+
+@admin_required
+@require_POST
+def variants_archive_import(request):
+    """Импортировать варианты из переносимого ZIP-архива."""
+    from django.contrib import messages
+
+    from .services.variant_archive import ArchiveImportError, import_variants_from_zip
+
+    uploaded = request.FILES.get("archive")
+    if not uploaded:
+        messages.error(request, "Файл не выбран.")
+        return redirect("admin_variants")
+
+    try:
+        result = import_variants_from_zip(uploaded)
+    except ArchiveImportError as e:
+        messages.error(request, f"Ошибка архива: {e}")
+        return redirect("admin_variants")
+    except Exception as e:
+        logger.exception("Непредвиденная ошибка при импорте архива вариантов")
+        messages.error(request, f"Ошибка импорта: {e}")
+        return redirect("admin_variants")
+
+    parts = [f"Импортировано: {result['variants_created']} вар., {result['tasks_created']} зад."]
+    if result["renamed"]:
+        parts.append("Переименованы: " + "; ".join(result["renamed"]))
+    if result["errors"]:
+        parts.append("Ошибки: " + "; ".join(result["errors"]))
+
+    messages.success(request, " ".join(parts))
+    return redirect("admin_variants")
+
+
+@admin_required
+@require_POST
 def variants_bulk_toggle(request):
     """Массовая активация / скрытие вариантов."""
     ids = request.POST.getlist("ids")

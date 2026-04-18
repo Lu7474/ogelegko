@@ -66,6 +66,16 @@ urlpatterns = [
     ),
     path("admin/variants/print-zip/", admin_variants.variants_print_zip, name="admin_variants_print_zip"),
     path(
+        "admin/variants/archive/export/",
+        admin_variants.variants_archive_export,
+        name="admin_variants_archive_export",
+    ),
+    path(
+        "admin/variants/archive/import/",
+        admin_variants.variants_archive_import,
+        name="admin_variants_archive_import",
+    ),
+    path(
         "admin/variants/bulk-delete/", admin_variants.variants_bulk_delete, name="admin_variants_bulk_delete"
     ),
     path(
