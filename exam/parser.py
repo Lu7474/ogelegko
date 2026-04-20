@@ -698,7 +698,10 @@ def import_variant_to_catalog(url, session=None):
                 except (ValueError, TypeError):
                     pass
 
-            default_pts = _get_oge_default_points(task_num_int) if exam_type == ExamType.OGE else 1
+            if exam_type == ExamType.OGE:
+                default_pts = _get_oge_default_points(task_num_int)
+            else:
+                default_pts = 2 if manual else 1
             ct = CatalogTask(
                 task_number=task_num_int,
                 exam_type=exam_type,
@@ -768,7 +771,10 @@ def import_variant_from_sdamgia(url, variant_number=None):
                             manual = True
                     except (ValueError, TypeError):
                         pass
-                default_pts = _get_oge_default_points(task_num_int) if exam_type == ExamType.OGE else 1
+                if exam_type == ExamType.OGE:
+                    default_pts = _get_oge_default_points(task_num_int)
+                else:
+                    default_pts = 2 if manual else 1
                 task = Task(
                     variant=variant,
                     number=td["number"],

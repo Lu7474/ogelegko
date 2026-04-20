@@ -357,7 +357,14 @@ def _parse_page(sess, proj, page, theme=""):
             continue
         guid = guid_input.get("value", "")
 
-        # Текст задания (ячейка cell_0)
+        # URL картинок из ShowPictureQ — извлекаем ДО удаления скриптов,
+        # т.к. картинки ФИПИ встроены именно через <script>ShowPictureQ(...)</script>,
+        # а не через обычные <img>. Скрипты живут внутри cell_0 и исчезают
+        # из дерева BS4 после decompose(). Поддерживаем оба вида кавычек.
+        pics = re.findall(r"ShowPictureQ\w*\(['\"]([^'\"]+)['\"]", str(block))
+        show_pic_urls = [f"{FIPI_BASE}/{p.lstrip('/')}" for p in pics]
+
+        # Текст задания (ячейка cell_0) — скрипты удаляем ПОСЛЕ извлечения URL
         cell = block.find("td", class_="cell_0")
         raw_html = ""
         if cell:
@@ -365,9 +372,7 @@ def _parse_page(sess, proj, page, theme=""):
                 s.decompose()
             raw_html = cell.decode_contents().strip()
 
-        # URL картинок: из ShowPictureQ (всплывающие) + <img> в тексте задания
-        pics = re.findall(r"ShowPictureQ\w*\('([^']+)'", str(block))
-        show_pic_urls = [f"{FIPI_BASE}/{p.lstrip('/')}" for p in pics]
+        # Обычные <img> в тексте (редко, но бывает)
         inline_srcs = re.findall(r'<img[^>]+\bsrc=["\']?(/[^"\'>\s]+)', raw_html, re.IGNORECASE)
         inline_urls = [f"{FIPI_BASE}{s}" for s in inline_srcs]
         # popup-картинки, которых нет в тексте
@@ -491,19 +496,32 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
                 except Exception:
                     pass
 
-            # 4. Для popup-картинок (не в тексте) — сохраняем как ct.image
-            image_content = None
-            image_name = None
+            # 4. Картинки задания (ShowPictureQ → popup_image_urls):
+            #    первая — ct.image, остальные — CatalogTaskImage
+            from .models import CatalogTaskImage
+
             popup_urls = td.get("popup_image_urls", [])
-            if popup_urls:
+            main_image_content = None
+            main_image_name = None
+            extra_images = []  # [(bytes, ext), ...]
+            for i, img_url in enumerate(popup_urls):
                 try:
                     time.sleep(FIPI_IMG_DELAY)
-                    img_resp = sess.get(popup_urls[0], headers=FIPI_HEADERS, timeout=15, verify=False)
+                    img_resp = sess.get(img_url, headers=FIPI_HEADERS, timeout=15, verify=False)
                     if img_resp.status_code == 200:
                         ct_header = img_resp.headers.get("Content-Type", "")
-                        ext = ".png" if "png" in ct_header else ".jpg"
-                        image_name = f"fipi_{uuid.uuid4().hex[:8]}{ext}"
-                        image_content = img_resp.content
+                        # Определяем расширение по Content-Type или по имени файла
+                        if "png" in ct_header:
+                            ext = ".png"
+                        elif "gif" in ct_header:
+                            ext = ".gif"
+                        else:
+                            ext = "." + img_url.rsplit(".", 1)[-1].lower() if "." in img_url else ".jpg"
+                        if i == 0:
+                            main_image_name = f"fipi_{uuid.uuid4().hex[:8]}{ext}"
+                            main_image_content = img_resp.content
+                        else:
+                            extra_images.append((img_resp.content, ext))
                 except Exception:
                     pass
 
@@ -514,13 +532,19 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
                 correct_answer="",
                 source=TaskSource.FIPI,
                 manual_grading=True,
+                points=2,
                 fipi_guid=guid or None,
                 text_hash=text_hash,
                 import_session=import_session,
             )
-            if image_content and image_name:
-                ct.image.save(image_name, ContentFile(image_content), save=False)
+            if main_image_content and main_image_name:
+                ct.image.save(main_image_name, ContentFile(main_image_content), save=False)
             ct.save()
+            for order, (img_bytes, ext) in enumerate(extra_images):
+                fname = f"fipi_{uuid.uuid4().hex[:8]}{ext}"
+                ci = CatalogTaskImage(task=ct, order=order)
+                ci.image.save(fname, ContentFile(img_bytes), save=False)
+                ci.save()
             added += 1
 
         # Обновляем прогресс после каждой страницы

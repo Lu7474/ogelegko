@@ -869,6 +869,7 @@ def _process_pdf_print_solve(pdf_path, exam_type, do_catalog, do_variants, sessi
                         correct_answer="",
                         source=TaskSource.PRINT_SOLVE,
                         manual_grading=True,
+                        points=2,
                         text_hash=text_hash,
                         shared_context=shared_ctx,
                         import_session=session,
@@ -916,6 +917,7 @@ def _process_pdf_print_solve(pdf_path, exam_type, do_catalog, do_variants, sessi
                             correct_answer="",
                             source=TaskSource.PRINT_SOLVE,
                             manual_grading=True,
+                            points=2,
                             shared_context=shared_ctx,
                         )
                         if i == 0 and ctx_img_bytes and ctx_img_fname:
@@ -958,6 +960,7 @@ def _process_pdf_universal(pdf_path, exam_type, session):
                 correct_answer="",
                 source=TaskSource.PRINT_SOLVE,
                 manual_grading=True,
+                points=2,
                 import_session=session,
             )
             if page_bytes:
