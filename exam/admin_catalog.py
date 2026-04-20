@@ -331,6 +331,8 @@ def catalog_assign_number(request, task_id):
         ct.no_student_input = _is_no_input_task(ct.exam_type, ct.task_number)
         if ct.exam_type == "oge":
             ct.points = _get_oge_default_points(ct.task_number)
+    else:
+        ct.no_student_input = False
 
     ct.save(update_fields=["task_number", "no_student_input", "points"])
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
