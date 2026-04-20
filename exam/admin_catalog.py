@@ -320,10 +320,19 @@ def catalog_unclassified(request):
 @require_POST
 def catalog_assign_number(request, task_id):
     """AJAX/form: назначить номер задания неопределённому заданию."""
+    from .parser import _get_oge_default_points, _is_no_input_task
+
     ct = get_object_or_404(CatalogTask, id=task_id)
     task_number_raw = request.POST.get("task_number", "").strip()
     ct.task_number = _safe_int(task_number_raw) if task_number_raw else None
-    ct.save(update_fields=["task_number"])
+
+    # Автоматически выставляем no_student_input и points по номеру задания
+    if ct.task_number is not None:
+        ct.no_student_input = _is_no_input_task(ct.exam_type, ct.task_number)
+        if ct.exam_type == "oge":
+            ct.points = _get_oge_default_points(ct.task_number)
+
+    ct.save(update_fields=["task_number", "no_student_input", "points"])
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return JsonResponse({"ok": True, "task_number": ct.task_number})
     return redirect("admin_catalog_unclassified")
