@@ -16,7 +16,7 @@ import urllib3
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 
-from .models import CatalogImportSession, CatalogTask, TaskSource
+from .models import CatalogImportSession, CatalogTask, CatalogTaskImage, TaskSource
 from .parser import ParserError, sanitize_html
 
 logger = logging.getLogger(__name__)
@@ -57,14 +57,16 @@ def _get(session, url):
             "Не удалось подключиться к oge.fipi.ru. Проверьте доступность сайта с вашего сервера."
         )
     resp.raise_for_status()
-    return resp.content.decode("cp1251", errors="replace")
+    enc = "utf-8" if "utf-8" in resp.headers.get("Content-Type", "").lower() else "cp1251"
+    return resp.content.decode(enc, errors="replace")
 
 
 def _post(session, url, data):
     time.sleep(FIPI_DELAY)
     resp = session.post(url, data=data, headers=FIPI_HEADERS, timeout=20, verify=False)
     resp.raise_for_status()
-    return resp.content.decode("cp1251", errors="replace")
+    enc = "utf-8" if "utf-8" in resp.headers.get("Content-Type", "").lower() else "cp1251"
+    return resp.content.decode(enc, errors="replace")
 
 
 def _qs_url(proj, page=0):
@@ -498,8 +500,6 @@ def import_fipi_to_catalog(proj, exam_type, theme_filter, session_id):
 
             # 4. Картинки задания (ShowPictureQ → popup_image_urls):
             #    первая — ct.image, остальные — CatalogTaskImage
-            from .models import CatalogTaskImage
-
             popup_urls = td.get("popup_image_urls", [])
             main_image_content = None
             main_image_name = None

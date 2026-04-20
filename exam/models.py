@@ -218,9 +218,9 @@ class Attempt(models.Model):
 
     @property
     def percentage(self):
-        if self.total_count == 0:
+        if self.max_score == 0:
             return 0
-        return round(self.correct_count / self.total_count * 100)
+        return round(self.score / self.max_score * 100)
 
 
 class CatalogImportSession(models.Model):

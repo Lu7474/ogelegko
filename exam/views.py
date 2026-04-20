@@ -343,28 +343,31 @@ def save_answer(request):
 def _finish_attempt(attempt):
     if attempt.is_finished:
         return
-    total_score = 0
-    max_score = 0
-    for answer in attempt.answers.select_related("task").all():
-        if answer.task is None:
-            continue
-        max_score += answer.task.points
-        if answer.task.manual_grading:
-            answer.is_correct = None  # ожидает проверки учителя
-            answer.awarded_points = None
-            answer.save(update_fields=["is_correct", "awarded_points"])
-        else:
-            is_correct = check_answer(answer.student_answer, answer.task.correct_answer)
-            answer.is_correct = is_correct
-            answer.save(update_fields=["is_correct"])
-            if is_correct:
-                total_score += answer.task.points
-
-    attempt.is_finished = True
-    attempt.finished_at = timezone.now()
-    attempt.score = total_score
-    attempt.max_score = max_score
-    attempt.save()
+    with transaction.atomic():
+        attempt = Attempt.objects.select_for_update().get(id=attempt.id)
+        if attempt.is_finished:
+            return
+        total_score = 0
+        max_score = 0
+        for answer in attempt.answers.select_related("task").all():
+            if answer.task is None:
+                continue
+            max_score += answer.task.points
+            if answer.task.manual_grading:
+                answer.is_correct = None  # ожидает проверки учителя
+                answer.awarded_points = None
+                answer.save(update_fields=["is_correct", "awarded_points"])
+            else:
+                is_correct = check_answer(answer.student_answer, answer.task.correct_answer)
+                answer.is_correct = is_correct
+                answer.save(update_fields=["is_correct"])
+                if is_correct:
+                    total_score += answer.task.points
+        attempt.is_finished = True
+        attempt.finished_at = timezone.now()
+        attempt.score = total_score
+        attempt.max_score = max_score
+        attempt.save()
     attempt.grade = get_grade_for_attempt(attempt)
     attempt.save(update_fields=["grade"])
 
@@ -464,19 +467,32 @@ def retry_mistakes(request, attempt_id):
         from .models import TaskImage
 
         for i, task in enumerate(wrong_tasks, start=1):
-            new_task = Task.objects.create(
+            new_task = Task(
                 variant=review_variant,
                 number=i,
                 text=task.text,
-                image=task.image,
                 correct_answer=task.correct_answer,
                 source=task.source,
                 points=task.points,
                 manual_grading=task.manual_grading,
                 no_student_input=task.no_student_input,
                 shared_context=task.shared_context,
-                shared_context_image=task.shared_context_image,
             )
+            if task.image:
+                try:
+                    with task.image.open("rb") as f:
+                        new_task.image.save(task.image.name.split("/")[-1], _CF(f.read()), save=False)
+                except Exception:
+                    pass
+            if task.shared_context_image:
+                try:
+                    with task.shared_context_image.open("rb") as f:
+                        new_task.shared_context_image.save(
+                            task.shared_context_image.name.split("/")[-1], _CF(f.read()), save=False
+                        )
+                except Exception:
+                    pass
+            new_task.save()
             for ci in task.extra_images.order_by("order"):
                 try:
                     with ci.image.open("rb") as f:

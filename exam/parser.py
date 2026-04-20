@@ -636,7 +636,10 @@ def import_task_to_catalog(url, task_number=None):
             pass
 
     try:
-        default_pts = _get_oge_default_points(task_number) if exam_type == ExamType.OGE else 1
+        if exam_type == ExamType.OGE:
+            default_pts = _get_oge_default_points(task_number)
+        else:
+            default_pts = 2 if manual else 1
         ct = CatalogTask(
             task_number=task_number,
             exam_type=exam_type,
