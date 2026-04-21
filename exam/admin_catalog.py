@@ -1115,6 +1115,97 @@ def catalog_pdf_import_status(request, job_id):
 
 
 @admin_required
+def catalog_fipi_export_answers(request):
+    """Экспорт заданий ФИПИ без ответов в JSON для AI-обработки."""
+    import re as _re
+
+    tasks = (
+        CatalogTask.objects.filter(
+            source=TaskSource.FIPI,
+            correct_answer="",
+            manual_grading=False,
+        )
+        .exclude(fipi_guid__isnull=True)
+        .exclude(fipi_guid="")
+        .prefetch_related("extra_images")
+        .order_by("task_number", "id")
+    )
+
+    def strip_html(text):
+        return _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", text or "")).strip()
+
+    def abs_url(field):
+        if not field:
+            return None
+        url = field.url
+        if url.startswith("http"):
+            return url
+        return request.build_absolute_uri(url)
+
+    data = [
+        {
+            "fipi_guid": t.fipi_guid,
+            "task_number": t.task_number,
+            "exam_type": t.exam_type,
+            "text": strip_html(t.text),
+            "image_url": abs_url(t.image),
+            "shared_context": strip_html(t.shared_context),
+            "shared_context_image_url": abs_url(t.shared_context_image),
+            "extra_image_urls": [abs_url(ei.image) for ei in t.extra_images.all()],
+        }
+        for t in tasks
+    ]
+
+    response = JsonResponse(data, safe=False, json_dumps_params={"ensure_ascii": False, "indent": 2})
+    response["Content-Disposition"] = 'attachment; filename="fipi_tasks_no_answer.json"'
+    return response
+
+
+@admin_required
+@require_POST
+def catalog_fipi_import_answers(request):
+    """Импорт ответов ФИПИ из JSON-файла [{fipi_guid, answer}]."""
+    from django.contrib import messages
+    from django.urls import reverse
+
+    f = request.FILES.get("answers_file")
+    if not f:
+        messages.error(request, "Выберите JSON-файл с ответами.")
+        return redirect(reverse("admin_catalog_unclassified") + "?tab=no_answer")
+
+    try:
+        data = json.loads(f.read().decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        messages.error(request, f"Ошибка чтения файла: {e}")
+        return redirect(reverse("admin_catalog_unclassified") + "?tab=no_answer")
+
+    if not isinstance(data, list):
+        messages.error(request, "JSON должен быть массивом объектов.")
+        return redirect(reverse("admin_catalog_unclassified") + "?tab=no_answer")
+
+    updated = skipped = not_found = 0
+    for entry in data:
+        guid = (entry.get("fipi_guid") or "").strip()
+        answer = str(entry.get("answer") or "").strip()
+        if not guid or not answer:
+            skipped += 1
+            continue
+        count = CatalogTask.objects.filter(fipi_guid=guid).update(correct_answer=answer)
+        if count:
+            updated += count
+        else:
+            not_found += 1
+
+    parts = [f"Обновлено: {updated}"]
+    if skipped:
+        parts.append(f"пропущено (нет guid/ответа): {skipped}")
+    if not_found:
+        parts.append(f"не найдено в БД: {not_found}")
+    messages.success(request, " | ".join(parts))
+    return redirect(reverse("admin_catalog_unclassified") + "?tab=no_answer")
+
+
+@admin_required
 def catalog_import_list(request):
     sessions = CatalogImportSession.objects.order_by("-created_at")
     return render(request, "admin/catalog_import_list.html", {"sessions": sessions})

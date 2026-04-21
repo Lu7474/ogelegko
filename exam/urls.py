@@ -132,6 +132,16 @@ urlpatterns = [
     path(
         "admin/catalog/unclassified/", admin_catalog.catalog_unclassified, name="admin_catalog_unclassified"
     ),
+    path(
+        "admin/catalog/fipi-answers/export/",
+        admin_catalog.catalog_fipi_export_answers,
+        name="admin_fipi_export_answers",
+    ),
+    path(
+        "admin/catalog/fipi-answers/import/",
+        admin_catalog.catalog_fipi_import_answers,
+        name="admin_fipi_import_answers",
+    ),
     path("admin/catalog/<int:task_id>/edit/", admin_catalog.catalog_edit, name="admin_catalog_edit"),
     path("admin/catalog/<int:task_id>/delete/", admin_catalog.catalog_delete, name="admin_catalog_delete"),
     path(
