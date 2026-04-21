@@ -26,6 +26,8 @@
     .answer-preview table { width: 100%; border-collapse: collapse; }
     .answer-preview td { padding: 4px 8px; border-bottom: 1px solid var(--border, #eee); font-size: 0.9rem; }
     .answer-preview .empty { color: #e74c3c; }
+    /* Таблицы в задачах: позволяем им быть шире контейнера — overflow-x:auto на .task-text их скроллит */
+    .task-text table { max-width: none; }
     @media (max-width: 600px) {
         .sticky-panel { padding: 6px 8px; gap: 6px; }
         .timer { font-size: 1rem; }
@@ -37,6 +39,19 @@
         .panel-right { gap: 0; }
         /* Минимум 16px чтобы iOS не зумировал при тапе на поле ввода */
         .answer-input { font-size: 16px !important; }
+        /* Фиксированная кнопка «Завершить» снизу экрана */
+        .finish-section {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            padding: 10px 16px;
+            background: var(--card-bg, #fff);
+            border-top: 1px solid var(--border, #e2e8f0);
+            box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+            z-index: 99;
+            text-align: left;
+            margin: 0;
+        }
+        .finish-section .btn { width: 100%; }
+        main.container { padding-bottom: 72px; }
     }
 </style>
 {% endblock %}

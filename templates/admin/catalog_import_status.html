@@ -1,6 +1,19 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Импорт в каталог — статус{% endblock %}
 
+{% block extra_head %}
+<style>
+.progress-bar-scan { height: 8px; border-radius: 20px; position: relative; }
+.progress-bar-scan::after {
+    content: ''; position: absolute; top: 0; left: -55%;
+    width: 55%; height: 100%;
+    background: var(--primary); border-radius: 20px;
+    animation: bar-scan 1.6s cubic-bezier(.4,0,.2,1) infinite;
+}
+@keyframes bar-scan { 0% { left: -55%; } 100% { left: 105%; } }
+</style>
+{% endblock %}
+
 {% block content %}
 <h1>Импорт заданий в каталог</h1>
 
@@ -9,13 +22,22 @@
     <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
     <p>Идёт импорт, подождите...</p>
     <div class="progress-bar-wrap" style="margin:16px auto;max-width:300px;">
-        <div class="progress-bar" id="progressBar" style="width:30%;animation:progress-pulse 1.5s infinite;"></div>
+        <div class="progress-bar-scan"></div>
     </div>
+    <p style="margin-top:10px;font-size:0.85rem;color:var(--text-muted);">Прошло: <span id="elapsedTime">0:00</span></p>
 </div>
 
 <script>
 (function() {
     var url = "{% url 'admin_catalog_import_status' job_id %}?json=1";
+    var start = Date.now();
+    var elapsedEl = document.getElementById('elapsedTime');
+
+    setInterval(function() {
+        var s = Math.floor((Date.now() - start) / 1000);
+        elapsedEl.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }, 1000);
+
     function poll() {
         fetch(url).then(r => r.json()).then(function(data) {
             if (data.status !== 'running') {

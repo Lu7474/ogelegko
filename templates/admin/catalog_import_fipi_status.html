@@ -14,6 +14,15 @@
 .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #ddd; border-top-color: var(--primary, #1a73e8); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: middle; margin-right: 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .duplicate-hint { margin-top: 12px; padding: 10px 14px; background: #fff8e1; border-left: 3px solid #f39c12; border-radius: 4px; font-size: 0.875rem; }
+.progress-bar-wrap { height: 8px; background: var(--border, #e2e8f0); border-radius: 20px; overflow: hidden; margin: 12px 0; }
+.progress-bar-scan { height: 8px; border-radius: 20px; position: relative; }
+.progress-bar-scan::after {
+    content: ''; position: absolute; top: 0; left: -55%;
+    width: 55%; height: 100%;
+    background: var(--primary, #3b82f6); border-radius: 20px;
+    animation: bar-scan 1.6s cubic-bezier(.4,0,.2,1) infinite;
+}
+@keyframes bar-scan { 0% { left: -55%; } 100% { left: 105%; } }
 </style>
 {% endblock %}
 
@@ -24,6 +33,8 @@
     <div id="statusBlock">
         {% if job.status == "running" %}
         <p class="status-running"><span class="spinner"></span> Импорт выполняется...</p>
+        <div class="progress-bar-wrap"><div class="progress-bar-scan"></div></div>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">Прошло: <span id="elapsedTime">0:00</span></p>
         {% elif job.status == "done" %}
         <p class="status-done" style="font-size:1.1rem;font-weight:600;">✓ Импорт завершён</p>
         {% elif job.status == "error" %}
@@ -77,6 +88,13 @@
 (function(){
     var job_id = "{{ job_id }}";
     var url = "{% url 'admin_fipi_import_status' job_id=job_id %}?json=1";
+    var start = Date.now();
+    var elapsedEl = document.getElementById('elapsedTime');
+
+    setInterval(function() {
+        var s = Math.floor((Date.now() - start) / 1000);
+        elapsedEl.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }, 1000);
 
     function poll() {
         fetch(url).then(function(r){ return r.json(); }).then(function(data){
