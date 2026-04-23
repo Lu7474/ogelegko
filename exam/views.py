@@ -548,6 +548,49 @@ def retry_mistakes(request, attempt_id):
 # --- Профиль / Статистика ---
 
 
+def _level_label(pct):
+    if pct >= 80:
+        return "Отличный уровень"
+    if pct >= 60:
+        return "Хороший уровень"
+    if pct >= 40:
+        return "Средний уровень"
+    return "Низкий уровень"
+
+
+def _level_css_class(pct):
+    if pct >= 80:
+        return "level-great"
+    if pct >= 60:
+        return "level-good"
+    if pct >= 40:
+        return "level-mid"
+    return "level-low"
+
+
+def _trend(percentages):
+    if len(percentages) < 3:
+        return "→"
+    recent = sum(percentages[:3]) / 3
+    older_slice = percentages[3:6] if len(percentages) >= 4 else []
+    if not older_slice:
+        return "→"
+    older = sum(older_slice) / len(older_slice)
+    if recent > older + 3:
+        return "↑"
+    if recent < older - 3:
+        return "↓"
+    return "→"
+
+
+_NEXT_STEP_PHRASES = {
+    "5": "Отличный результат. Попробуйте ещё — закрепите уверенность.",
+    "4": "Хороший уровень. Несколько попыток — и оценка будет стабильной.",
+    "3": "До четвёрки совсем немного. Разберите ошибки и попробуйте снова.",
+    "2": "Продолжайте тренироваться. Каждая попытка улучшает результат.",
+}
+
+
 @student_required
 def profile_view(request):
     student = request.student
@@ -558,15 +601,36 @@ def profile_view(request):
     )
 
     avg_percentage = None
-    if attempts.exists():
-        percentages = [a.percentage for a in attempts]
+    level_label = level_css = trend = next_step = grade4_threshold_pct = None
+    weak_spots = []
+
+    attempts_list = list(attempts)
+    if attempts_list:
+        percentages = [a.percentage for a in attempts_list]
         avg_percentage = round(sum(percentages) / len(percentages))
+        level_label = _level_label(avg_percentage)
+        level_css = _level_css_class(avg_percentage)
+        trend = _trend(percentages)
+        last_grade = attempts_list[0].grade
+        next_step = _NEXT_STEP_PHRASES.get(last_grade, "Продолжайте тренироваться.")
+
+        if len(percentages) >= 3:
+            spread = max(percentages[:5]) - min(percentages[:5])
+            if spread > 20:
+                weak_spots.append("Нестабильный результат в последних попытках")
+            else:
+                weak_spots.append("Стабильный прогресс")
+
+        exam_type = student.exam_type
+        last = attempts_list[0]
+        if last.max_score and exam_type in ("oge", "ege_base"):
+            t = 15 if exam_type == "oge" else 12
+            grade4_threshold_pct = round(t / last.max_score * 100)
 
     chart_data = []
-    for a in reversed(list(attempts)):
+    for a in reversed(attempts_list):
         chart_data.append(
             {
-                "date": a.finished_at.strftime("%d.%m.%Y"),
                 "variant": a.variant.number,
                 "score": a.score,
                 "max_score": a.max_score,
@@ -579,8 +643,14 @@ def profile_view(request):
         "exam/profile.html",
         {
             "student": student,
-            "attempts": attempts,
+            "attempts": attempts_list,
             "avg_percentage": avg_percentage,
+            "level_label": level_label,
+            "level_css": level_css,
+            "trend": trend,
+            "next_step": next_step,
+            "weak_spots": weak_spots,
+            "grade4_threshold_pct": grade4_threshold_pct,
             "chart_data": json.dumps(chart_data),
         },
     )

@@ -628,6 +628,65 @@ a:hover { color: var(--link-hover); text-decoration: underline; }
     border: 1px solid var(--border);
 }
 
+/* === Profile === */
+.level-zone {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--card-shadow);
+}
+.level-pct {
+    font-family: 'PT Serif', serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.level-great .level-pct { color: var(--success); }
+.level-good  .level-pct { color: var(--primary); }
+.level-mid   .level-pct { color: var(--warning); }
+.level-low   .level-pct { color: var(--danger); }
+.level-name { font-size: 1rem; font-weight: 600; color: var(--heading); margin-bottom: 4px; }
+.level-meta { font-size: 0.8rem; color: var(--text-muted); }
+.trend-up   { color: var(--success); }
+.trend-down { color: var(--danger); }
+.trend-flat { color: var(--text-muted); }
+
+.profile-insights { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+.insight-block {
+    flex: 1;
+    min-width: 220px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: var(--radius-sm);
+    padding: 20px 24px;
+    box-shadow: var(--shadow-subtle);
+}
+.insight-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    font-family: 'PT Sans', sans-serif;
+}
+.insight-block p { font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
+.insight-block .btn { margin-top: 4px; }
+
+@media (max-width: 600px) {
+    .level-zone { padding: 20px; gap: 16px; }
+    .level-pct { font-size: 2rem; }
+    .profile-insights { flex-direction: column; }
+}
+
 /* === Badges === */
 .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
 .badge-green { background: var(--success-light); color: var(--success); }
