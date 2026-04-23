@@ -61,11 +61,11 @@
                 <td style="max-width:300px;word-break:break-word;white-space:pre-wrap">{{ answer.student_answer|default:"—" }}</td>
                 <td style="white-space:nowrap">
                     {% if answer.is_correct is None %}
-                        <span style="color:var(--warning);font-weight:600">⏳ Ожидает проверки</span>
+                        <span class="status-badge status-pending"><i data-lucide="clock"></i> Ожидает проверки</span>
                     {% elif answer.is_correct %}
-                        <span style="color:var(--success);font-weight:600">✓ Верно</span>
+                        <span class="status-badge status-correct"><i data-lucide="check"></i> Верно</span>
                     {% else %}
-                        <span style="color:var(--danger);font-weight:600">✗ Неверно</span>
+                        <span class="status-badge status-wrong"><i data-lucide="x"></i> Неверно</span>
                     {% endif %}
                 </td>
             </tr>

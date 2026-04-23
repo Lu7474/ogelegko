@@ -1006,9 +1006,17 @@ tr:hover .row-actions { opacity: 1; }
     border-radius: var(--radius); border: 2px dashed var(--border);
     margin-bottom: 20px;
 }
-.empty-state-icon { font-size: 3.2rem; margin-bottom: 14px; display: block; line-height: 1; }
+.empty-state-icon { margin-bottom: 14px; display: block; line-height: 1; }
+.empty-state-icon svg { display: block; margin: 0 auto; }
 .empty-state h3 { color: var(--text-secondary); font-weight: 600; margin-bottom: 6px; font-size: 1.1rem; }
 .empty-state p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; }
+
+/* === Status badges (results manual answers) === */
+.status-badge { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+.status-badge svg { width: 14px; height: 14px; flex-shrink: 0; stroke-width: 2.5; }
+.status-pending { color: var(--warning); }
+.status-correct { color: var(--success); }
+.status-wrong { color: var(--danger); }
 
 /* === Improved task nav (solve) === */
 .task-nav a {
