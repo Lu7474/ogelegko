@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Итоги — Вариант {{ attempt.variant.number }}{% endblock %}
+{% block title %}Результаты — Вариант {{ attempt.variant.number }}{% endblock %}
 
 {% block nav %}
 <nav class="navbar">
@@ -12,100 +12,101 @@
 {% endblock %}
 
 {% block content %}
-<h1>Итоги — Вариант {{ attempt.variant.number }}</h1>
 
-<div class="results-summary">
-    <div class="result-card" style="min-width:130px">
-        <div class="progress-ring-wrap">
-            <svg class="progress-ring" viewBox="0 0 100 100">
-                <circle class="ring-bg" cx="50" cy="50" r="42"/>
-                <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="42"/>
-            </svg>
-            <div class="ring-text" id="ringText">0%</div>
-        </div>
-        <div class="result-label">Выполнено</div>
+<!-- Зона 1: Итог -->
+<div class="results-hero {{ hero_css_class }}">
+    <div class="grade-display {{ hero_css_class }}" id="gradeDisplay">{{ attempt.grade }}</div>
+    <div class="grade-label">{{ grade_display }}</div>
+    {% if grade_phrase %}
+    <p class="grade-phrase">{{ grade_phrase }}</p>
+    {% endif %}
+    <div class="results-stat-line">
+        <strong>{{ attempt.correct_count }}</strong> из {{ attempt.total_count }} верно
+        &nbsp;·&nbsp; Балл: <strong>{{ attempt.score }}</strong>
+        &nbsp;·&nbsp; Время: <strong>{{ attempt.duration_display }}</strong>
     </div>
-    <div class="result-card">
-        <div class="result-number">{{ attempt.correct_count }}/{{ attempt.total_count }}</div>
-        <div class="result-label">Правильных</div>
-    </div>
-    <div class="result-card">
-        <div class="result-number">{{ attempt.score }}</div>
-        <div class="result-label">Первичный балл</div>
-    </div>
-    <div class="result-card {% if attempt.grade == '5' %}grade-card-5{% elif attempt.grade == '4' %}grade-card-4{% elif attempt.grade == '3' %}grade-card-3{% elif attempt.grade == '2' %}grade-card-2{% endif %}">
-        <div class="result-number">{{ attempt.grade }}</div>
-        <div class="result-label">{{ grade_display }}</div>
-    </div>
-    <div class="result-card">
-        <div class="result-number" style="font-size:1.4rem">{{ attempt.duration_display }}</div>
-        <div class="result-label">Время</div>
-    </div>
+    {% if wrong_answers %}
+    <a href="#mistakes" class="scroll-hint">Посмотреть разбор ↓</a>
+    {% endif %}
 </div>
 
-<!-- Кружки по заданиям -->
-<div class="answer-dots">
-    {% for answer in answers %}
-    <span class="dot {% if answer.is_correct is None %}dot-pending{% elif answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}">{{ answer.task.number }}</span>
-    {% endfor %}
-</div>
+<!-- Зона 2: Разбор -->
+<div class="results-section">
+    <h2>Карта ответов</h2>
 
-{% if manual_answers %}
-<h2>Часть 2 — развёрнутые ответы</h2>
-<table class="table">
-    <thead>
-        <tr><th>№</th><th>Ваш ответ</th><th>Статус</th></tr>
-    </thead>
-    <tbody>
-    {% for answer in manual_answers %}
-        <tr>
-            <td><strong>{{ answer.task.number }}</strong></td>
-            <td style="max-width:300px;word-break:break-word;white-space:pre-wrap">{{ answer.student_answer|default:"—" }}</td>
-            <td style="white-space:nowrap">
-                {% if answer.is_correct is None %}
-                    <span style="color:#f59e0b;font-weight:600">⏳ Ожидает проверки учителя</span>
-                {% elif answer.is_correct %}
-                    <span style="color:#10b981;font-weight:600">✓ Верно</span>
-                {% else %}
-                    <span style="color:#ef4444;font-weight:600">✗ Неверно</span>
-                {% endif %}
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
-{% endif %}
+    {% if auto_answers %}
+    {% if manual_answers %}<p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--text-muted);margin-bottom:10px;">Часть 1</p>{% endif %}
+    <div class="answer-dots" style="margin-bottom:{% if manual_answers %}20px{% else %}0{% endif %}">
+        {% for answer in auto_answers %}
+        <span class="dot {% if answer.is_correct is None %}dot-pending{% elif answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}">{{ answer.task.number }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if manual_answers %}
+    <p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--text-muted);margin-bottom:10px;">Часть 2</p>
+    <div class="answer-dots" style="margin-bottom:24px;">
+        {% for answer in manual_answers %}
+        <span class="dot {% if answer.is_correct is None %}dot-pending{% elif answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}">{{ answer.task.number }}</span>
+        {% endfor %}
+    </div>
+    <table class="table">
+        <thead>
+            <tr><th>№</th><th>Ваш ответ</th><th>Статус</th></tr>
+        </thead>
+        <tbody>
+        {% for answer in manual_answers %}
+            <tr>
+                <td><strong>{{ answer.task.number }}</strong></td>
+                <td style="max-width:300px;word-break:break-word;white-space:pre-wrap">{{ answer.student_answer|default:"—" }}</td>
+                <td style="white-space:nowrap">
+                    {% if answer.is_correct is None %}
+                        <span style="color:var(--warning);font-weight:600">⏳ Ожидает проверки</span>
+                    {% elif answer.is_correct %}
+                        <span style="color:var(--success);font-weight:600">✓ Верно</span>
+                    {% else %}
+                        <span style="color:var(--danger);font-weight:600">✗ Неверно</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <div class="results-actions" style="margin-top:8px;">
+        {% if wrong_answers %}
+        <a href="{% url 'retry_mistakes' attempt.id %}" class="btn btn-secondary">Повторить ошибки ({{ wrong_answers|length }})</a>
+        {% endif %}
+        <a href="{% url 'view_attempt' attempt.id %}" class="btn btn-secondary">Весь вариант</a>
+    </div>
+</div>
 
 {% if previous_attempts %}
-<h2>Предыдущие попытки</h2>
-<table class="table">
-    <thead>
-        <tr><th>Дата</th><th>Результат</th><th>Оценка</th><th>Время</th></tr>
-    </thead>
-    <tbody>
-        {% for pa in previous_attempts %}
-        <tr>
-            <td>{{ pa.finished_at|date:"d.m.Y H:i" }}</td>
-            <td>{{ pa.correct_count }}/{{ pa.total_count }} ({{ pa.percentage }}%)</td>
-            <td>{{ pa.grade }}</td>
-            <td>{{ pa.duration_display }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="results-section">
+    <h2>Предыдущие попытки</h2>
+    <table class="table">
+        <thead>
+            <tr><th>Дата</th><th>Результат</th><th>Оценка</th><th>Время</th></tr>
+        </thead>
+        <tbody>
+            {% for pa in previous_attempts %}
+            <tr>
+                <td>{{ pa.finished_at|date:"d.m.Y H:i" }}</td>
+                <td>{{ pa.correct_count }}/{{ pa.total_count }} ({{ pa.percentage }}%)</td>
+                <td>{{ pa.grade }}</td>
+                <td>{{ pa.duration_display }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endif %}
 
-<div class="results-actions">
-    <button class="btn btn-secondary" id="toggleWrong">Посмотреть неправильные ({{ wrong_answers|length }})</button>
-    {% if wrong_answers %}
-    <a href="{% url 'retry_mistakes' attempt.id %}" class="btn btn-secondary">Повторить ошибки ({{ wrong_answers|length }})</a>
-    {% endif %}
-    <a href="{% url 'view_attempt' attempt.id %}" class="btn btn-secondary">Весь вариант</a>
-    <a href="{% url 'choose_variant' %}" class="btn btn-primary">Решить ещё →</a>
-</div>
-
-<div id="wrongAnswers" style="display:none;">
-    <h2>Неправильные ответы</h2>
+<!-- Зона 3: Ошибки -->
+{% if wrong_answers %}
+<div class="results-section" id="mistakes">
+    <h2>Разбор ошибок</h2>
     {% for answer in wrong_answers %}
     <div class="wrong-answer-block">
         <h3>Задание {{ answer.task.number }}</h3>
@@ -118,32 +119,39 @@
     </div>
     {% endfor %}
 </div>
+{% endif %}
+
+<!-- Зона 4: Следующий шаг -->
+<div class="next-step-zone">
+    <span class="next-step-text">Ещё один вариант — закрепить результат.</span>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <a href="{% url 'choose_variant' %}" class="btn btn-primary">Решить следующий →</a>
+        <a href="{% url 'profile' %}" class="btn btn-secondary">Профиль</a>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Animated ring
-const pct = {{ attempt.percentage }};
-const ring = document.getElementById('ringFill');
-const text = document.getElementById('ringText');
-const circumference = 264;
-setTimeout(() => {
-    const offset = circumference - (circumference * pct / 100);
-    ring.style.strokeDashoffset = offset;
-    // Color by percentage
-    if (pct >= 80) ring.style.stroke = '#10b981';
-    else if (pct >= 60) ring.style.stroke = '#3b82f6';
-    else if (pct >= 40) ring.style.stroke = '#f59e0b';
-    else ring.style.stroke = '#ef4444';
-    text.textContent = pct + '%';
-}, 100);
+// Анимация счётчика оценки (один раз за сессию)
+const gradeStr = '{{ attempt.grade }}';
+const gradeNum = parseInt(gradeStr);
+const isSimpleGrade = ['2', '3', '4', '5'].includes(gradeStr);
+const sessionKey = 'results_animated_{{ attempt.id }}';
+const gradeEl = document.getElementById('gradeDisplay');
 
-document.getElementById('toggleWrong').addEventListener('click', function() {
-    const el = document.getElementById('wrongAnswers');
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    this.textContent = el.style.display === 'none'
-        ? 'Посмотреть неправильные ({{ wrong_answers|length }})'
-        : 'Скрыть неправильные';
-});
+if (isSimpleGrade && gradeEl && !sessionStorage.getItem(sessionKey)) {
+    sessionStorage.setItem(sessionKey, '1');
+    gradeEl.textContent = '0';
+    let current = 0;
+    const delay = Math.max(150, Math.round(600 / gradeNum));
+    const step = () => {
+        current++;
+        gradeEl.textContent = current;
+        if (current < gradeNum) setTimeout(step, delay);
+    };
+    setTimeout(step, 400);
+}
 </script>
 {% endblock %}

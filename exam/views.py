@@ -397,6 +397,39 @@ def finish_exam(request, attempt_id):
 
 # --- Итоги ---
 
+_GRADE_PHRASES = {
+    "5": "Отличный результат.",
+    "4": "Хороший результат.",
+    "3": "Результат ниже цели.",
+    "2": "Пока не получается.",
+}
+_OGE_NEXT = {"2": 8, "3": 15, "4": 22}
+_EGE_BASE_NEXT = {"2": 7, "3": 12, "4": 17}
+
+
+def _decline_point(n):
+    if 11 <= n % 100 <= 14:
+        return "баллов"
+    r = n % 10
+    if r == 1:
+        return "балл"
+    if 2 <= r <= 4:
+        return "балла"
+    return "баллов"
+
+
+def _grade_phrase(exam_type, grade, score):
+    if exam_type == "ege_profile" or grade not in _GRADE_PHRASES:
+        return ""
+    base = _GRADE_PHRASES[grade]
+    thresholds = _OGE_NEXT if exam_type == "oge" else _EGE_BASE_NEXT
+    nxt = thresholds.get(grade)
+    if nxt and nxt > score:
+        gap = nxt - score
+        name = "пятёрки" if grade == "4" else "четвёрки"
+        return f"{base} До {name} — ещё {gap} {_decline_point(gap)}."
+    return base
+
 
 @student_required
 def results_view(request, attempt_id):
@@ -406,6 +439,7 @@ def results_view(request, attempt_id):
     answers = attempt.answers.select_related("task").order_by("task__id")
     wrong_answers = answers.filter(is_correct=False)
     manual_answers = answers.filter(task__manual_grading=True)
+    auto_answers = answers.filter(task__manual_grading=False, task__no_student_input=False)
 
     previous_attempts = (
         Attempt.objects.filter(student=student, variant=attempt.variant, is_finished=True)
@@ -413,7 +447,10 @@ def results_view(request, attempt_id):
         .order_by("-finished_at")
     )
 
-    grade_display = get_grade_display(attempt.variant.exam_type, attempt.grade)
+    exam_type = attempt.variant.exam_type
+    grade_display = get_grade_display(exam_type, attempt.grade)
+    grade_phrase = _grade_phrase(exam_type, attempt.grade, attempt.score)
+    hero_css_class = f"grade-{attempt.grade}" if attempt.grade in ("2", "3", "4", "5") else ""
 
     return render(
         request,
@@ -422,10 +459,13 @@ def results_view(request, attempt_id):
             "student": student,
             "attempt": attempt,
             "answers": answers,
+            "auto_answers": auto_answers,
             "wrong_answers": wrong_answers,
             "manual_answers": manual_answers,
             "previous_attempts": previous_attempts,
             "grade_display": grade_display,
+            "grade_phrase": grade_phrase,
+            "hero_css_class": hero_css_class,
         },
     )
 
