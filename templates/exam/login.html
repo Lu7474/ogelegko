@@ -2,28 +2,42 @@
 {% block title %}Вход{% endblock %}
 
 {% block extra_head %}
-<style>body { background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #0891b2 100%) !important; min-height: 100vh; } .auth-container { margin-top: 72px; box-shadow: 0 20px 60px rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.15); }</style>
+<style>
+    main.container { max-width: 100%; padding: 0; margin: 0; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="auth-container">
-    <div class="auth-logo">📝</div>
-    <h1>Пробные ОГЭ / ЕГЭ</h1>
-    <h2>Введите свои данные для входа</h2>
-    <form method="post">
-        {% csrf_token %}
-        <div class="form-group">
-            <label for="full_name">ФИО</label>
-            <input type="text" id="full_name" name="full_name" placeholder="Иванов Иван Иванович" required autofocus>
+<div class="login-page">
+    <div class="login-left">
+        <div class="login-brand">
+            <div class="login-title">Математика</div>
+            <div class="login-subtitle">ОГЭ · ЕГЭ</div>
+            <div class="login-year">2025</div>
         </div>
-        <div class="form-group">
-            <label for="password">Пароль</label>
-            <input type="password" id="password" name="password" placeholder="••••••" required>
+    </div>
+
+    <div class="login-right">
+        <div class="login-form-wrap">
+            <h1 class="login-heading">Войти</h1>
+            <form method="post">
+                {% csrf_token %}
+                <div class="login-field">
+                    <label for="full_name">ФИО</label>
+                    <input type="text" id="full_name" name="full_name"
+                           placeholder="Иванов Иван Иванович" required autofocus>
+                </div>
+                <div class="login-field">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" name="password"
+                           placeholder="••••••" required>
+                </div>
+                {% if error %}
+                <div class="error-message" style="margin-bottom:16px;">{{ error }}</div>
+                {% endif %}
+                <button type="submit" class="login-submit">Войти →</button>
+            </form>
         </div>
-        {% if error %}
-        <div class="error-message">{{ error }}</div>
-        {% endif %}
-        <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:4px">Войти →</button>
-    </form>
+    </div>
 </div>
 {% endblock %}
