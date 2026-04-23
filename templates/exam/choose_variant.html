@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Выбор варианта{% endblock %}
+{% load exam_tags %}
+{% block title %}Варианты{% endblock %}
 
 {% block nav %}
 <nav class="navbar">
@@ -12,60 +13,104 @@
 {% endblock %}
 
 {% block content %}
-<h1>Выбор варианта</h1>
-<p class="subtitle">{{ student.school_class }} — {{ student.school_class.get_exam_type_display }}</p>
 
-<div class="choose-section">
-    <div class="choose-card">
-        <h3>Случайный вариант</h3>
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="random">
-            <button type="submit" class="btn btn-primary">Случайный вариант</button>
-        </form>
-    </div>
-
-    <div class="choose-card">
-        <h3>По ID варианта</h3>
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="by_id">
-            <div class="form-group">
-                <input type="text" name="variant_number" placeholder="Например: 092" required>
-                {% if error %}
-                <div class="error-message-inline">{{ error }}</div>
-                {% endif %}
-            </div>
-            <button type="submit" class="btn btn-primary">Начать</button>
-        </form>
-    </div>
+<div style="margin-bottom:24px;">
+    <p style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:4px;">{{ student.school_class }} · {{ student.school_class.get_exam_type_display }}</p>
+    <h1 style="margin-bottom:0;">{{ student.full_name }}</h1>
 </div>
 
+<!-- Primary block -->
+<div class="primary-block">
+    <div>
+        <div class="primary-block-label">Следующий вариант</div>
+        <div class="primary-block-sub">
+            {% if past_attempts %}Решено вариантов: {{ past_attempts|length }}{% else %}Начните прямо сейчас{% endif %}
+        </div>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="random">
+        <button type="submit" class="btn btn-primary btn-lg">Начать случайный</button>
+    </form>
+</div>
+
+<div style="text-align:right;margin-bottom:32px;">
+    <a href="#" id="toggleVariantLink" style="font-size:0.875rem;color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:1px;">Есть номер варианта →</a>
+</div>
+
+<!-- Форма по номеру (скрыта по умолчанию, открывается если была ошибка) -->
+<div id="variantByIdForm" style="margin-bottom:32px;{% if not error %}display:none{% endif %}">
+    <form method="post" class="form-card" style="max-width:360px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="by_id">
+        <div class="form-group">
+            <label>Номер варианта</label>
+            <input type="text" name="variant_number" placeholder="Например: 092" {% if error %}autofocus{% endif %}>
+            {% if error %}<div class="error-message-inline">{{ error }}</div>{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">Начать</button>
+    </form>
+</div>
+
+<!-- Лента истории -->
 {% if past_attempts %}
-<h2>Ранее решённые варианты</h2>
-<table class="table">
-    <thead>
-        <tr>
-            <th>Вариант</th>
-            <th>Дата</th>
-            <th>Результат</th>
-            <th>Оценка</th>
-            <th>Время</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for attempt in past_attempts %}
-        <tr>
-            <td>{{ attempt.variant.number }}</td>
-            <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
-            <td>{{ attempt.correct_count }}/{{ attempt.total_count }} ({{ attempt.percentage }}%)</td>
-            <td>{{ attempt.grade }}</td>
-            <td>{{ attempt.duration_display }}</td>
-            <td><a href="{% url 'results' attempt.id %}" class="btn btn-sm">Подробнее</a></td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<h2>Прошлые попытки</h2>
+<div class="attempt-feed">
+    {% for attempt in past_attempts %}
+    <a href="{% url 'results' attempt.id %}"
+       class="attempt-row grade-{{ attempt.grade }}"
+       {% if forloop.counter > 5 %}data-hidden style="display:none"{% endif %}>
+        <div class="attempt-row-main">
+            <span class="attempt-variant">Вариант {{ attempt.variant.number }}</span>
+            <span class="attempt-date">{{ attempt.finished_at|human_date }}</span>
+        </div>
+        <div class="attempt-row-right">
+            <span class="attempt-result">{{ attempt.correct_count }}/{{ attempt.total_count }} · {{ attempt.percentage }}%</span>
+            <span class="attempt-grade grade-badge-{{ attempt.grade }}">{{ attempt.grade }}</span>
+            <span class="attempt-arrow">→</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% if past_attempts|length > 5 %}
+<div style="text-align:right;margin-top:10px;">
+    <a href="#" id="showAllAttempts" style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:1px;">Показать все ({{ past_attempts|length }}) →</a>
+</div>
 {% endif %}
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Тогл формы по номеру варианта
+const toggleLink = document.getElementById('toggleVariantLink');
+const byIdForm = document.getElementById('variantByIdForm');
+if (toggleLink && byIdForm) {
+    // Обновить текст ссылки если форма уже открыта (при ошибке)
+    if (byIdForm.style.display !== 'none') {
+        toggleLink.textContent = 'Скрыть ↑';
+    }
+    toggleLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        const visible = byIdForm.style.display !== 'none';
+        byIdForm.style.display = visible ? 'none' : 'block';
+        this.textContent = visible ? 'Есть номер варианта →' : 'Скрыть ↑';
+        if (!visible) {
+            const inp = byIdForm.querySelector('input[name="variant_number"]');
+            if (inp) inp.focus();
+        }
+    });
+}
+
+// Показать все попытки
+const showAllBtn = document.getElementById('showAllAttempts');
+if (showAllBtn) {
+    showAllBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('[data-hidden]').forEach(el => el.style.display = '');
+        this.parentElement.style.display = 'none';
+    });
+}
+</script>
 {% endblock %}
