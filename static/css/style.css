@@ -82,7 +82,8 @@ a:hover { color: var(--link-hover); text-decoration: underline; }
     height: 56px;
     border-bottom: 3px solid var(--primary);
 }
-.nav-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.3px; }
+.nav-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.3px; color: #fff; text-decoration: none; }
+.nav-title:hover { color: #fff; text-decoration: none; }
 .nav-right { display: flex; align-items: center; gap: 16px; }
 .nav-profile { color: #cbd5e1; font-weight: 500; cursor: pointer; font-size: 0.9rem; }
 .nav-profile:hover, .nav-profile.active { color: #fff; text-decoration: none; }

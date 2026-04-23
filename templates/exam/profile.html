@@ -8,7 +8,7 @@
 
 {% block nav %}
 <nav class="navbar">
-    <span class="nav-title">Пробные ОГЭ/ЕГЭ</span>
+    <a href="{% url 'choose_variant' %}" class="nav-title">Пробные ОГЭ/ЕГЭ</a>
     <div class="nav-right">
         <a href="{% url 'profile' %}" class="nav-profile active">{{ student.full_name }}</a>
         <form method="post" action="{% url 'logout' %}" class="nav-logout-form">{% csrf_token %}<button type="submit" class="nav-link nav-logout-btn">Выйти</button></form>

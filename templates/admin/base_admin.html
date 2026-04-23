@@ -11,7 +11,7 @@
 </head>
 <body class="admin-body">
     <nav class="navbar admin-navbar">
-        <span class="nav-title">Админ-панель</span>
+        <a href="{% url 'admin_dashboard' %}" class="nav-title">Админ-панель</a>
         <div class="nav-links" id="adminNavLinks">
             <a href="{% url 'admin_dashboard' %}">Главная</a>
             <a href="{% url 'admin_classes' %}">Классы</a>

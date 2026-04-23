@@ -4,7 +4,7 @@
 
 {% block nav %}
 <nav class="navbar">
-    <span class="nav-title">Пробные ОГЭ/ЕГЭ</span>
+    <a href="{% url 'choose_variant' %}" class="nav-title">Пробные ОГЭ/ЕГЭ</a>
     <div class="nav-right">
         <a href="{% url 'profile' %}" class="nav-profile">{{ student.full_name }}</a>
         <form method="post" action="{% url 'logout' %}" class="nav-logout-form">{% csrf_token %}<button type="submit" class="nav-link nav-logout-btn">Выйти</button></form>
@@ -34,13 +34,9 @@
     </form>
 </div>
 
-<div style="text-align:right;margin-bottom:32px;">
-    <a href="#" id="toggleVariantLink" style="font-size:0.875rem;color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:1px;">Есть номер варианта →</a>
-</div>
-
-<!-- Форма по номеру (скрыта по умолчанию, открывается если была ошибка) -->
-<div id="variantByIdForm" style="margin-bottom:32px;{% if not error %}display:none{% endif %}">
-    <form method="post" class="form-card" style="max-width:360px;">
+<div id="variantByIdForm" style="margin-bottom:32px;">
+    <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:10px;">Есть номер варианта</div>
+    <form method="post" class="form-card" style="max-width:360px;margin:0;">
         {% csrf_token %}
         <input type="hidden" name="action" value="by_id">
         <div class="form-group">
@@ -83,26 +79,6 @@
 
 {% block scripts %}
 <script>
-// Тогл формы по номеру варианта
-const toggleLink = document.getElementById('toggleVariantLink');
-const byIdForm = document.getElementById('variantByIdForm');
-if (toggleLink && byIdForm) {
-    // Обновить текст ссылки если форма уже открыта (при ошибке)
-    if (byIdForm.style.display !== 'none') {
-        toggleLink.textContent = 'Скрыть ↑';
-    }
-    toggleLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        const visible = byIdForm.style.display !== 'none';
-        byIdForm.style.display = visible ? 'none' : 'block';
-        this.textContent = visible ? 'Есть номер варианта →' : 'Скрыть ↑';
-        if (!visible) {
-            const inp = byIdForm.querySelector('input[name="variant_number"]');
-            if (inp) inp.focus();
-        }
-    });
-}
-
 // Показать все попытки
 const showAllBtn = document.getElementById('showAllAttempts');
 if (showAllBtn) {
