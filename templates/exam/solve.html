@@ -179,6 +179,7 @@ const timerEl = document.getElementById('timer');
 const finishForm = document.getElementById('finishForm');
 let timerSubmitted = false;
 let warningPlayed = false;
+let finishing = false;
 const notifiedAt = new Set();
 
 // === Браузерные уведомления ===
@@ -358,7 +359,6 @@ answerInputs.forEach(input => {
 });
 
 // === Защита от случайного ухода ===
-let finishing = false;
 window.addEventListener('beforeunload', e => {
     if (!finishing) { e.preventDefault(); e.returnValue = ''; }
 });
