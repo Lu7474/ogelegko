@@ -418,6 +418,14 @@ def _decline_point(n):
     return "баллов"
 
 
+_NEXT_STEP_CTA = {
+    "5": "Результат зафиксирован. Попробуй следующий вариант.",
+    "4": "До пятёрки немного — ещё один вариант.",
+    "3": "Практика важнее анализа. Ещё один вариант.",
+    "2": "Не останавливайся. Следующий вариант.",
+}
+
+
 def _grade_phrase(exam_type, grade, score):
     if exam_type == "ege_profile" or grade not in _GRADE_PHRASES:
         return ""
@@ -451,6 +459,7 @@ def results_view(request, attempt_id):
     grade_display = get_grade_display(exam_type, attempt.grade)
     grade_phrase = _grade_phrase(exam_type, attempt.grade, attempt.score)
     hero_css_class = f"grade-{attempt.grade}" if attempt.grade in ("2", "3", "4", "5") else ""
+    next_step_cta = _NEXT_STEP_CTA.get(attempt.grade, "Ещё один вариант — закрепить результат.")
 
     return render(
         request,
@@ -466,6 +475,7 @@ def results_view(request, attempt_id):
             "grade_display": grade_display,
             "grade_phrase": grade_phrase,
             "hero_css_class": hero_css_class,
+            "next_step_cta": next_step_cta,
         },
     )
 

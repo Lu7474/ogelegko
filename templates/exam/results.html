@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load exam_tags %}
 {% block title %}Результаты — Вариант {{ attempt.variant.number }}{% endblock %}
 
 {% block nav %}
@@ -92,7 +93,7 @@
         <tbody>
             {% for pa in previous_attempts %}
             <tr>
-                <td>{{ pa.finished_at|date:"d.m.Y H:i" }}</td>
+                <td>{{ pa.finished_at|human_date }}<span style="color:var(--text-muted);font-size:0.8em;margin-left:5px;">{{ pa.finished_at|date:"H:i" }}</span></td>
                 <td>{{ pa.correct_count }}/{{ pa.total_count }} ({{ pa.percentage }}%)</td>
                 <td>{{ pa.grade }}</td>
                 <td>{{ pa.duration_display }}</td>
@@ -123,7 +124,7 @@
 
 <!-- Зона 4: Следующий шаг -->
 <div class="next-step-zone">
-    <span class="next-step-text">Ещё один вариант — закрепить результат.</span>
+    <span class="next-step-text">{{ next_step_cta }}</span>
     <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <a href="{% url 'choose_variant' %}" class="btn btn-primary">Решить следующий →</a>
         <a href="{% url 'profile' %}" class="btn btn-secondary">Профиль</a>
