@@ -199,7 +199,9 @@ function sendNotification(title, body) {
 function updateTimer() {
     if (remaining <= 0 && !timerSubmitted) {
         timerSubmitted = true;
-        document.getElementById('finishForm').submit();
+        // dispatchEvent triggers the submit handler (answer flush + localStorage clear)
+        // Native .submit() would bypass the submit event entirely
+        document.getElementById('finishForm').dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
         return;
     }
     remaining--;
