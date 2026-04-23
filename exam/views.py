@@ -426,8 +426,8 @@ def _grade_phrase(exam_type, grade, score):
     nxt = thresholds.get(grade)
     if nxt and nxt > score:
         gap = nxt - score
-        name = "пятёрки" if grade == "4" else "четвёрки"
-        return f"{base} До {name} — ещё {gap} {_decline_point(gap)}."
+        name = {"2": "тройки", "3": "четвёрки", "4": "пятёрки"}.get(grade, "следующей оценки")
+        return f"{base} До {name} — ещё {gap} {_decline_point(gap)}."
     return base
 
 
