@@ -6,30 +6,33 @@
 
 {% if pending_grading %}
 <div class="info-box" style="background:#fff3cd;border-color:#ffc107;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
-    <span>⚠ Есть {{ pending_grading }} попытк{{ pending_grading|pluralize:"а,и,ок" }} с заданиями, ожидающими ручной проверки.
-    Откройте <a href="{% url 'admin_students' %}">статистику класса</a> или перейдите к ученику, чтобы выставить баллы.</span>
+    <span style="display:flex;align-items:flex-start;gap:10px;max-width:720px;">
+        <span class="info-box-icon"><i data-lucide="triangle-alert" aria-hidden="true"></i></span>
+        <span>Есть {{ pending_grading }} попытк{{ pending_grading|pluralize:"а,и,ок" }} с заданиями, ожидающими ручной проверки.
+        Откройте <a href="{% url 'admin_students' %}">статистику класса</a> или перейдите к ученику, чтобы выставить баллы.</span>
+    </span>
     <a href="{% url 'admin_students' %}?has_pending=1" class="btn btn-primary" style="white-space:nowrap;">Перейти к проверке</a>
 </div>
 {% endif %}
 
 <div class="stats-summary">
     <div class="result-card stat-card stat-card-blue">
-        <span class="stat-card-icon">🏫</span>
+        <span class="stat-card-icon"><i data-lucide="school" aria-hidden="true"></i></span>
         <div class="result-number">{{ stats.classes_count }}</div>
         <div class="result-label">Классов</div>
     </div>
     <div class="result-card stat-card stat-card-green">
-        <span class="stat-card-icon">👥</span>
+        <span class="stat-card-icon"><i data-lucide="users" aria-hidden="true"></i></span>
         <div class="result-number">{{ stats.students_count }}</div>
         <div class="result-label">Учеников</div>
     </div>
     <div class="result-card stat-card stat-card-purple">
-        <span class="stat-card-icon">📋</span>
+        <span class="stat-card-icon"><i data-lucide="files" aria-hidden="true"></i></span>
         <div class="result-number">{{ stats.variants_count }}</div>
         <div class="result-label">Вариантов</div>
     </div>
     <div class="result-card stat-card stat-card-orange">
-        <span class="stat-card-icon">✏️</span>
+        <span class="stat-card-icon"><i data-lucide="pen-line" aria-hidden="true"></i></span>
         <div class="result-number">{{ stats.attempts_count }}</div>
         <div class="result-label">Попыток</div>
     </div>

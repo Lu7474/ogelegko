@@ -41,7 +41,7 @@
             <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
             <td>
                 {% for answer in attempt.answers.all %}
-                <span class="dot-small {% if answer.is_correct %}dot-correct{% elif answer.is_correct is None %}dot-pending{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}: {% if answer.is_correct %}✓{% elif answer.is_correct is None %}⏳{% else %}✗{% endif %}"></span>
+                <span class="dot-small {% if answer.is_correct %}dot-correct{% elif answer.is_correct is None %}dot-pending{% else %}dot-wrong{% endif %}" title="Задание {{ answer.task.number }}: {% if answer.is_correct %}верно{% elif answer.is_correct is None %}ожидает проверки{% else %}неверно{% endif %}"></span>
                 {% endfor %}
             </td>
             <td>{{ attempt.score }}/{{ attempt.max_score }}</td>
@@ -92,7 +92,7 @@
 {% endif %}
 {% endif %}
 
-<a href="{% url 'admin_students' %}" class="btn btn-secondary" style="margin-top:20px; display:inline-block;">← Назад к ученикам</a>
+<a href="{% url 'admin_students' %}" class="btn btn-secondary" style="margin-top:20px; display:inline-flex;"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Назад к ученикам</span></a>
 {% endblock %}
 
 {% block scripts %}

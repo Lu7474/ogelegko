@@ -19,9 +19,14 @@
             <a href="{% url 'admin_variants' %}">Варианты</a>
             <a href="{% url 'admin_catalog' %}">Каталог</a>
         </div>
-        <button class="burger-btn" id="burgerBtn" aria-label="Меню">☰</button>
+        <button class="burger-btn" id="burgerBtn" aria-label="Меню">
+            <i data-lucide="menu" aria-hidden="true"></i>
+        </button>
         <div class="notif-wrap">
-            <button class="notif-btn" id="notifBtn" title="Уведомления">🔔<span class="notif-badge" id="notifBadge" style="display:none"></span></button>
+            <button class="notif-btn" id="notifBtn" title="Уведомления" aria-label="Уведомления">
+                <i data-lucide="bell" aria-hidden="true"></i>
+                <span class="notif-badge" id="notifBadge" style="display:none"></span>
+            </button>
             <div class="notif-dropdown" id="notifDropdown">
                 <div class="notif-header">Последние попытки</div>
                 <div id="notifList"><div class="notif-empty">Загрузка...</div></div>
@@ -104,7 +109,7 @@ document.addEventListener('click', function(e){
     });
 
     document.addEventListener('click', function(e){
-        if (!dropdown.contains(e.target) && e.target !== btn) {
+        if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
             dropdown.classList.remove('open');
         }
     });
@@ -113,6 +118,15 @@ document.addEventListener('click', function(e){
     poll(true);
     setInterval(function(){ poll(true); }, 30000);
 })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+window.refreshIcons = function() {
+    if (window.lucide) {
+        window.lucide.createIcons();
+    }
+};
+window.refreshIcons();
 </script>
 </body>
 </html>

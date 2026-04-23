@@ -19,16 +19,16 @@
     <p style="color:var(--text-muted);font-size:0.9rem;">Страница обновляется автоматически каждые 3 секунды.</p>
     <p>Добавлено заданий: <strong>{{ job.added|default:0 }}</strong></p>
     {% elif job.status == "done" %}
-    <div style="font-size:1.5rem;margin-bottom:8px;">✅</div>
-    <strong>Импорт завершён</strong>
+    <div class="empty-icon"><i data-lucide="check" aria-hidden="true"></i></div>
+    <strong class="status-inline"><i data-lucide="check" aria-hidden="true"></i><span>Импорт завершён</span></strong>
     <p>Добавлено заданий: <strong>{{ job.added|default:0 }}</strong></p>
     <div style="display:flex;gap:10px;margin-top:16px;">
         <a href="{% url 'admin_catalog_unclassified' %}" class="btn btn-primary">Назначить номера заданий</a>
         <a href="{% url 'admin_import_list' %}" class="btn btn-secondary">История импортов</a>
     </div>
     {% else %}
-    <div style="font-size:1.5rem;margin-bottom:8px;">❌</div>
-    <strong style="color:#e74c3c;">Ошибка импорта</strong>
+    <div class="empty-icon"><i data-lucide="x" aria-hidden="true"></i></div>
+    <strong class="status-inline" style="color:#e74c3c;"><i data-lucide="x" aria-hidden="true"></i><span>Ошибка импорта</span></strong>
     {% if job.error %}<p style="color:#e74c3c;">{{ job.error }}</p>{% endif %}
     <div style="margin-top:16px;">
         <a href="{% url 'admin_pdf_import' %}" class="btn btn-secondary">Попробовать снова</a>

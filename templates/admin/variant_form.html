@@ -114,7 +114,8 @@
         Или создайте вариант из каталога готовых заданий:
     </p>
     <button type="button" class="btn btn-secondary" id="openCatalogBtn" style="font-size:1rem;">
-        📚 Создать из каталога
+        <i data-lucide="book-open" aria-hidden="true"></i>
+        <span>Создать из каталога</span>
     </button>
 </div>
 
@@ -123,7 +124,9 @@
     <div class="catalog-modal">
         <div class="catalog-modal-head">
             <h2 style="margin:0;font-size:1.1rem;">Создать вариант из каталога</h2>
-            <button type="button" id="closeCatalogBtn" class="catalog-close-btn">✕</button>
+            <button type="button" id="closeCatalogBtn" class="catalog-close-btn" aria-label="Закрыть">
+                <i data-lucide="x" aria-hidden="true"></i>
+            </button>
         </div>
 
         <!-- Настройки варианта -->
@@ -150,7 +153,10 @@
             <div class="catalog-left">
                 <div class="catalog-search-wrap">
                     <div class="form-group" style="margin:0;">
-                        <input type="text" id="catalogSearch" placeholder="🔍 Поиск..." style="width:100%;">
+                        <div class="catalog-search-input-wrap">
+                            <i data-lucide="search" aria-hidden="true"></i>
+                            <input type="text" id="catalogSearch" placeholder="Поиск..." style="width:100%;">
+                        </div>
                     </div>
                     <div class="form-group" style="margin:4px 0 0;">
                         <select id="catalogSourceFilter" style="width:100%;font-size:0.8rem;">
@@ -172,7 +178,7 @@
             <div class="catalog-right">
                 <div id="catalogTasksWrap">
                     <div class="catalog-placeholder">
-                        <div style="font-size:2rem;margin-bottom:8px;">←</div>
+                        <span class="catalog-placeholder-icon"><i data-lucide="arrow-left" aria-hidden="true"></i></span>
                         Выберите номер задания слева
                     </div>
                 </div>
@@ -304,6 +310,18 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
     var countEl = document.getElementById('catalogSelectedCount');
     var errorEl = document.getElementById('catalogCreateError');
 
+    function refreshCatalogIcons() {
+        if (window.refreshIcons) window.refreshIcons();
+    }
+
+    function withIcon(name, text) {
+        return '<i data-lucide="' + name + '" aria-hidden="true"></i><span>' + text + '</span>';
+    }
+
+    function placeholderMarkup(message) {
+        return '<div class="catalog-placeholder"><span class="catalog-placeholder-icon"><i data-lucide="arrow-left" aria-hidden="true"></i></span>' + message + '</div>';
+    }
+
     // Открыть/закрыть модал
     document.getElementById('openCatalogBtn').addEventListener('click', function() {
         modal.style.display = 'flex';
@@ -324,7 +342,8 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
         currentNumber = null;
         updateCount();
         loadNumberList();
-        tasksWrapEl.innerHTML = '<div class="catalog-placeholder"><div style="font-size:2rem;margin-bottom:8px;">←</div>Выберите номер задания слева</div>';
+        tasksWrapEl.innerHTML = placeholderMarkup('Выберите номер задания слева');
+        refreshCatalogIcons();
     });
 
     // Поиск с дебаунсом
@@ -363,7 +382,7 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
                     return '<button class="catalog-num-btn ' + (isSelected ? 'has-task' : '') + ' ' + (n == currentNumber ? 'active' : '') + '" data-num="' + n + '">'
                         + 'Задание ' + n
                         + '<span class="catalog-num-count">' + counts[n] + '</span>'
-                        + (isSelected ? '<span class="catalog-check">✓</span>' : '')
+                        + (isSelected ? '<span class="catalog-check"><i data-lucide="check" aria-hidden="true"></i></span>' : '')
                         + '</button>';
                 }).join('');
                 numListEl.querySelectorAll('.catalog-num-btn').forEach(function(btn) {
@@ -374,6 +393,7 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
                         loadTasks(currentNumber);
                     });
                 });
+                refreshCatalogIcons();
             });
     }
 
@@ -395,6 +415,7 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
     function renderTasks() {
         if (!currentTasks.length) {
             tasksWrapEl.innerHTML = '<div class="catalog-placeholder">По запросу заданий не найдено</div>';
+            refreshCatalogIcons();
             return;
         }
         tasksWrapEl.innerHTML = currentTasks.map(function(t) {
@@ -415,7 +436,7 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
                 + '</div>'
                 + '<button class="btn btn-sm ' + (isAdded ? 'btn-success' : isOtherAdded ? 'btn-secondary' : 'btn-primary') + ' catalog-add-btn"'
                 + ' data-id="' + t.id + '" data-num="' + t.task_number + '">'
-                + (isAdded ? '✓ Добавлено' : isOtherAdded ? '⟳ Заменить' : 'Добавить')
+                + (isAdded ? withIcon('check', 'Добавлено') : isOtherAdded ? withIcon('refresh-cw', 'Заменить') : withIcon('plus', 'Добавить'))
                 + '</button>'
                 + '</div>';
         }).join('');
@@ -427,6 +448,7 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
                 addTask(id, num);
             });
         });
+        refreshCatalogIcons();
     }
 
     function addTask(id, num) {
@@ -448,11 +470,12 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
             btn.classList.toggle('has-task', isSelected);
             var check = btn.querySelector('.catalog-check');
             if (isSelected && !check) {
-                btn.insertAdjacentHTML('beforeend', '<span class="catalog-check">✓</span>');
+                btn.insertAdjacentHTML('beforeend', '<span class="catalog-check"><i data-lucide="check" aria-hidden="true"></i></span>');
             } else if (!isSelected && check) {
                 check.remove();
             }
         });
+        refreshCatalogIcons();
     }
 
     function updateCount() {

@@ -4,17 +4,17 @@
 {% block content %}
 <div class="actions-bar" style="margin-bottom:20px;">
     <h1 style="margin:0;">Задания требующие внимания</h1>
-    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">← К каталогу</a>
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary"><i data-lucide="arrow-left" aria-hidden="true"></i><span>К каталогу</span></a>
 </div>
 
 <!-- Панель экспорта/импорта ответов ФИПИ -->
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;padding:14px 16px;background:var(--bg-secondary);border-radius:var(--radius);border:1px solid var(--border);">
     <span style="font-size:0.875rem;color:var(--text-muted);margin-right:4px;">Ответы ФИПИ:</span>
-    <a href="{% url 'admin_fipi_export_answers' %}" class="btn btn-secondary">↓ Экспорт без ответов (JSON)</a>
+    <a href="{% url 'admin_fipi_export_answers' %}" class="btn btn-secondary"><i data-lucide="download" aria-hidden="true"></i><span>Экспорт без ответов (JSON)</span></a>
     <form method="post" action="{% url 'admin_fipi_import_answers' %}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;">
         {% csrf_token %}
         <input type="file" name="answers_file" accept=".json" required style="font-size:0.875rem;">
-        <button type="submit" class="btn btn-primary">↑ Загрузить ответы</button>
+        <button type="submit" class="btn btn-primary"><i data-lucide="upload" aria-hidden="true"></i><span>Загрузить ответы</span></button>
     </form>
 </div>
 
@@ -58,7 +58,7 @@
         {% endfor %}
     </select>
     {% if exam_type_filter or source_filter %}
-    <a href="?tab={{ tab }}" class="btn btn-secondary" style="height:38px;line-height:38px;padding:0 12px;">✕</a>
+    <a href="?tab={{ tab }}" class="btn btn-secondary" style="height:38px;line-height:38px;padding:0 12px;"><i data-lucide="x" aria-hidden="true"></i></a>
     {% endif %}
 </form>
 
@@ -120,7 +120,7 @@
 {% include "includes/pagination.html" with page_obj=page %}
 {% else %}
 <div class="empty-state">
-    <div class="empty-icon">✅</div>
+    <div class="empty-icon"><i data-lucide="check" aria-hidden="true"></i></div>
     {% if tab == 'no_number' %}
     <div class="empty-title">Все задания имеют номер</div>
     <div class="empty-desc">Нет заданий без назначенного номера задания</div>

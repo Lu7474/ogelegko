@@ -6,9 +6,9 @@
     <h1 style="margin:0;">Каталог заданий</h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <a href="{% url 'admin_catalog_add' %}" class="btn btn-primary">+ Добавить вручную</a>
-        <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary">⬇ СдамГИА</a>
-        <a href="{% url 'admin_fipi_import' %}" class="btn btn-secondary">⬇ ФИПИ</a>
-        <a href="{% url 'admin_pdf_import' %}" class="btn btn-secondary">⬇ PDF</a>
+        <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary"><i data-lucide="download" aria-hidden="true"></i><span>СдамГИА</span></a>
+        <a href="{% url 'admin_fipi_import' %}" class="btn btn-secondary"><i data-lucide="download" aria-hidden="true"></i><span>ФИПИ</span></a>
+        <a href="{% url 'admin_pdf_import' %}" class="btn btn-secondary"><i data-lucide="download" aria-hidden="true"></i><span>PDF</span></a>
         <a href="{% url 'admin_import_list' %}" class="btn btn-secondary">История импортов</a>
         <a href="{% url 'admin_catalog_unclassified' %}" class="btn btn-secondary">
             Неопределённые{% if unclassified_count %} <span class="notif-badge" style="position:static;display:inline-flex;margin-left:4px;">{{ unclassified_count }}</span>{% endif %}
@@ -46,7 +46,7 @@
     </div>
     <button type="submit" class="btn btn-primary" style="height:38px;">Найти</button>
     {% if exam_type_filter or num_filter or source_filter or search %}
-    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary" style="height:38px;">✕ Сбросить</a>
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary" style="height:38px;"><i data-lucide="x" aria-hidden="true"></i><span>Сбросить</span></a>
     {% endif %}
 </form>
 
@@ -140,7 +140,7 @@
         {% include "includes/pagination.html" with page_obj=page %}
         {% else %}
         <div class="empty-state">
-            <div class="empty-icon">📚</div>
+            <div class="empty-icon"><i data-lucide="book-open" aria-hidden="true"></i></div>
             <div class="empty-title">Заданий не найдено</div>
             <div class="empty-desc">
                 {% if search or num_filter or source_filter %}

@@ -45,7 +45,7 @@
     <a href="{% url 'admin_fipi_import' %}" class="btn btn-primary" style="margin-left:auto;">+ Импорт ФИПИ</a>
     <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary">Импорт СдамГИА</a>
     <a href="{% url 'admin_pdf_import' %}" class="btn btn-secondary">PDF</a>
-    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">← Каталог</a>
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Каталог</span></a>
 </div>
 
 {% if sessions %}
@@ -93,7 +93,7 @@
 </div>
 {% else %}
 <div class="card" style="padding:40px;text-align:center;color:var(--text-muted);">
-    <div style="font-size:2.5rem;margin-bottom:8px;">📭</div>
+    <div class="empty-icon"><i data-lucide="inbox" aria-hidden="true"></i></div>
     <p>Импортов ещё не было.</p>
     <a href="{% url 'admin_fipi_import' %}" class="btn btn-primary">Импортировать из ФИПИ</a>
 </div>

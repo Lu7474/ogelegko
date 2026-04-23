@@ -19,8 +19,8 @@
 
 {% if job.status == "running" %}
 <div class="card" style="padding:32px;text-align:center;">
-    <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
-    <p>Идёт импорт, подождите...</p>
+    <div class="empty-icon"><i data-lucide="clock" aria-hidden="true"></i></div>
+    <p class="status-inline" style="justify-content:center;"><i data-lucide="clock" aria-hidden="true"></i><span>Идёт импорт, подождите...</span></p>
     <div class="progress-bar-wrap" style="margin:16px auto;max-width:300px;">
         <div class="progress-bar-scan"></div>
     </div>

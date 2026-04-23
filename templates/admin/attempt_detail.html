@@ -14,7 +14,7 @@
         <div><span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Оценка</span><br><strong id="attempt-grade" style="font-size:1.1rem;">{{ attempt.grade }}</strong></div>
     </div>
     <div id="pending-warning" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);color:#e67e22;font-size:0.9rem;{% if not has_pending %}display:none{% endif %}">
-        ⚠ Есть задания, ожидающие ручной проверки
+        <span class="status-inline"><i data-lucide="triangle-alert" aria-hidden="true"></i><span>Есть задания, ожидающие ручной проверки</span></span>
     </div>
 </div>
 
@@ -78,7 +78,7 @@
                                 {% endfor %}
                             </div>
                         {% else %}
-                            <span style="color:#e67e22">⏳ Ожидает</span>
+                            <span class="status-inline" style="color:#e67e22"><i data-lucide="clock" aria-hidden="true"></i><span>Ожидает</span></span>
                             <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
                                 {% for pts in answer.task.points|get_points_range %}
                                 <form class="grade-form" data-answer-id="{{ answer.id }}" method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline">
@@ -93,28 +93,28 @@
                     {% else %}
                         {# Обычные задания с ручной проверкой (1 балл — верно/неверно) #}
                         {% if answer.is_correct is None %}
-                            <span style="color:#e67e22">⏳ Ожидает</span>
+                            <span class="status-inline" style="color:#e67e22"><i data-lucide="clock" aria-hidden="true"></i><span>Ожидает</span></span>
                             <div style="margin-top:6px;display:flex;gap:8px">
                                 <form class="grade-form" data-answer-id="{{ answer.id }}" method="post" action="{% url 'admin_grade_answer' answer.id %}">
                                     {% csrf_token %}
                                     <input type="hidden" name="is_correct" value="true">
-                                    <button class="btn btn-primary" style="padding:4px 12px">✓ Верно</button>
+                                    <button class="btn btn-primary" style="padding:4px 12px"><i data-lucide="check" aria-hidden="true"></i><span>Верно</span></button>
                                 </form>
                                 <form class="grade-form" data-answer-id="{{ answer.id }}" method="post" action="{% url 'admin_grade_answer' answer.id %}">
                                     {% csrf_token %}
                                     <input type="hidden" name="is_correct" value="false">
-                                    <button class="btn btn-danger" style="padding:4px 12px">✗ Неверно</button>
+                                    <button class="btn btn-danger" style="padding:4px 12px"><i data-lucide="x" aria-hidden="true"></i><span>Неверно</span></button>
                                 </form>
                             </div>
                         {% elif answer.is_correct %}
-                            <span style="color:#27ae60">✓ Верно</span>
+                            <span class="status-inline" style="color:#27ae60"><i data-lucide="check" aria-hidden="true"></i><span>Верно</span></span>
                             <form class="grade-form" data-answer-id="{{ answer.id }}" method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
                                 {% csrf_token %}
                                 <input type="hidden" name="is_correct" value="false">
                                 <button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>
                             </form>
                         {% else %}
-                            <span style="color:#e74c3c">✗ Неверно</span>
+                            <span class="status-inline" style="color:#e74c3c"><i data-lucide="x" aria-hidden="true"></i><span>Неверно</span></span>
                             <form class="grade-form" data-answer-id="{{ answer.id }}" method="post" action="{% url 'admin_grade_answer' answer.id %}" style="display:inline;margin-left:8px">
                                 {% csrf_token %}
                                 <input type="hidden" name="is_correct" value="true">
@@ -124,9 +124,9 @@
                     {% endif %}
                 </div>
                 {% elif answer.is_correct %}
-                    <span style="color:#27ae60">✓</span>
+                    <span class="status-inline" style="color:#27ae60"><i data-lucide="check" aria-hidden="true"></i></span>
                 {% else %}
-                    <span style="color:#e74c3c">✗</span>
+                    <span class="status-inline" style="color:#e74c3c"><i data-lucide="x" aria-hidden="true"></i></span>
                 {% endif %}
             </td>
         </tr>
@@ -135,7 +135,7 @@
 </table>
 
 <div style="margin-top:20px;display:flex;gap:12px">
-    <a href="{% url 'admin_student_stats' attempt.student.id %}" class="btn btn-secondary">← Назад к ученику</a>
+    <a href="{% url 'admin_student_stats' attempt.student.id %}" class="btn btn-secondary"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Назад к ученику</span></a>
     <form method="post" action="{% url 'admin_attempt_delete' attempt.id %}">
         {% csrf_token %}
         <button class="btn btn-danger" onclick="return confirm('Удалить попытку?')">Удалить попытку</button>
@@ -151,7 +151,7 @@
     function buildMultiPoint(answerId, gradeUrl, awardedPts, maxPts) {
         const pending = awardedPts === null;
         let html = pending
-            ? '<span style="color:#e67e22">⏳ Ожидает</span>'
+            ? '<span class="status-inline" style="color:#e67e22"><i data-lucide="clock" aria-hidden="true"></i><span>Ожидает</span></span>'
             : '<span style="font-weight:600">' + awardedPts + '&nbsp;/&nbsp;' + maxPts + '&nbsp;б</span>';
         html += '<div style="margin-top:' + (pending ? '6' : '4') + 'px;display:flex;gap:6px;flex-wrap:wrap">';
         for (let p = 0; p <= maxPts; p++) {
@@ -172,6 +172,8 @@
 
     function buildSinglePoint(answerId, gradeUrl, isCorrect) {
         const csrf = getCSRF();
+        const status = (name, color, text) =>
+            '<span class="status-inline" style="color:' + color + '"><i data-lucide="' + name + '" aria-hidden="true"></i><span>' + text + '</span></span>';
         const form = (val, cls, label) =>
             '<form class="grade-form" data-answer-id="' + answerId + '" action="' + gradeUrl + '" method="post" style="display:inline">'
             + '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrf + '">'
@@ -179,10 +181,10 @@
             + '<button class="btn ' + cls + '" style="padding:4px 12px">' + label + '</button>'
             + '</form>';
         if (isCorrect === null) {
-            return '<span style="color:#e67e22">⏳ Ожидает</span>'
+            return status('clock', '#e67e22', 'Ожидает')
                 + '<div style="margin-top:6px;display:flex;gap:8px">'
-                + form('true', 'btn-primary', '✓ Верно')
-                + form('false', 'btn-danger', '✗ Неверно')
+                + form('true', 'btn-primary', '<i data-lucide="check" aria-hidden="true"></i><span>Верно</span>')
+                + form('false', 'btn-danger', '<i data-lucide="x" aria-hidden="true"></i><span>Неверно</span>')
                 + '</div>';
         }
         const changeForm = '<form class="grade-form" data-answer-id="' + answerId + '" action="' + gradeUrl + '" method="post" style="display:inline;margin-left:8px">'
@@ -191,8 +193,8 @@
             + '<button class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">Изменить</button>'
             + '</form>';
         return isCorrect
-            ? '<span style="color:#27ae60">✓ Верно</span>' + changeForm
-            : '<span style="color:#e74c3c">✗ Неверно</span>' + changeForm;
+            ? status('check', '#27ae60', 'Верно') + changeForm
+            : status('x', '#e74c3c', 'Неверно') + changeForm;
     }
 
     function updatePendingWarning() {
@@ -232,6 +234,7 @@
                         container.innerHTML = buildSinglePoint(answerId, gradeUrl, d.is_correct);
                         container.dataset.pending = d.is_correct === null ? '1' : '';
                     }
+                    if (window.refreshIcons) window.refreshIcons();
                     attach(container);
                     updatePendingWarning();
                 } catch {

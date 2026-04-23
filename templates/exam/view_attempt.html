@@ -15,14 +15,21 @@
 <h1>Вариант {{ attempt.variant.number }} — Просмотр</h1>
 <p>Результат: {{ attempt.correct_count }}/{{ attempt.total_count }} | Оценка: {{ attempt.grade }}</p>
 
-<a href="{% url 'results' attempt.id %}" class="btn btn-secondary" style="margin-bottom: 20px; display:inline-block;">← Назад к итогам</a>
+<a href="{% url 'results' attempt.id %}" class="btn btn-secondary" style="margin-bottom: 20px; display:inline-flex;">
+    <i data-lucide="arrow-left" aria-hidden="true"></i>
+    <span>Назад к итогам</span>
+</a>
 
 {% for answer in answers %}
 <div class="task-block {% if answer.is_correct %}task-correct{% else %}task-wrong{% endif %}">
     <h3>
         Задание {{ answer.task.number }}
         <span class="dot-inline {% if answer.is_correct %}dot-correct{% else %}dot-wrong{% endif %}">
-            {% if answer.is_correct %}✓{% else %}✗{% endif %}
+            {% if answer.is_correct %}
+            <i data-lucide="check" aria-hidden="true"></i>
+            {% else %}
+            <i data-lucide="x" aria-hidden="true"></i>
+            {% endif %}
         </span>
     </h3>
     {% if answer.task.shared_context or answer.task.shared_context_image %}

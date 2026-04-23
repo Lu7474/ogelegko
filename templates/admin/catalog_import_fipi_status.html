@@ -36,9 +36,9 @@
         <div class="progress-bar-wrap"><div class="progress-bar-scan"></div></div>
         <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">Прошло: <span id="elapsedTime">0:00</span></p>
         {% elif job.status == "done" %}
-        <p class="status-done" style="font-size:1.1rem;font-weight:600;">✓ Импорт завершён</p>
+        <p class="status-done status-inline" style="font-size:1.1rem;font-weight:600;"><i data-lucide="check" aria-hidden="true"></i><span>Импорт завершён</span></p>
         {% elif job.status == "error" %}
-        <p class="status-error" style="font-size:1.1rem;font-weight:600;">✗ Ошибка импорта</p>
+        <p class="status-error status-inline" style="font-size:1.1rem;font-weight:600;"><i data-lucide="x" aria-hidden="true"></i><span>Ошибка импорта</span></p>
         {% else %}
         <p>Неизвестный статус: {{ job.status }}</p>
         {% endif %}

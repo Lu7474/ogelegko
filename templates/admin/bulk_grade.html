@@ -6,9 +6,9 @@
 
 {% if not pending_answers %}
 <div class="card" style="padding:40px;text-align:center;color:var(--text-muted);">
-    <div style="font-size:2rem;margin-bottom:8px;">✓</div>
+    <div class="empty-icon"><i data-lucide="check" aria-hidden="true"></i></div>
     <p>В выбранных попытках нет заданий, ожидающих проверки.</p>
-    <a href="{% url 'admin_class_stats' school_class.id %}" class="btn btn-secondary" style="margin-top:8px;">← Назад</a>
+    <a href="{% url 'admin_class_stats' school_class.id %}" class="btn btn-secondary" style="margin-top:8px;"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Назад</span></a>
 </div>
 {% else %}
 <p style="color:var(--text-muted);margin-bottom:16px;font-size:0.9rem;">
