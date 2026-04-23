@@ -176,6 +176,7 @@
 // === Таймер ===
 let remaining = {{ remaining_seconds }};
 const timerEl = document.getElementById('timer');
+const finishForm = document.getElementById('finishForm');
 let timerSubmitted = false;
 let warningPlayed = false;
 const notifiedAt = new Set();
@@ -196,12 +197,17 @@ function sendNotification(title, body) {
     }
 }
 
+function submitFinishFlow() {
+    if (finishing) return;
+    timerSubmitted = true;
+    // dispatchEvent triggers the submit handler (answer flush + localStorage clear)
+    // Native .submit() would bypass the submit event entirely
+    finishForm.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+}
+
 function updateTimer() {
     if (remaining <= 0 && !timerSubmitted) {
-        timerSubmitted = true;
-        // dispatchEvent triggers the submit handler (answer flush + localStorage clear)
-        // Native .submit() would bypass the submit event entirely
-        document.getElementById('finishForm').dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+        submitFinishFlow();
         return;
     }
     remaining--;
@@ -330,8 +336,7 @@ answerInputs.forEach(input => {
                 body: JSON.stringify({answer_id: answerId, value: value})
             }).then(r => {
                 if (r.status === 403) {
-                    timerSubmitted = true;
-                    document.getElementById('finishForm').submit();
+                    submitFinishFlow();
                     return;
                 }
                 indicator.className = 'save-indicator';
@@ -359,7 +364,7 @@ window.addEventListener('beforeunload', e => {
 });
 
 // === Сброс localStorage на сервер перед финальной отправкой ===
-document.getElementById('finishForm').addEventListener('submit', async function(e) {
+finishForm.addEventListener('submit', async function(e) {
     if (finishing) return; // уже сбрасываем — пропускаем рекурсию от .submit()
     e.preventDefault();
     finishing = true;
