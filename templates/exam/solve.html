@@ -4,33 +4,32 @@
 
 {% block extra_head %}
 <style>
-    .sticky-panel { position: sticky; top: 0; z-index: 100; background: var(--card-bg, #fff); border-bottom: 2px solid var(--border, #e0e0e0); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; overflow: hidden; }
-    .timer { font-size: 1.2rem; font-weight: bold; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
-    .timer.warning { color: #e74c3c; animation: pulse 1s ease-in-out infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .sticky-panel { position: sticky; top: 0; z-index: 100; background: var(--card-bg); border-bottom: 2px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; overflow: hidden; }
+    .timer { font-size: 1.4rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+    .timer.warning { color: var(--danger); background: rgba(176, 58, 46, 0.1); padding: 2px 8px; border-radius: 4px; animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
     .task-nav-wrap { flex: 1; min-width: 0; overflow: hidden; }
     .task-nav { display: flex; gap: 4px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -ms-overflow-style: none; }
     .task-nav::-webkit-scrollbar { display: none; }
-    .task-nav a { flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 7px; background: var(--border, #e0e0e0); text-decoration: none; color: var(--text, #333); font-size: 0.78rem; font-weight: 600; }
-    .task-nav a.answered { background: #3b82f6; color: #fff; }
+    .task-nav a { flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 7px; background: var(--border); text-decoration: none; color: var(--text); font-size: 0.78rem; font-weight: 600; }
     .task-block { scroll-margin-top: 64px; }
-    .progress-bar-wrap { height: 3px; background: var(--border, #e0e0e0); border-radius: 3px; margin-top: 3px; }
-    .progress-bar-fill { height: 100%; background: #27ae60; border-radius: 3px; transition: width 0.3s; }
-    .progress-text { font-size: 0.7rem; color: var(--text-muted, #7f8c8d); white-space: nowrap; }
+    .progress-bar-wrap { height: 6px; background: var(--border); border-radius: 6px; margin-top: 4px; }
+    .progress-bar-fill { height: 100%; border-radius: 6px; transition: width 0.3s, background 0.5s; }
+    .progress-text { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
     .panel-right { white-space: nowrap; flex-shrink: 0; font-size: 0.82rem; min-width: 0; }
-    .save-indicator { font-size: 0.75rem; color: #27ae60; opacity: 0; transition: opacity 0.3s; margin-left: 4px; }
+    .save-indicator { font-size: 0.75rem; color: var(--text-muted); opacity: 0; transition: opacity 0.3s; margin-left: 4px; }
     .save-indicator.show { opacity: 1; }
-    .save-indicator.error { color: #e74c3c; }
-    .answer-hint { font-size: 0.75rem; color: var(--text-muted, #7f8c8d); margin-top: 2px; }
+    .save-indicator.error { color: var(--danger); }
+    .answer-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
     .answer-preview { max-height: 300px; overflow-y: auto; text-align: left; margin: 12px 0; }
     .answer-preview table { width: 100%; border-collapse: collapse; }
-    .answer-preview td { padding: 4px 8px; border-bottom: 1px solid var(--border, #eee); font-size: 0.9rem; }
-    .answer-preview .empty { color: #e74c3c; }
+    .answer-preview td { padding: 4px 8px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .answer-preview .empty { color: var(--danger); }
     /* Таблицы в задачах: позволяем им быть шире контейнера — overflow-x:auto на .task-text их скроллит */
     .task-text table { max-width: none; }
     @media (max-width: 600px) {
         .sticky-panel { padding: 6px 8px; gap: 6px; }
-        .timer { font-size: 1rem; }
+        .timer { font-size: 1.1rem; }
         .task-nav a { width: 28px !important; height: 28px !important; font-size: 0.7rem !important; }
         .task-block { scroll-margin-top: 60px; }
         .panel-right { display: flex; flex-shrink: 1; overflow: hidden; }
@@ -42,10 +41,10 @@
         /* Фиксированная кнопка «Завершить» снизу экрана */
         .finish-section {
             position: fixed; bottom: 0; left: 0; right: 0;
-            padding: 10px 16px;
-            background: var(--card-bg, #fff);
-            border-top: 1px solid var(--border, #e2e8f0);
-            box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+            padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            background: var(--card-bg);
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -2px 8px rgba(28, 21, 16, .08);
             z-index: 99;
             text-align: left;
             margin: 0;
@@ -84,7 +83,7 @@
 </p>
 
 {% if resumed %}
-<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:0.9rem;color:#92400e;">
+<div style="background:var(--warning-light);border-left:4px solid var(--warning);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:16px;font-size:0.9rem;color:var(--warning);">
     Продолжаете предыдущую попытку — ответы сохранены
 </div>
 {% endif %}
@@ -241,20 +240,31 @@ setInterval(updateTimer, 1000);
 // Запросить разрешение при старте
 requestNotificationPermission();
 
-// === Прогресс (#23) ===
+// === Прогресс ===
 const answerInputs = document.querySelectorAll('.answer-input');
 const totalTasks = answerInputs.length;
 
 function updateProgress() {
     let answered = 0;
     answerInputs.forEach(input => { if (input.value.trim()) answered++; });
-    document.getElementById('progressBar').style.width = (answered / totalTasks * 100) + '%';
+    const pct = totalTasks ? (answered / totalTasks * 100) : 0;
+    const bar = document.getElementById('progressBar');
+    bar.style.width = pct + '%';
+    if (pct >= 67) bar.style.background = 'var(--success)';
+    else if (pct >= 34) bar.style.background = 'var(--primary)';
+    else bar.style.background = 'var(--text-muted)';
     document.getElementById('progressText').textContent = answered + '/' + totalTasks;
 }
 
 // === Автосохранение ===
 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 const answerMap = JSON.parse('{{ answer_map_json|escapejs }}');
+
+// === Инициализация классов task-block ===
+document.querySelectorAll('.task-block').forEach(block => {
+    if (block.querySelector('.no-input-task')) block.classList.add('is-no-input');
+    else if (block.querySelector('textarea.answer-input')) block.classList.add('is-manual');
+});
 
 // === localStorage: восстановление ответов при загрузке ===
 answerInputs.forEach(input => {
@@ -266,6 +276,14 @@ answerInputs.forEach(input => {
             const navEl = document.getElementById('nav-' + taskNumber);
             if (navEl) navEl.classList.add('answered');
         }
+    }
+});
+
+// === Инициализация is-answered для заполненных полей ===
+answerInputs.forEach(input => {
+    if (input.value.trim()) {
+        const block = input.closest('.task-block');
+        if (block) block.classList.add('is-answered');
     }
 });
 updateProgress();
@@ -286,10 +304,16 @@ answerInputs.forEach(input => {
             localStorage.removeItem(LS_PREFIX + taskNumber);
         }
 
-        // Навигация
+        // Навигация и состояние блока
         const navEl = document.getElementById('nav-' + taskNumber);
-        if (value.trim()) { navEl.classList.add('answered'); }
-        else { navEl.classList.remove('answered'); }
+        const block = this.closest('.task-block');
+        if (value.trim()) {
+            navEl.classList.add('answered');
+            if (block) block.classList.add('is-answered');
+        } else {
+            navEl.classList.remove('answered');
+            if (block) block.classList.remove('is-answered');
+        }
 
         updateProgress();
 
@@ -304,14 +328,19 @@ answerInputs.forEach(input => {
                 body: JSON.stringify({answer_id: answerId, value: value})
             }).then(r => {
                 if (r.status === 403) {
-                    // Время истекло на сервере
                     timerSubmitted = true;
                     document.getElementById('finishForm').submit();
                     return;
                 }
-                indicator.textContent = r.ok ? 'Сохранено' : 'Ошибка';
-                indicator.className = 'save-indicator show' + (r.ok ? '' : ' error');
-                setTimeout(() => { indicator.className = 'save-indicator'; }, 1500);
+                indicator.className = 'save-indicator';
+                if (r.ok) {
+                    this.style.borderBottomColor = 'var(--success)';
+                    setTimeout(() => { this.style.borderBottomColor = ''; }, 1500);
+                } else {
+                    indicator.textContent = 'Ошибка';
+                    indicator.className = 'save-indicator show error';
+                    setTimeout(() => { indicator.className = 'save-indicator'; }, 1500);
+                }
             }).catch(() => {
                 indicator.textContent = 'Нет сети';
                 indicator.className = 'save-indicator show error';
@@ -321,10 +350,13 @@ answerInputs.forEach(input => {
     });
 });
 
-// === Сброс localStorage на сервер перед финальной отправкой ===
-// Перехватывает submit формы завершения и синхронизирует все ответы с БД,
-// чтобы восстановленные из localStorage значения не потерялись.
+// === Защита от случайного ухода ===
 let finishing = false;
+window.addEventListener('beforeunload', e => {
+    if (!finishing) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// === Сброс localStorage на сервер перед финальной отправкой ===
 document.getElementById('finishForm').addEventListener('submit', async function(e) {
     if (finishing) return; // уже сбрасываем — пропускаем рекурсию от .submit()
     e.preventDefault();
@@ -405,5 +437,33 @@ answerInputs.forEach(input => {
     const navEl = document.getElementById('nav-' + taskNumber);
     if (navEl && input.value.trim()) navEl.classList.add('answered');
 });
+
+// === Разделители частей ===
+(function insertPartDividers() {
+    const form = document.getElementById('examForm');
+    if (!form) return;
+    const blocks = Array.from(form.querySelectorAll('.task-block'));
+    if (!blocks.length) return;
+
+    const isManualBlock = b => b.querySelector('textarea.answer-input') || b.querySelector('.no-input-task');
+
+    if (!isManualBlock(blocks[0])) {
+        const d = document.createElement('div');
+        d.className = 'part-divider';
+        d.innerHTML = '<span>ЧАСТЬ 1</span><span>Краткий ответ · автопроверка</span>';
+        form.insertBefore(d, blocks[0]);
+    }
+
+    let part2Done = false;
+    blocks.forEach(block => {
+        if (isManualBlock(block) && !part2Done) {
+            part2Done = true;
+            const d = document.createElement('div');
+            d.className = 'part-divider';
+            d.innerHTML = '<span>ЧАСТЬ 2</span><span>Развёрнутый ответ · ручная проверка</span>';
+            form.insertBefore(d, block);
+        }
+    });
+})();
 </script>
 {% endblock %}
