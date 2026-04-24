@@ -5,11 +5,12 @@
 <h1>Ученики</h1>
 
 <div class="actions-bar">
-    <a href="{% url 'admin_student_add' %}" class="btn btn-primary">Добавить ученика</a>
-    <a href="{% url 'admin_student_import' %}" class="btn btn-secondary">Импорт из Excel</a>
+    <a href="{% url 'admin_student_add' %}" class="btn btn-primary"><i data-lucide="user-plus" aria-hidden="true"></i><span>Добавить ученика</span></a>
+    <a href="{% url 'admin_student_import' %}" class="btn btn-secondary"><i data-lucide="upload" aria-hidden="true"></i><span>Импорт из Excel</span></a>
 
     <form method="get" class="filter-form">
-        <select name="class" onchange="this.form.submit()">
+        <label for="filter-class" style="font-size:0.85rem;color:var(--text-muted);white-space:nowrap;">Класс:</label>
+        <select id="filter-class" name="class" onchange="this.form.submit()">
             <option value="">Все классы</option>
             {% for cls in classes %}
             <option value="{{ cls.id }}" {% if class_filter == cls.id|stringformat:"d" %}selected{% endif %}>{{ cls.name }}</option>
@@ -19,13 +20,17 @@
         <input type="hidden" name="has_pending" value="1">
         {% endif %}
     </form>
+
     {% if has_pending %}
     <a href="?{% if class_filter %}class={{ class_filter }}{% endif %}" class="btn btn-secondary">Все ученики</a>
     {% else %}
-    <a href="?has_pending=1{% if class_filter %}&class={{ class_filter }}{% endif %}" class="btn btn-secondary">Только с незачтёнными</a>
+    <a href="?has_pending=1{% if class_filter %}&class={{ class_filter }}{% endif %}" class="btn btn-secondary {% if has_pending %}btn-active{% endif %}">
+        <i data-lucide="clock" aria-hidden="true"></i><span>С незачтёнными</span>
+    </a>
     {% endif %}
 </div>
 
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr><th>ФИО</th><th>Класс</th><th>Тип</th><th>Попыток</th><th>Действия</th></tr>
@@ -59,5 +64,6 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% include "includes/pagination.html" %}
 {% endblock %}

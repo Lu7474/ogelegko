@@ -21,7 +21,7 @@
 </div>
 
 <!-- Панель массового скачивания (появляется при выборе) -->
-<div id="bulkBar" style="display:none;align-items:center;gap:12px;padding:10px 14px;margin-bottom:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);">
+<div id="bulkBar" style="display:none;align-items:center;gap:12px;padding:10px 14px;margin-bottom:12px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);">
     <span id="bulkCount" style="font-size:0.9rem;color:var(--text-muted);"></span>
     <form method="post" action="{% url 'admin_variants_print_zip' %}" id="bulkForm">
         {% csrf_token %}
@@ -48,6 +48,7 @@
     <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()">Снять выбор</button>
 </div>
 
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr>
@@ -66,19 +67,19 @@
             <td>{% if v.max_attempts == 0 %}&infin;{% else %}{{ v.max_attempts }}{% endif %}</td>
             <td>{% if v.is_active %}<span class="badge badge-green">Активен</span>{% else %}<span class="badge badge-gray">Скрыт</span>{% endif %}</td>
             <td style="white-space:nowrap">
-                <div class="row-actions" style="flex-wrap:wrap;">
+                <div class="row-actions">
                 <a href="{% url 'admin_variant_stats' v.id %}" class="btn btn-sm">Статистика</a>
                 <a href="{% url 'admin_variant_edit' v.id %}" class="btn btn-sm">Редактировать</a>
                 <a href="{% url 'admin_variant_print' v.id 'teacher' %}" class="btn btn-sm btn-secondary" download>Распечатать</a>
-                <form method="post" action="{% url 'admin_variant_toggle' v.id %}">
+                <form method="post" action="{% url 'admin_variant_toggle' v.id %}" style="display:inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-secondary">{% if v.is_active %}Скрыть{% else %}Активировать{% endif %}</button>
                 </form>
-                <form method="post" action="{% url 'admin_variant_duplicate' v.id %}">
+                <form method="post" action="{% url 'admin_variant_duplicate' v.id %}" style="display:inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-secondary">Дублировать</button>
                 </form>
-                <form method="post" action="{% url 'admin_variant_delete' v.id %}" onsubmit="return confirm('Удалить вариант {{ v.number }}?')">
+                <form method="post" action="{% url 'admin_variant_delete' v.id %}" style="display:inline;" onsubmit="return confirm('Удалить вариант {{ v.number }}?')">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
                 </form>
@@ -88,7 +89,7 @@
         {% empty %}
         <tr><td colspan="8" style="padding:0;border:none">
             <div class="empty-state">
-                <span class="empty-state-icon">📋</span>
+                <span class="empty-state-icon"><i data-lucide="files" aria-hidden="true"></i></span>
                 <h3>Вариантов пока нет</h3>
                 <p>Создайте вариант вручную или импортируйте с sdamgia.ru</p>
                 <a href="{% url 'admin_variant_add' %}" class="btn btn-primary">Создать вариант</a>
@@ -97,6 +98,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% include "includes/pagination.html" %}
 
 <!-- Модалка архива ZIP -->
