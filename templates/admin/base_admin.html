@@ -14,7 +14,7 @@
         <a href="{% url 'admin_dashboard' %}" class="nav-title">Админ-панель</a>
         <div class="nav-links" id="adminNavLinks">
             <a href="{% url 'admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">Главная</a>
-            <a href="{% url 'admin_classes' %}" class="{% if 'class' in request.resolver_match.url_name %}active{% endif %}">Классы</a>
+            <a href="{% url 'admin_classes' %}" class="{% if 'admin_class' in request.resolver_match.url_name %}active{% endif %}">Классы</a>
             <a href="{% url 'admin_students' %}" class="{% if 'student' in request.resolver_match.url_name %}active{% endif %}">Ученики</a>
             <a href="{% url 'admin_variants' %}" class="{% if 'variant' in request.resolver_match.url_name or 'attempt' in request.resolver_match.url_name %}active{% endif %}">Варианты</a>
             <a href="{% url 'admin_catalog' %}" class="{% if 'catalog' in request.resolver_match.url_name %}active{% endif %}">Каталог</a>
