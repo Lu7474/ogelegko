@@ -58,7 +58,7 @@
                         <textarea name="task_{{ task.number }}_text" rows="4"
                                   style="resize:vertical;font-family:monospace;font-size:0.82rem"
                                   oninput="updatePreview(this)">{{ task.text }}</textarea>
-                        <div class="task-text task-preview" style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);min-height:80px;padding:8px 10px;font-size:0.9rem"></div>
+                        <div class="task-text task-preview" style="border:1px solid var(--border);border-radius:var(--radius);background:var(--card-bg);min-height:80px;padding:8px 10px;font-size:0.9rem"></div>
                     </div>
                 </div>
                 <div class="form-group">
@@ -243,7 +243,7 @@ document.getElementById('addTask').addEventListener('click', function() {
                 <textarea name="task_${taskCount}_text" rows="4"
                           style="resize:vertical;font-family:monospace;font-size:0.82rem"
                           oninput="updatePreview(this)"></textarea>
-                <div class="task-text task-preview" style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);min-height:80px;padding:8px 10px;font-size:0.9rem"></div>
+                <div class="task-text task-preview" style="border:1px solid var(--border);border-radius:var(--radius);background:var(--card-bg);min-height:80px;padding:8px 10px;font-size:0.9rem"></div>
             </div>
         </div>
         <div class="form-group">

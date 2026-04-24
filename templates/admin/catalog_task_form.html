@@ -34,7 +34,7 @@
         </div>
     </div>
 
-    <details class="shared-context-editor" {% if task.shared_context or task.shared_context_image %}open{% endif %} style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);">
+    <details class="shared-context-editor" {% if task.shared_context or task.shared_context_image %}open{% endif %} style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);">
         <summary style="cursor:pointer;font-weight:600;font-size:0.9rem;color:var(--text-muted);">Общее условие (для задач 13–19 ЕГЭ и аналогичных)</summary>
         <div class="form-group" style="margin-top:10px;">
             <label for="shared_context">Текст общего условия</label>
@@ -67,7 +67,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;">
             <textarea id="text" name="text" rows="8" placeholder="HTML или обычный текст..."
                       style="resize:vertical;font-family:monospace;font-size:0.82rem;">{{ task.text|default:'' }}</textarea>
-            <div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);min-height:120px;display:flex;flex-direction:column;">
+            <div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--card-bg);min-height:120px;display:flex;flex-direction:column;">
                 <div style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:0.75rem;color:var(--text-muted);font-weight:600;letter-spacing:.03em;">КАК ВИДИТ УЧЕНИК</div>
                 <div id="text-preview" class="task-text" style="padding:10px 12px;flex:1;"></div>
             </div>
