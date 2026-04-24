@@ -1352,3 +1352,69 @@ tr:hover .row-actions { opacity: 1; }
         gap: 12px;
     }
 }
+
+/* === Row "···" actions dropdown === */
+.actions-more {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+}
+.actions-more-btn {
+    padding: 0 8px;
+    font-size: 1rem;
+    letter-spacing: 2px;
+    line-height: 30px;
+    height: 32px;
+    color: var(--text-muted);
+}
+.actions-more-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-elevated);
+    z-index: 200;
+    min-width: 170px;
+    padding: 4px 0;
+    white-space: nowrap;
+}
+.actions-more-menu.open { display: block; }
+.menu-action {
+    display: block;
+    width: 100%;
+    padding: 9px 16px;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-family: inherit;
+    color: var(--text);
+    text-decoration: none;
+    transition: background .1s;
+    white-space: nowrap;
+}
+.menu-action:hover { background: var(--hover-bg); text-decoration: none; color: var(--text); }
+.menu-action-danger { color: var(--danger); }
+.menu-action-danger:hover { background: var(--danger-light, #fee2e2); color: var(--danger); }
+.menu-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+/* Spinner utility (used in import status pages) */
+.spinner {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

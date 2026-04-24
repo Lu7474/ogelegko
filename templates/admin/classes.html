@@ -24,14 +24,20 @@
                 <div class="row-actions">
                     <a href="{% url 'admin_class_stats' cls.id %}" class="btn btn-sm">Статистика</a>
                     <a href="{% url 'admin_class_edit' cls.id %}" class="btn btn-sm">Редактировать</a>
-                    <form method="post" action="{% url 'admin_class_toggle' cls.id %}" style="display:inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-secondary">{% if cls.is_active %}Архивировать{% else %}Активировать{% endif %}</button>
-                    </form>
-                    <form method="post" action="{% url 'admin_class_delete' cls.id %}" style="display:inline;" onsubmit="return confirm('Удалить класс {{ cls.name }}? Все ученики этого класса будут удалены!')">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
-                    </form>
+                    <div class="actions-more">
+                        <button type="button" class="btn btn-sm btn-secondary actions-more-btn" aria-label="Ещё действия">···</button>
+                        <div class="actions-more-menu">
+                            <form method="post" action="{% url 'admin_class_toggle' cls.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="menu-action">{% if cls.is_active %}Архивировать{% else %}Активировать{% endif %}</button>
+                            </form>
+                            <div class="menu-sep"></div>
+                            <form method="post" action="{% url 'admin_class_delete' cls.id %}" onsubmit="return confirm('Удалить класс {{ cls.name }}? Все ученики этого класса будут удалены!')">
+                                {% csrf_token %}
+                                <button type="submit" class="menu-action menu-action-danger">Удалить</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </td>
         </tr>

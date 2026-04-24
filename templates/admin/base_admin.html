@@ -57,6 +57,30 @@ document.addEventListener('click', function(e){
 </script>
 <script>
 (function(){
+    function closeAllMenus(except) {
+        document.querySelectorAll('.actions-more-menu.open').forEach(function(m){
+            if (m !== except) m.classList.remove('open');
+        });
+    }
+    document.addEventListener('click', function(e){
+        var btn = e.target.closest('.actions-more-btn');
+        if (btn) {
+            e.stopPropagation();
+            var menu = btn.parentElement.querySelector('.actions-more-menu');
+            var opening = !menu.classList.contains('open');
+            closeAllMenus(null);
+            if (opening) menu.classList.add('open');
+            return;
+        }
+        closeAllMenus(null);
+    });
+    document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') closeAllMenus(null);
+    });
+})();
+</script>
+<script>
+(function(){
     var API = "{% url 'admin_api_new_attempts' %}";
     var LS_KEY = "admin_notif_seen";
     var badge = document.getElementById('notifBadge');
