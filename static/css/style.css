@@ -1211,6 +1211,14 @@ tr:hover .row-actions { opacity: 1; }
     .catalog-modal-foot .btn { width: 100%; justify-content: center; }
 }
 
+/* Generic card utility (used in catalog pages) */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+}
+
 /* === Admin polish (wave 2) === */
 
 /* Responsive table wrapper */
