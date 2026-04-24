@@ -15,8 +15,8 @@
         <div class="nav-links" id="adminNavLinks">
             <a href="{% url 'admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">Главная</a>
             <a href="{% url 'admin_classes' %}" class="{% if 'admin_class' in request.resolver_match.url_name or 'bulk_grade' in request.resolver_match.url_name %}active{% endif %}">Классы</a>
-            <a href="{% url 'admin_students' %}" class="{% if 'student' in request.resolver_match.url_name %}active{% endif %}">Ученики</a>
-            <a href="{% url 'admin_variants' %}" class="{% if 'variant' in request.resolver_match.url_name or 'attempt' in request.resolver_match.url_name %}active{% endif %}">Варианты</a>
+            <a href="{% url 'admin_students' %}" class="{% if 'student' in request.resolver_match.url_name or 'attempt' in request.resolver_match.url_name %}active{% endif %}">Ученики</a>
+            <a href="{% url 'admin_variants' %}" class="{% if 'variant' in request.resolver_match.url_name %}active{% endif %}">Варианты</a>
             <a href="{% url 'admin_catalog' %}" class="{% if 'catalog' in request.resolver_match.url_name or 'fipi' in request.resolver_match.url_name or 'pdf_import' in request.resolver_match.url_name or 'import_list' in request.resolver_match.url_name or 'import_session' in request.resolver_match.url_name %}active{% endif %}">Каталог</a>
         </div>
         <button class="burger-btn" id="burgerBtn" aria-label="Меню">
