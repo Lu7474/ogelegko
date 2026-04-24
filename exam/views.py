@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import Answer, Attempt, Student, Task, Variant
-from .utils import check_answer, get_grade_display, get_grade_for_attempt
+from .utils import check_answer, get_grade_display, get_grade_for_attempt, normalize_full_name
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +96,13 @@ def login_view(request):
         if rate_error:
             error = rate_error
         else:
-            full_name = request.POST.get("full_name", "").strip()
+            full_name = normalize_full_name(request.POST.get("full_name", ""))
             password = request.POST.get("password", "").strip()
 
             if full_name and password:
-                for student in Student.objects.filter(full_name=full_name).select_related("school_class"):
+                for student in Student.objects.filter(full_name__iexact=full_name).select_related(
+                    "school_class"
+                ):
                     if student.check_password(password):
                         _clear_login_fails(request, "student_login")
                         request.session.cycle_key()

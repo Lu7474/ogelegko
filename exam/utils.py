@@ -2,6 +2,15 @@ import re
 from fractions import Fraction
 
 
+def normalize_full_name(name: str) -> str:
+    """Trim, collapse whitespace, title-case each word.
+
+    "иванов   иван иванович" → "Иванов Иван Иванович"
+    "ПЕТРОВ ПЁТР"            → "Петров Пётр"
+    """
+    return " ".join(word.capitalize() for word in name.split())
+
+
 def normalize_answer(answer: str) -> str:
     """Нормализует ответ для сравнения. Приводит дроби и числа к единому формату."""
     answer = answer.strip()

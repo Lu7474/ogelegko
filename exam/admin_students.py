@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 
 from .admin_views import _safe_int, admin_required
 from .models import Answer, Attempt, ExamType, SchoolClass, Student
+from .utils import normalize_full_name
 
 logger = logging.getLogger(__name__)
 
@@ -298,7 +299,7 @@ def student_list(request):
 def student_add(request):
     error = ""
     if request.method == "POST":
-        full_name = request.POST.get("full_name", "").strip()
+        full_name = normalize_full_name(request.POST.get("full_name", ""))
         password = request.POST.get("password", "").strip()
         class_id = _safe_int(request.POST.get("school_class", ""))
 
@@ -311,10 +312,13 @@ def student_add(request):
         else:
             try:
                 school_class = SchoolClass.objects.get(id=class_id)
-                student = Student(full_name=full_name, school_class=school_class)
-                student.set_password(password)
-                student.save()
-                return redirect("admin_students")
+                if Student.objects.filter(school_class=school_class, full_name__iexact=full_name).exists():
+                    error = f"Ученик '{full_name}' уже существует в этом классе"
+                else:
+                    student = Student(full_name=full_name, school_class=school_class)
+                    student.set_password(password)
+                    student.save()
+                    return redirect("admin_students")
             except SchoolClass.DoesNotExist:
                 error = "Выбранный класс не найден"
             except IntegrityError:
@@ -329,7 +333,7 @@ def student_edit(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     error = ""
     if request.method == "POST":
-        full_name = request.POST.get("full_name", "").strip()
+        full_name = normalize_full_name(request.POST.get("full_name", ""))
         class_id = _safe_int(request.POST.get("school_class", ""))
         password = request.POST.get("password", "").strip()
 
@@ -340,12 +344,20 @@ def student_edit(request, student_id):
         else:
             try:
                 school_class = SchoolClass.objects.get(id=class_id)
-                student.full_name = full_name
-                student.school_class = school_class
-                if password:
-                    student.set_password(password)
-                student.save()
-                return redirect("admin_students")
+                conflict = (
+                    Student.objects.filter(school_class=school_class, full_name__iexact=full_name)
+                    .exclude(pk=student.pk)
+                    .exists()
+                )
+                if conflict:
+                    error = f"Ученик '{full_name}' уже существует в этом классе"
+                else:
+                    student.full_name = full_name
+                    student.school_class = school_class
+                    if password:
+                        student.set_password(password)
+                    student.save()
+                    return redirect("admin_students")
             except SchoolClass.DoesNotExist:
                 error = "Выбранный класс не найден"
             except IntegrityError:
@@ -409,11 +421,11 @@ def student_import(request):
                             )
                             continue
 
-                        full_name = str(row[0]).strip()
+                        full_name = normalize_full_name(str(row[0]))
                         password = str(row[1]).strip()
                         class_name = str(row[2]).strip()
 
-                        dup_key = (class_name, full_name)
+                        dup_key = (class_name, full_name.lower())
                         if dup_key in seen_in_file:
                             errors.append(
                                 f"Строка {row_num}: дубль — '{full_name}' ({class_name}) "
@@ -423,6 +435,13 @@ def student_import(request):
                         seen_in_file[dup_key] = row_num
 
                         school_class = SchoolClass.objects.get(name=class_name)
+                        if Student.objects.filter(
+                            school_class=school_class, full_name__iexact=full_name
+                        ).exists():
+                            errors.append(
+                                f"Строка {row_num}: ученик '{full_name}' уже существует в классе '{class_name}'"
+                            )
+                            continue
                         student = Student(full_name=full_name, school_class=school_class)
                         student.set_password(password)
                         student.save()
