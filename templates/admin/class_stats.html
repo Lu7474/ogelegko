@@ -4,24 +4,30 @@
 {% block content %}
 <h1>{{ school_class.name }} — Статистика</h1>
 
-<div class="results-summary">
-    <div class="result-card">
+<div class="stats-summary">
+    <div class="result-card stat-card stat-card-blue">
+        <span class="stat-card-icon"><i data-lucide="users" aria-hidden="true"></i></span>
         <div class="result-number">{{ student_stats|length }}</div>
         <div class="result-label">Учеников</div>
     </div>
-    <div class="result-card">
+    <div class="result-card stat-card stat-card-green">
+        <span class="stat-card-icon"><i data-lucide="clipboard-list" aria-hidden="true"></i></span>
         <div class="result-number">{{ total_attempts }}</div>
         <div class="result-label">Попыток</div>
     </div>
-    <div class="result-card">
+    <div class="result-card stat-card stat-card-purple">
+        <span class="stat-card-icon"><i data-lucide="percent" aria-hidden="true"></i></span>
         <div class="result-number">{% if class_avg is not None %}{{ class_avg }}%{% else %}—{% endif %}</div>
         <div class="result-label">Средний результат</div>
     </div>
 </div>
 
 {% if pending_attempts %}
+<hr class="section-sep">
 <h2>Ожидают проверки ({{ pending_attempts|length }})</h2>
+<p class="subtitle" style="margin-top:-8px;margin-bottom:12px;">Выберите попытки для массовой проверки или откройте каждую отдельно.</p>
 <form method="get" action="{% url 'admin_bulk_grade' school_class.id %}" id="bulkGradeForm">
+    <div class="table-responsive">
     <table class="table">
         <thead>
             <tr>
@@ -36,20 +42,24 @@
                 <td>{{ attempt.student.full_name }}</td>
                 <td>{{ attempt.variant.number }}</td>
                 <td>{{ attempt.finished_at|date:"d.m.Y H:i" }}</td>
-                <td><span style="color:#e67e22;font-weight:600;">{{ attempt.pending_count }} зад.</span></td>
+                <td><span class="status-inline status-pending"><i data-lucide="clock" aria-hidden="true"></i><span>{{ attempt.pending_count }} зад.</span></span></td>
                 <td><a href="{% url 'admin_attempt_detail' attempt.id %}" class="btn btn-sm btn-secondary">Проверить</a></td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    </div>
     <button type="submit" class="btn btn-primary" id="bulkBtn" disabled>Массовая проверка выбранных</button>
 </form>
 {% endif %}
 
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+<hr class="section-sep">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
     <h2 style="margin:0;">Ученики</h2>
 </div>
-<div class="card" style="overflow-x:auto;margin-bottom:24px;">
+
+{% if student_stats %}
+<div class="table-responsive">
 <table class="table" style="margin:0;">
     <thead>
         <tr><th>ФИО</th><th>Попыток</th><th>Средний %</th><th>Последняя попытка</th><th></th></tr>
@@ -61,7 +71,7 @@
             <td>{{ s.attempts_count }}</td>
             <td>
                 {% if s.avg_percentage is not None %}
-                <span style="font-weight:600;color:{% if s.avg_percentage >= 70 %}#27ae60{% elif s.avg_percentage >= 50 %}#f39c12{% else %}#e74c3c{% endif %}">
+                <span class="perf-badge {% if s.avg_percentage >= 70 %}perf-badge-high{% elif s.avg_percentage >= 50 %}perf-badge-mid{% else %}perf-badge-low{% endif %}">
                     {{ s.avg_percentage }}%
                 </span>
                 {% else %}—{% endif %}
@@ -73,27 +83,33 @@
     </tbody>
 </table>
 </div>
+{% else %}
+<div class="empty-state">
+    <span class="empty-state-icon"><i data-lucide="bar-chart-2" aria-hidden="true"></i></span>
+    <h3>В классе ещё нет попыток</h3>
+    <p>Результаты появятся после того, как ученики начнут решать варианты.</p>
+</div>
+{% endif %}
 
 {% if class_task_perf %}
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+<hr class="section-sep">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
     <h2 style="margin:0;">Аналитика по заданиям</h2>
-    <a href="{% url 'admin_class_stats_excel' school_class.id %}" class="btn btn-secondary" style="font-size:0.85rem;"><i data-lucide="download" aria-hidden="true"></i><span>Excel</span></a>
+    <a href="{% url 'admin_class_stats_excel' school_class.id %}" class="btn btn-secondary btn-sm"><i data-lucide="download" aria-hidden="true"></i><span>Excel</span></a>
 </div>
-<div class="card" style="overflow-x:auto;margin-bottom:24px;">
-<table class="table" style="margin:0;max-width:600px;">
+<div class="table-responsive" style="max-width:600px;">
+<table class="table" style="margin:0;">
     <thead>
         <tr><th>Задание</th><th>Попыток</th><th>Верно</th><th>%</th></tr>
     </thead>
     <tbody>
         {% for t in class_task_perf %}
-        <tr>
+        <tr {% if t.percentage < 50 %}class="row-weak"{% endif %}>
             <td><strong>{{ t.number }}</strong></td>
             <td>{{ t.tried }}</td>
             <td>{{ t.correct }}</td>
             <td>
-                <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.8rem;font-weight:600;
-                    background:{% if t.percentage >= 70 %}#d4edda{% elif t.percentage >= 50 %}#fff3cd{% else %}#f8d7da{% endif %};
-                    color:{% if t.percentage >= 70 %}#155724{% elif t.percentage >= 50 %}#856404{% else %}#721c24{% endif %};">
+                <span class="perf-badge {% if t.percentage >= 70 %}perf-badge-high{% elif t.percentage >= 50 %}perf-badge-mid{% else %}perf-badge-low{% endif %}">
                     {{ t.percentage }}%
                 </span>
             </td>
@@ -104,7 +120,9 @@
 </div>
 {% endif %}
 
-<a href="{% url 'admin_classes' %}" class="btn btn-secondary" style="margin-top:12px;">Назад к классам</a>
+<div style="margin-top:24px;">
+    <a href="{% url 'admin_classes' %}" class="btn btn-secondary"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Назад к классам</span></a>
+</div>
 
 {% if pending_attempts %}
 <script>
