@@ -1192,9 +1192,12 @@ tr:hover .row-actions { opacity: 1; }
 }
 .btn-success:hover { background: #059669; border-color: #059669; }
 
-/* Прогресс-бар для статуса импорта */
+/* Прогресс-бар для статуса импорта и аналитики */
 .progress-bar-wrap { height: 8px; background: var(--border); border-radius: 20px; overflow: hidden; }
 .progress-bar { height: 100%; background: var(--primary); border-radius: 20px; }
+.progress-bar-high { background: var(--success); }
+.progress-bar-mid  { background: var(--warning); }
+.progress-bar-low  { background: var(--danger); }
 @keyframes progress-pulse {
     0%, 100% { width: 20%; }
     50% { width: 80%; }

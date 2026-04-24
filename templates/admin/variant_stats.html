@@ -4,55 +4,62 @@
 {% block content %}
 <h1>Вариант {{ variant.number }} — Статистика</h1>
 
-<div class="results-summary">
-    <div class="result-card">
+<div class="stats-summary">
+    <div class="result-card stat-card stat-card-green">
+        <span class="stat-card-icon"><i data-lucide="clipboard-list" aria-hidden="true"></i></span>
         <div class="result-number">{{ attempts|length }}</div>
         <div class="result-label">Попыток</div>
     </div>
-    <div class="result-card">
+    <div class="result-card stat-card stat-card-blue">
+        <span class="stat-card-icon"><i data-lucide="percent" aria-hidden="true"></i></span>
         <div class="result-number">{% if avg_percentage is not None %}{{ avg_percentage }}%{% else %}—{% endif %}</div>
         <div class="result-label">Средний результат</div>
     </div>
 </div>
 
 {% if task_stats %}
+<hr class="section-sep">
 <h2>По заданиям</h2>
-<table class="table">
+<div class="table-responsive" style="max-width:560px;">
+<table class="table" style="margin:0;">
     <thead>
-        <tr><th>#</th><th>Правильных</th><th>Всего</th><th>%</th><th></th></tr>
+        <tr><th>#</th><th>Правильных</th><th>Всего</th><th>%</th><th style="min-width:100px;"></th></tr>
     </thead>
     <tbody>
         {% for ts in task_stats %}
-        <tr>
+        <tr {% if ts.percentage < 40 %}class="row-weak"{% endif %}>
             <td>{{ ts.task.number }}</td>
             <td>{{ ts.correct }}</td>
             <td>{{ ts.total }}</td>
             <td>
-                <span style="color:{% if ts.percentage >= 70 %}#27ae60{% elif ts.percentage >= 40 %}#f39c12{% else %}#e74c3c{% endif %}; font-weight:600;">
+                <span class="perf-badge {% if ts.percentage >= 70 %}perf-badge-high{% elif ts.percentage >= 40 %}perf-badge-mid{% else %}perf-badge-low{% endif %}">
                     {{ ts.percentage }}%
                 </span>
             </td>
             <td>
-                <div style="width:100px; height:8px; background:var(--border,#e0e0e0); border-radius:4px;">
-                    <div style="width:{{ ts.percentage }}%; height:100%; background:{% if ts.percentage >= 70 %}#27ae60{% elif ts.percentage >= 40 %}#f39c12{% else %}#e74c3c{% endif %}; border-radius:4px;"></div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar {% if ts.percentage >= 70 %}progress-bar-high{% elif ts.percentage >= 40 %}progress-bar-mid{% else %}progress-bar-low{% endif %}" style="width:{{ ts.percentage }}%"></div>
                 </div>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}
 
 {% if attempts %}
+<hr class="section-sep">
 <h2>Попытки</h2>
-<table class="table">
+<div class="table-responsive">
+<table class="table" style="margin:0;">
     <thead>
         <tr><th>Ученик</th><th>Класс</th><th>Дата</th><th>Результат</th><th>Оценка</th><th>Время</th></tr>
     </thead>
     <tbody>
         {% for a in attempts %}
         <tr>
-            <td>{{ a.student.full_name }}</td>
+            <td><a href="{% url 'admin_student_stats' a.student.id %}">{{ a.student.full_name }}</a></td>
             <td>{{ a.student.school_class.name }}</td>
             <td>{{ a.finished_at|date:"d.m.Y H:i" }}</td>
             <td>{{ a.correct_count }}/{{ a.total_count }} ({{ a.percentage }}%)</td>
@@ -62,7 +69,18 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}
 
-<a href="{% url 'admin_variants' %}" class="btn btn-secondary" style="margin-top:12px;">Назад к вариантам</a>
+{% if not task_stats and not attempts %}
+<div class="empty-state">
+    <span class="empty-state-icon"><i data-lucide="bar-chart-2" aria-hidden="true"></i></span>
+    <h3>Вариант ещё никто не решал</h3>
+    <p>Статистика появится после первой завершённой попытки.</p>
+</div>
+{% endif %}
+
+<div style="margin-top:24px;">
+    <a href="{% url 'admin_variants' %}" class="btn btn-secondary"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Назад к вариантам</span></a>
+</div>
 {% endblock %}

@@ -1,14 +1,16 @@
 {% extends "admin/base_admin.html" %}
+{% load exam_tags %}
 {% block title %}Массовая проверка — {{ school_class.name }}{% endblock %}
 
 {% block content %}
 <h1>Массовая проверка — {{ school_class.name }}</h1>
 
 {% if not pending_answers %}
-<div class="card" style="padding:40px;text-align:center;color:var(--text-muted);">
-    <div class="empty-icon"><i data-lucide="check" aria-hidden="true"></i></div>
+<div class="empty-state">
+    <span class="empty-state-icon"><i data-lucide="check-circle" aria-hidden="true"></i></span>
+    <h3>Нечего проверять</h3>
     <p>В выбранных попытках нет заданий, ожидающих проверки.</p>
-    <a href="{% url 'admin_class_stats' school_class.id %}" class="btn btn-secondary" style="margin-top:8px;"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Назад</span></a>
+    <a href="{% url 'admin_class_stats' school_class.id %}" class="btn btn-secondary"><i data-lucide="arrow-left" aria-hidden="true"></i><span>Назад</span></a>
 </div>
 {% else %}
 <p style="color:var(--text-muted);margin-bottom:16px;font-size:0.9rem;">
@@ -20,7 +22,7 @@
     <input type="hidden" name="attempt_ids" value="{{ aid }}">
     {% endfor %}
 
-    <div class="card" style="overflow-x:auto;margin-bottom:16px;">
+    <div class="table-responsive">
     <table class="table" style="margin:0;">
         <thead>
             <tr><th>Ученик</th><th>Вариант / Задание</th><th>Ответ ученика</th><th style="text-align:center;">Макс.</th><th>Выставить</th></tr>
