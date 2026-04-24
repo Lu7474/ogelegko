@@ -16,6 +16,7 @@
     <div class="form-group">
         <label for="password">Пароль{% if student %} (оставьте пустым, чтобы не менять){% endif %}</label>
         <input type="text" id="password" name="password" {% if not student %}required{% endif %}>
+        {% if student %}<small class="form-help">Оставьте поле пустым, если не хотите менять пароль.</small>{% endif %}
     </div>
     <div class="form-group">
         <label for="school_class">Класс</label>

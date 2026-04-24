@@ -21,6 +21,7 @@
             <option value="{{ value }}" {% if school_class.exam_type == value or not school_class.exam_type and value == "oge" %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
+        <small class="form-help">Определяет набор заданий и шкалу оценок для учеников класса.</small>
     </div>
     <button type="submit" class="btn btn-primary">Сохранить</button>
     <a href="{% url 'admin_classes' %}" class="btn btn-secondary">Отмена</a>
