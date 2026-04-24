@@ -13,11 +13,11 @@
     <nav class="navbar admin-navbar">
         <a href="{% url 'admin_dashboard' %}" class="nav-title">Админ-панель</a>
         <div class="nav-links" id="adminNavLinks">
-            <a href="{% url 'admin_dashboard' %}">Главная</a>
-            <a href="{% url 'admin_classes' %}">Классы</a>
-            <a href="{% url 'admin_students' %}">Ученики</a>
-            <a href="{% url 'admin_variants' %}">Варианты</a>
-            <a href="{% url 'admin_catalog' %}">Каталог</a>
+            <a href="{% url 'admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">Главная</a>
+            <a href="{% url 'admin_classes' %}" class="{% if 'class' in request.resolver_match.url_name %}active{% endif %}">Классы</a>
+            <a href="{% url 'admin_students' %}" class="{% if 'student' in request.resolver_match.url_name %}active{% endif %}">Ученики</a>
+            <a href="{% url 'admin_variants' %}" class="{% if 'variant' in request.resolver_match.url_name or 'attempt' in request.resolver_match.url_name %}active{% endif %}">Варианты</a>
+            <a href="{% url 'admin_catalog' %}" class="{% if 'catalog' in request.resolver_match.url_name %}active{% endif %}">Каталог</a>
         </div>
         <button class="burger-btn" id="burgerBtn" aria-label="Меню">
             <i data-lucide="menu" aria-hidden="true"></i>
@@ -38,9 +38,7 @@
         {% if messages %}
         <div style="margin-bottom:12px">
             {% for msg in messages %}
-            <div class="alert {% if msg.tags == 'error' %}alert-error{% else %}alert-success{% endif %}" style="padding:10px 14px;border-radius:var(--radius);margin-bottom:6px;{% if msg.tags == 'error' %}background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;{% else %}background:#dcfce7;color:#166534;border:1px solid #86efac;{% endif %}">
-                {{ msg }}
-            </div>
+            <div class="{% if msg.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">{{ msg }}</div>
             {% endfor %}
         </div>
         {% endif %}

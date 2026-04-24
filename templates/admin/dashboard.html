@@ -5,13 +5,12 @@
 <h1>Дашборд</h1>
 
 {% if pending_grading %}
-<div class="info-box" style="background:#fff3cd;border-color:#ffc107;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
-    <span style="display:flex;align-items:flex-start;gap:10px;max-width:720px;">
+<div class="info-box info-box-warning" style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+    <span style="display:flex;align-items:flex-start;gap:10px;">
         <span class="info-box-icon"><i data-lucide="triangle-alert" aria-hidden="true"></i></span>
-        <span>Есть {{ pending_grading }} попытк{{ pending_grading|pluralize:"а,и,ок" }} с заданиями, ожидающими ручной проверки.
-        Откройте <a href="{% url 'admin_students' %}">статистику класса</a> или перейдите к ученику, чтобы выставить баллы.</span>
+        <span>Есть {{ pending_grading }} попытк{{ pending_grading|pluralize:"а,и,ок" }} с заданиями, ожидающими ручной проверки.</span>
     </span>
-    <a href="{% url 'admin_students' %}?has_pending=1" class="btn btn-primary" style="white-space:nowrap;">Перейти к проверке</a>
+    <a href="{% url 'admin_students' %}?has_pending=1" class="btn btn-primary" style="white-space:nowrap;flex-shrink:0;">Перейти к проверке</a>
 </div>
 {% endif %}
 
@@ -38,13 +37,16 @@
     </div>
 </div>
 
-<div class="actions-bar">
-    <a href="{% url 'admin_export' %}" class="btn btn-secondary">Экспорт результатов (Excel)</a>
-    <a href="{% url 'admin_export_docx' %}" class="btn btn-secondary">Экспорт результатов (Word)</a>
+<div class="export-group">
+    <span class="export-group-label">Выгрузить:</span>
+    <a href="{% url 'admin_export' %}" class="btn btn-secondary btn-sm"><i data-lucide="table-2" aria-hidden="true"></i><span>Excel</span></a>
+    <a href="{% url 'admin_export_docx' %}" class="btn btn-secondary btn-sm"><i data-lucide="file-text" aria-hidden="true"></i><span>Word</span></a>
 </div>
 
 {% if class_stats %}
+<hr class="section-sep">
 <h2>Статистика по классам</h2>
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr><th>Класс</th><th>Учеников</th><th>Попыток</th><th>Средний %</th><th></th></tr>
@@ -52,7 +54,7 @@
     <tbody>
         {% for cs in class_stats %}
         <tr>
-            <td>{{ cs.school_class.name }}</td>
+            <td><strong>{{ cs.school_class.name }}</strong></td>
             <td>{{ cs.school_class.student_count }}</td>
             <td>{{ cs.attempts_count }}</td>
             <td>{% if cs.avg_percentage is not None %}{{ cs.avg_percentage }}%{% else %}—{% endif %}</td>
@@ -61,10 +63,13 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}
 
 {% if recent_attempts %}
+<hr class="section-sep">
 <h2>Последние попытки</h2>
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr><th>Ученик</th><th>Класс</th><th>Вариант</th><th>Дата</th><th>Результат</th><th>Оценка</th></tr>
@@ -82,5 +87,6 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}
 {% endblock %}
