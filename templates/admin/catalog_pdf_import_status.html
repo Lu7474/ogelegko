@@ -1,35 +1,46 @@
 {% extends "admin/base_admin.html" %}
 {% block title %}Импорт PDF — статус{% endblock %}
 
-{% block extra_head %}
-{% if job.status == "running" %}
-<meta http-equiv="refresh" content="3">
-{% endif %}
-{% endblock %}
-
 {% block content %}
 <h1>Импорт PDF</h1>
 
-<div class="card" style="max-width:480px;padding:28px;">
+<div class="card" style="max-width:480px;padding:28px;margin-top:8px;">
     {% if job.status == "running" %}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-        <div style="width:24px;height:24px;border:3px solid #3b82f6;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
-        <strong>Выполняется импорт…</strong>
+    <div id="statusBlock">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div class="spinner"></div>
+            <strong>Выполняется импорт…</strong>
+        </div>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-scan"></div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-top:8px;">
+            Добавлено заданий: <strong id="addedCount">{{ job.added|default:0 }}</strong>
+        </p>
+        <p style="color:var(--text-muted);font-size:0.85rem;">
+            Прошло: <span id="elapsedTime">0:00</span>
+        </p>
     </div>
-    <p style="color:var(--text-muted);font-size:0.9rem;">Страница обновляется автоматически каждые 3 секунды.</p>
-    <p>Добавлено заданий: <strong>{{ job.added|default:0 }}</strong></p>
+
     {% elif job.status == "done" %}
-    <div class="empty-icon"><i data-lucide="check" aria-hidden="true"></i></div>
-    <strong class="status-inline"><i data-lucide="check" aria-hidden="true"></i><span>Импорт завершён</span></strong>
+    <div class="status-inline status-correct" style="font-size:1.05rem;font-weight:600;margin-bottom:12px;">
+        <i data-lucide="check-circle" aria-hidden="true"></i>
+        <span>Импорт завершён</span>
+    </div>
     <p>Добавлено заданий: <strong>{{ job.added|default:0 }}</strong></p>
-    <div style="display:flex;gap:10px;margin-top:16px;">
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
         <a href="{% url 'admin_catalog_unclassified' %}" class="btn btn-primary">Назначить номера заданий</a>
         <a href="{% url 'admin_import_list' %}" class="btn btn-secondary">История импортов</a>
     </div>
+
     {% else %}
-    <div class="empty-icon"><i data-lucide="x" aria-hidden="true"></i></div>
-    <strong class="status-inline" style="color:#e74c3c;"><i data-lucide="x" aria-hidden="true"></i><span>Ошибка импорта</span></strong>
-    {% if job.error %}<p style="color:#e74c3c;">{{ job.error }}</p>{% endif %}
+    <div class="status-inline status-wrong" style="font-size:1.05rem;font-weight:600;margin-bottom:12px;">
+        <i data-lucide="x-circle" aria-hidden="true"></i>
+        <span>Ошибка импорта</span>
+    </div>
+    {% if job.error %}
+    <div class="error-message">{{ job.error }}</div>
+    {% endif %}
     <div style="margin-top:16px;">
         <a href="{% url 'admin_pdf_import' %}" class="btn btn-secondary">Попробовать снова</a>
     </div>
@@ -37,6 +48,46 @@
 </div>
 
 <style>
-@keyframes spin { to { transform: rotate(360deg); } }
+.progress-bar-scan { height: 8px; border-radius: 20px; position: relative; background: var(--border); overflow: hidden; }
+.progress-bar-scan::after {
+    content: ''; position: absolute; top: 0; left: -55%;
+    width: 55%; height: 100%;
+    background: var(--primary); border-radius: 20px;
+    animation: bar-scan 1.6s cubic-bezier(.4,0,.2,1) infinite;
+}
+@keyframes bar-scan { 0% { left: -55%; } 100% { left: 105%; } }
 </style>
+{% endblock %}
+
+{% block scripts %}
+{% if job.status == "running" %}
+<script>
+(function(){
+    var url = "{% url 'admin_pdf_import_status' job_id=job_id %}?json=1";
+    var start = Date.now();
+    var elapsedEl = document.getElementById('elapsedTime');
+    var addedEl = document.getElementById('addedCount');
+
+    setInterval(function(){
+        var s = Math.floor((Date.now() - start) / 1000);
+        elapsedEl.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }, 1000);
+
+    function poll(){
+        fetch(url)
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if (addedEl && data.added != null) addedEl.textContent = data.added;
+                if (data.status !== 'running') {
+                    location.reload();
+                } else {
+                    setTimeout(poll, 2000);
+                }
+            })
+            .catch(function(){ setTimeout(poll, 3000); });
+    }
+    setTimeout(poll, 2000);
+})();
+</script>
+{% endif %}
 {% endblock %}

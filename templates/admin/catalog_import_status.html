@@ -3,7 +3,7 @@
 
 {% block extra_head %}
 <style>
-.progress-bar-scan { height: 8px; border-radius: 20px; position: relative; }
+.progress-bar-scan { height: 8px; border-radius: 20px; position: relative; background: var(--border); overflow: hidden; }
 .progress-bar-scan::after {
     content: ''; position: absolute; top: 0; left: -55%;
     width: 55%; height: 100%;
@@ -67,9 +67,12 @@
 
 {% else %}
 <div class="error-message">
-    Ошибка импорта:<br>
+    <strong>Ошибка импорта:</strong><br>
     {% for e in job.errors %}{{ e }}<br>{% endfor %}
 </div>
-<a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary" style="margin-top:12px;">Попробовать снова</a>
+<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{% url 'admin_catalog_import' %}" class="btn btn-secondary">Попробовать снова</a>
+    <a href="{% url 'admin_catalog' %}" class="btn btn-secondary">В каталог</a>
+</div>
 {% endif %}
 {% endblock %}
