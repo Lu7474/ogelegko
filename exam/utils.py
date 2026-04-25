@@ -152,6 +152,22 @@ def get_grade(exam_type: str, primary_score: int) -> str:
     return "—"
 
 
+def compute_task_stats(answers_qs) -> dict:
+    """Подсчитывает статистику по номерам заданий из переданного queryset ответов.
+
+    Returns: {task_number: {"tried": int, "correct": int}}
+    """
+    stats: dict = {}
+    for answer in answers_qs.select_related("task").exclude(task__isnull=True):
+        num = answer.task.number
+        if num not in stats:
+            stats[num] = {"tried": 0, "correct": 0}
+        stats[num]["tried"] += 1
+        if answer.is_correct is True:
+            stats[num]["correct"] += 1
+    return stats
+
+
 def get_grade_display(exam_type: str, grade: str) -> str:
     """Форматирует отображение оценки."""
     if exam_type == "ege_profile":

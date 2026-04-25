@@ -11,20 +11,31 @@ try:
 except ImportError:
     pass
 
-_secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
-if not _secret_key or "insecure" in _secret_key:
-    # Локальная разработка: генерируем временный ключ (не годится для продакшна)
-    import secrets as _secrets
-
-    _secret_key = _secrets.token_hex(50)
-SECRET_KEY = _secret_key
+import sys as _sys
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
+_TESTING = "test" in _sys.argv
+
+_secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
+if not _secret_key or "insecure" in _secret_key:
+    if DEBUG or _TESTING:
+        import secrets as _secrets
+
+        _secret_key = _secrets.token_hex(50)
+    else:
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured("Установите DJANGO_SECRET_KEY в переменные окружения")
+SECRET_KEY = _secret_key
 
 _allowed = os.environ.get("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [h.strip() for h in _allowed.split(",") if h.strip()] or (
     ["localhost", "127.0.0.1"] if DEBUG else []
 )
+if not ALLOWED_HOSTS and not DEBUG and not _TESTING:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured("Установите ALLOWED_HOSTS для продакшена")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

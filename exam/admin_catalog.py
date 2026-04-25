@@ -1059,9 +1059,13 @@ def catalog_pdf_import(request):
             os.makedirs(upload_dir, exist_ok=True)
 
             file_paths = []
+            MAX_PDF_SIZE = 50 * 1024 * 1024  # 50 МБ
             for f in files:
                 if not f.name.lower().endswith(".pdf"):
                     errors.append(f"Файл '{f.name}' не является PDF")
+                    continue
+                if f.size > MAX_PDF_SIZE:
+                    errors.append(f"Файл '{f.name}' слишком большой (макс. 50 МБ)")
                     continue
                 dest = os.path.join(upload_dir, f"{uuid.uuid4()}_{f.name}")
                 with open(dest, "wb") as out:

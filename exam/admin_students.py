@@ -3,6 +3,7 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 
+from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
@@ -12,7 +13,7 @@ from django.views.decorators.http import require_POST
 
 from .admin_views import _safe_int, admin_required
 from .models import Answer, Attempt, ExamType, SchoolClass, Student
-from .utils import normalize_full_name
+from .utils import compute_task_stats, normalize_full_name
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,12 @@ def class_edit(request, class_id):
 @require_POST
 def class_delete(request, class_id):
     school_class = get_object_or_404(SchoolClass, id=class_id)
+    logger.info(
+        "Администратор %s удалил класс ID=%d ('%s')",
+        request.user.username,
+        school_class.id,
+        school_class.name,
+    )
     school_class.delete()
     return redirect("admin_classes")
 
@@ -151,18 +158,9 @@ def class_stats(request, class_id):
     class_avg = round(sum(all_percentages) / len(all_percentages)) if all_percentages else None
 
     # Аналитика по номерам заданий для всего класса
-    class_task_stats = {}
-    for answer in (
+    class_task_stats = compute_task_stats(
         Answer.objects.filter(attempt__student__school_class=school_class, attempt__is_finished=True)
-        .select_related("task")
-        .exclude(task__isnull=True)
-    ):
-        num = answer.task.number
-        if num not in class_task_stats:
-            class_task_stats[num] = {"tried": 0, "correct": 0}
-        class_task_stats[num]["tried"] += 1
-        if answer.is_correct is True:
-            class_task_stats[num]["correct"] += 1
+    )
 
     def _sort_key(n):
         try:
@@ -205,18 +203,9 @@ def class_stats_excel(request, class_id):
 
     school_class = get_object_or_404(SchoolClass, id=class_id)
 
-    class_task_stats = {}
-    for answer in (
+    class_task_stats = compute_task_stats(
         Answer.objects.filter(attempt__student__school_class=school_class, attempt__is_finished=True)
-        .select_related("task")
-        .exclude(task__isnull=True)
-    ):
-        num = answer.task.number
-        if num not in class_task_stats:
-            class_task_stats[num] = {"tried": 0, "correct": 0}
-        class_task_stats[num]["tried"] += 1
-        if answer.is_correct is True:
-            class_task_stats[num]["correct"] += 1
+    )
 
     def _sort_key(n):
         try:
@@ -282,12 +271,15 @@ def student_list(request):
             attempts__answers__is_correct__isnull=True,
         ).distinct()
 
+    paginator = Paginator(students, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
     classes = SchoolClass.objects.all()
     return render(
         request,
         "admin/students.html",
         {
-            "students": students,
+            "students": page_obj,
+            "page_obj": page_obj,
             "classes": classes,
             "class_filter": class_filter,
             "has_pending": has_pending,
@@ -379,6 +371,13 @@ def student_edit(request, student_id):
 @require_POST
 def student_delete(request, student_id):
     student = get_object_or_404(Student, id=student_id)
+    logger.info(
+        "Администратор %s удалил ученика ID=%d ('%s', класс %s)",
+        request.user.username,
+        student.id,
+        student.full_name,
+        student.school_class.name,
+    )
     student.delete()
     return redirect("admin_students")
 
@@ -489,18 +488,9 @@ def student_stats(request, student_id):
     ]
 
     # Аналитика по номерам заданий
-    task_stats = {}
-    for answer in (
+    task_stats = compute_task_stats(
         Answer.objects.filter(attempt__student=student, attempt__is_finished=True)
-        .select_related("task")
-        .exclude(task__isnull=True)
-    ):
-        num = answer.task.number
-        if num not in task_stats:
-            task_stats[num] = {"tried": 0, "correct": 0}
-        task_stats[num]["tried"] += 1
-        if answer.is_correct is True:
-            task_stats[num]["correct"] += 1
+    )
 
     def _sort_key(n):
         try:
@@ -643,6 +633,13 @@ def api_new_attempts(request):
 def attempt_delete(request, attempt_id):
     attempt = get_object_or_404(Attempt, id=attempt_id)
     student_id = attempt.student_id
+    logger.info(
+        "Администратор %s удалил попытку ID=%d (ученик ID=%d, вариант '%s')",
+        request.user.username,
+        attempt.id,
+        student_id,
+        attempt.variant.number,
+    )
     attempt.delete()
     return redirect("admin_student_stats", student_id=student_id)
 

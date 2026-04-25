@@ -129,8 +129,11 @@ def _update_variant_tasks(variant, request):
                 task.shared_context_image = shared_context_image
                 task.save(update_fields=["shared_context_image"])
 
-    # Удалить задания, которых больше нет в форме (каскадно удаляет их ответы)
-    variant.tasks.exclude(number__in=task_numbers_in_form).delete()
+    to_delete = variant.tasks.exclude(number__in=task_numbers_in_form)
+    if to_delete.filter(answers__attempt__is_finished=True).exists():
+        return "Нельзя удалить задания, по которым уже есть завершённые попытки. Сначала удалите все попытки по этому варианту."
+    to_delete.delete()
+    return None
 
 
 @admin_required
@@ -186,8 +189,11 @@ def variant_edit(request, variant_id):
                 variant.max_attempts = max_attempts
                 variant.save()
 
-                _update_variant_tasks(variant, request)
-                return redirect("admin_variants")
+                update_error = _update_variant_tasks(variant, request)
+                if update_error:
+                    error = update_error
+                else:
+                    return redirect("admin_variants")
             except IntegrityError:
                 error = f"Вариант с номером '{number}' уже существует"
 
@@ -249,6 +255,12 @@ def variant_duplicate(request, variant_id):
 @require_POST
 def variant_delete(request, variant_id):
     variant = get_object_or_404(Variant, id=variant_id)
+    logger.info(
+        "Администратор %s удалил вариант ID=%d ('%s')",
+        request.user.username,
+        variant.id,
+        variant.number,
+    )
     variant.delete()
     return redirect("admin_variants")
 

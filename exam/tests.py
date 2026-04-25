@@ -1,3 +1,4 @@
+import io
 import json
 
 from django.contrib.auth.models import User
@@ -15,8 +16,8 @@ from .models import (
     TaskSource,
     Variant,
 )
-from .parser import _strip_measurement_unit
-from .utils import check_answer, get_grade, normalize_answer, normalize_full_name
+from .parser import _strip_measurement_unit, sanitize_html
+from .utils import check_answer, compute_task_stats, get_grade, normalize_answer, normalize_full_name
 
 
 class NormalizeAnswerTests(TestCase):
@@ -584,3 +585,94 @@ class StudentSaveNormalizationTests(TestCase):
         resp = self.client.post("/admin/students/import/", {"file": buf})
         self.assertEqual(Student.objects.filter(school_class=self.school_class).count(), 1)
         self.assertContains(resp, "уже существует")
+
+
+class SecurityTests(TestCase):
+    """Тесты безопасности: изоляция данных, санитизация, лимиты."""
+
+    def setUp(self):
+        self.client = Client()
+        self.school_class = SchoolClass.objects.create(name="10Б", exam_type=ExamType.EGE_PROFILE)
+        self.student1 = Student(full_name="Тест Один", school_class=self.school_class)
+        self.student1.set_password("pass1")
+        self.student1.save()
+        self.student2 = Student(full_name="Тест Два", school_class=self.school_class)
+        self.student2.set_password("pass2")
+        self.student2.save()
+        self.variant = Variant.objects.create(number="sec_v1", exam_type=ExamType.EGE_PROFILE)
+        self.task = Task.objects.create(
+            variant=self.variant,
+            number="1",
+            text="Задание",
+            correct_answer="42",
+        )
+
+    def _login(self, student):
+        session = self.client.session
+        session["student_id"] = student.id
+        session.save()
+
+    def test_student_cannot_access_other_results(self):
+        """Ученик не должен видеть результаты другого ученика."""
+        attempt = Attempt.objects.create(
+            student=self.student2,
+            variant=self.variant,
+            is_finished=True,
+            score=1,
+            max_score=1,
+        )
+        self._login(self.student1)
+        resp = self.client.get(f"/results/{attempt.id}/")
+        self.assertNotEqual(resp.status_code, 200)
+
+    def test_sanitize_html_strips_script_tags(self):
+        """sanitize_html удаляет script-теги."""
+        xss = '<script>alert("xss")</script>текст задания'
+        result = sanitize_html(xss)
+        self.assertNotIn("<script>", result)
+        self.assertIn("текст задания", result)
+
+    def test_sanitize_html_strips_event_handlers(self):
+        """sanitize_html удаляет атрибуты-обработчики событий."""
+        xss = '<img src="x" onerror="alert(1)">'
+        result = sanitize_html(xss)
+        self.assertNotIn("onerror", result)
+
+    def test_attempt_limit_enforced(self):
+        """Ученик не может создать попытку сверх лимита."""
+        self.variant.max_attempts = 1
+        self.variant.save()
+        Attempt.objects.create(
+            student=self.student1,
+            variant=self.variant,
+            is_finished=True,
+            score=0,
+            max_score=1,
+        )
+        self._login(self.student1)
+        resp = self.client.get(f"/start/{self.variant.id}/")
+        self.assertNotEqual(resp.status_code, 302)
+        self.assertEqual(Attempt.objects.filter(student=self.student1, is_finished=False).count(), 0)
+
+    def test_pdf_size_limit_rejected(self):
+        """PDF больше 50 МБ отклоняется без записи на диск."""
+        User.objects.create_user("admin_sec", password="pass", is_staff=True)
+        self.client.login(username="admin_sec", password="pass")
+        big_file = io.BytesIO(b"0" * (51 * 1024 * 1024))
+        big_file.name = "big.pdf"
+        big_file.size = 51 * 1024 * 1024
+        resp = self.client.post(
+            "/admin/catalog/import-pdf/",
+            {
+                "exam_type": ExamType.EGE_PROFILE,
+                "pdf_files": big_file,
+                "mode": "catalog",
+                "format": "print_solve",
+            },
+        )
+        self.assertContains(resp, "слишком большой")
+
+    def test_compute_task_stats_empty(self):
+        """compute_task_stats возвращает пустой dict для пустого queryset."""
+        result = compute_task_stats(Answer.objects.none())
+        self.assertEqual(result, {})

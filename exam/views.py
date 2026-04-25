@@ -205,7 +205,8 @@ def _check_attempt_limit(student, variant):
 def _is_attempt_expired(attempt):
     """Проверяет, истекло ли время попытки (серверная проверка)."""
     elapsed = (timezone.now() - attempt.started_at).total_seconds()
-    max_time = attempt.variant.duration_minutes * 60 + 30  # 30 сек grace
+    EXAM_SUBMIT_GRACE_SECONDS = 30
+    max_time = attempt.variant.duration_minutes * 60 + EXAM_SUBMIT_GRACE_SECONDS
     return elapsed > max_time
 
 
@@ -232,7 +233,7 @@ def start_exam(request, variant_id):
 
     with transaction.atomic():
         # select_for_update блокирует строку студента, предотвращая создание дубликатов попыток
-        Student.objects.select_for_update().filter(id=student.id).exists()
+        student = Student.objects.select_for_update().get(id=student.id)
         attempt = Attempt.objects.filter(student=student, variant=variant, is_finished=False).first()
         resumed = attempt is not None
 
@@ -532,16 +533,16 @@ def retry_mistakes(request, attempt_id):
                 try:
                     with task.image.open("rb") as f:
                         new_task.image.save(task.image.name.split("/")[-1], _CF(f.read()), save=False)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Не удалось скопировать изображение задания %d: %s", task.id, e)
             if task.shared_context_image:
                 try:
                     with task.shared_context_image.open("rb") as f:
                         new_task.shared_context_image.save(
                             task.shared_context_image.name.split("/")[-1], _CF(f.read()), save=False
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Не удалось скопировать shared_context_image задания %d: %s", task.id, e)
             new_task.save()
             for ci in task.extra_images.order_by("order"):
                 try:
@@ -549,8 +550,8 @@ def retry_mistakes(request, attempt_id):
                         ti = TaskImage(task=new_task, order=ci.order)
                         ti.image.save(ci.image.name.split("/")[-1], _CF(f.read()), save=False)
                         ti.save()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Не удалось скопировать доп. изображение %d: %s", ci.id, e)
 
     return redirect("start_exam", variant_id=review_variant.id)
 
