@@ -345,12 +345,18 @@ def variant_stats(request, variant_id):
         percentages = [a.percentage for a in attempts]
         avg_percentage = round(sum(percentages) / len(percentages))
 
+    tasks = list(variant.tasks.order_by("id"))
+    counts_map = {
+        c["task_id"]: c
+        for c in Answer.objects.filter(task_id__in=[t.id for t in tasks], attempt__is_finished=True)
+        .values("task_id")
+        .annotate(total=Count("id"), correct=Count("id", filter=Q(is_correct=True)))
+    }
     task_stats = []
-    for task in variant.tasks.order_by("id"):
-        total = Answer.objects.filter(task=task, attempt__is_finished=True).count()
-        correct = Answer.objects.filter(task=task, attempt__is_finished=True, is_correct=True).count()
-        pct = round(correct / total * 100) if total > 0 else 0
-        task_stats.append({"task": task, "correct": correct, "total": total, "percentage": pct})
+    for task in tasks:
+        c = counts_map.get(task.id, {"total": 0, "correct": 0})
+        pct = round(c["correct"] / c["total"] * 100) if c["total"] > 0 else 0
+        task_stats.append({"task": task, "correct": c["correct"], "total": c["total"], "percentage": pct})
 
     return render(
         request,

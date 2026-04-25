@@ -433,7 +433,7 @@ def variant_from_catalog(request):
                     except Exception:
                         pass
                 if ct.shared_context_image:
-                    task.__dict__["shared_context_image"] = ct.shared_context_image.name
+                    task.shared_context_image = ct.shared_context_image.name
                 task.save()
                 for ci in ct.extra_images.order_by("order"):
                     try:
@@ -508,7 +508,7 @@ def variant_auto_generate(request):
                     except Exception:
                         pass
                 if ct.shared_context_image:
-                    task.__dict__["shared_context_image"] = ct.shared_context_image.name
+                    task.shared_context_image = ct.shared_context_image.name
                 task.save()
                 for ci in ct.extra_images.order_by("order"):
                     try:
@@ -889,7 +889,7 @@ def _process_pdf_print_solve(pdf_path, exam_type, do_catalog, do_variants, sessi
                         fname = f"catalog/pdf_{pdf_stem}_b{block_idx + 1}.{ctx_img_ext}"
                         obj.shared_context_image.save(fname, ContentFile(ctx_img_bytes), save=False)
                     elif ctx_image_path:
-                        obj.__dict__["shared_context_image"] = ctx_image_path
+                        obj.shared_context_image = ctx_image_path
                     if i in extra_task_imgs:
                         t_bytes, t_ext = extra_task_imgs[i]
                         obj.image.save(
@@ -937,7 +937,7 @@ def _process_pdf_print_solve(pdf_path, exam_type, do_catalog, do_variants, sessi
                             )
                             ctx_img_saved = True
                         elif ctx_img_saved and ctx_img_fname:
-                            task.__dict__["shared_context_image"] = ctx_img_fname
+                            task.shared_context_image = ctx_img_fname
                         if i in extra_task_imgs:
                             t_bytes, t_ext = extra_task_imgs[i]
                             task.image.save(

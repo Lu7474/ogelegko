@@ -110,11 +110,13 @@ def login_view(request):
                         request.session.save()
                         student.session_key = request.session.session_key
                         student.save(update_fields=["session_key"])
-                        logger.info("Вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
+                        logger.info("Вход ученика ID=%d (IP: %s)", student.id, _get_client_ip(request))
                         return redirect("choose_variant")
 
             _record_failed_login(request, "student_login")
-            logger.warning("Неудачный вход ученика: %s (IP: %s)", full_name, _get_client_ip(request))
+            logger.warning(
+                "Неудачный вход ученика: %s (IP: %s)", full_name[:3] + "***", _get_client_ip(request)
+            )
             error = "Неверное ФИО или пароль"
 
     return render(request, "exam/login.html", {"error": error})
@@ -280,9 +282,7 @@ def start_exam(request, variant_id):
         _finish_attempt(attempt)
         return redirect("results", attempt_id=attempt.id)
 
-    answer_map = {}
-    for a in attempt.answers.select_related("task").all():
-        answer_map[str(a.task.number)] = a.id
+    answer_map = {str(a.task.number): a.id for a in answers.values()}
 
     return render(
         request,
@@ -352,8 +352,6 @@ def _finish_attempt(attempt):
         total_score = 0
         max_score = 0
         for answer in attempt.answers.select_related("task").all():
-            if answer.task is None:
-                continue
             max_score += answer.task.points
             if answer.task.manual_grading:
                 answer.is_correct = None  # ожидает проверки учителя
@@ -385,7 +383,7 @@ def _recalculate_attempt_score(attempt):
     attempt.score = total_score
     attempt.grade = get_grade_for_attempt(attempt)
     attempt.save(update_fields=["score", "grade"])
-    logger.info("Попытка %d пересчитана: %s — %d баллов", attempt.id, attempt.student.full_name, total_score)
+    logger.info("Попытка %d пересчитана: ID=%d — %d баллов", attempt.id, attempt.student_id, total_score)
 
 
 @require_POST

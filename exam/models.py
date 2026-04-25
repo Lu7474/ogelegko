@@ -65,7 +65,7 @@ class Student(models.Model):
     school_class = models.ForeignKey(
         SchoolClass, on_delete=models.CASCADE, verbose_name="Класс", related_name="students"
     )
-    session_key = models.CharField("Ключ сессии", max_length=255, blank=True, null=True)
+    session_key = models.CharField("Ключ сессии", max_length=255, blank=True, null=True, db_index=True)
     created_at = models.DateTimeField("Создан", auto_now_add=True)
 
     class Meta:
