@@ -358,7 +358,10 @@ def api_catalog_tasks(request):
     if search:
         tasks = tasks.filter(Q(text__icontains=search) | Q(correct_answer__icontains=search))
 
-    tasks = tasks.order_by("-created_at")[:200]
+    if task_number:
+        tasks = tasks.order_by("-created_at")
+    else:
+        tasks = tasks.order_by("-created_at")[:200]
 
     result = [
         {
@@ -377,6 +380,19 @@ def api_catalog_tasks(request):
     ]
 
     return JsonResponse({"tasks": result})
+
+
+@admin_required
+def api_catalog_counts(request):
+    """JSON API для левой панели: количество заданий по номерам."""
+    exam_type = request.GET.get("exam_type", "oge")
+    rows = (
+        CatalogTask.objects.filter(task_number__isnull=False, exam_type=exam_type)
+        .values("task_number")
+        .annotate(cnt=Count("id"))
+        .order_by("task_number")
+    )
+    return JsonResponse({"counts": {row["task_number"]: row["cnt"] for row in rows}})
 
 
 @admin_required

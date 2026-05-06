@@ -151,6 +151,7 @@ urlpatterns = [
     ),
     # Админ — API
     path("admin/api/catalog/", admin_catalog.api_catalog_tasks, name="admin_api_catalog"),
+    path("admin/api/catalog/counts/", admin_catalog.api_catalog_counts, name="admin_api_catalog_counts"),
     path("admin/api/new-attempts/", admin_students.api_new_attempts, name="admin_api_new_attempts"),
     # Админ — попытки
     path("admin/attempts/<int:attempt_id>/", admin_students.attempt_detail, name="admin_attempt_detail"),

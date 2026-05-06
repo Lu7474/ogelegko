@@ -364,14 +364,10 @@ document.getElementById('tasksContainer').addEventListener('click', function(e) 
             numListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Выберите тип экзамена</div>';
             return;
         }
-        fetch('{% url "admin_api_catalog" %}?exam_type=' + encodeURIComponent(examType) + '&_all=1')
+        fetch('{% url "admin_api_catalog_counts" %}?exam_type=' + encodeURIComponent(examType))
             .then(r => r.json())
             .then(function(data) {
-                // Считаем количество по номерам
-                var counts = {};
-                data.tasks.forEach(function(t) {
-                    counts[t.task_number] = (counts[t.task_number] || 0) + 1;
-                });
+                var counts = data.counts;
                 var nums = Object.keys(counts).map(Number).sort((a,b) => a-b);
                 if (!nums.length) {
                     numListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Заданий нет</div>';
