@@ -26,7 +26,7 @@ _JOB_TTL = 7200  # 2 часа
 @admin_required
 def variant_list(request):
     exam_filter = request.GET.get("exam_type", "oge")
-    variants = Variant.objects.annotate(
+    variants = Variant.objects.exclude(number__startswith="ошибки_").annotate(
         task_count=Count("tasks", distinct=True),
         attempts_count=Count("attempts", filter=Q(attempts__is_finished=True), distinct=True),
     )
@@ -1010,7 +1010,7 @@ def variants_archive_export(request):
     if ids:
         variants = Variant.objects.filter(id__in=ids)
     else:
-        variants = Variant.objects.all()
+        variants = Variant.objects.exclude(number__startswith="ошибки_")
 
     if not variants.exists():
         messages.error(request, "Нет вариантов для экспорта.")

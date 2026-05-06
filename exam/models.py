@@ -187,6 +187,7 @@ class Attempt(models.Model):
         verbose_name = "Попытка"
         verbose_name_plural = "Попытки"
         ordering = ["-started_at"]
+        indexes = [models.Index(fields=["student", "variant"])]
 
     def __str__(self):
         return f"{self.student.full_name} — Вариант {self.variant.number} ({self.started_at:%d.%m.%Y %H:%M})"
