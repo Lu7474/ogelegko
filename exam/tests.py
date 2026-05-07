@@ -1,8 +1,11 @@
 import io
 import json
+import zipfile
+from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from .models import (
     Answer,
@@ -611,6 +614,8 @@ class SecurityTests(TestCase):
         session = self.client.session
         session["student_id"] = student.id
         session.save()
+        student.session_key = self.client.session.session_key
+        student.save(update_fields=["session_key"])
 
     def test_student_cannot_access_other_results(self):
         """Ученик не должен видеть результаты другого ученика."""
@@ -676,3 +681,105 @@ class SecurityTests(TestCase):
         """compute_task_stats возвращает пустой dict для пустого queryset."""
         result = compute_task_stats(Answer.objects.none())
         self.assertEqual(result, {})
+
+    def test_sanitize_html_onerror_unquoted(self):
+        result = sanitize_html("<img src=x onerror=alert(1)>")
+        self.assertNotIn("onerror", result)
+
+    def test_sanitize_html_javascript_href(self):
+        result = sanitize_html('<a href="javascript:alert(1)">click</a>')
+        self.assertNotIn("javascript:", result)
+
+    def test_zip_import_text_not_sanitized(self):
+        """ZIP-импорт не вызывает sanitize_html — документируем текущее поведение."""
+        from exam.services.variant_archive import import_variants_from_zip
+
+        xss = "<img src=x onerror=alert(1)>"
+        folder = "xss_zip"
+        manifest = {
+            "format_version": 1,
+            "exported_at": "2026-01-01T00:00:00+00:00",
+            "app": "EGE",
+            "variants_count": 1,
+            "variants": [{"folder": folder, "number": "xss_zip_v", "exam_type": "oge"}],
+        }
+        vdata = {
+            "format_version": 1,
+            "number": "xss_zip_v",
+            "exam_type": "oge",
+            "max_attempts": 1,
+            "is_active": True,
+            "tasks": [{"folder": "tasks/1", "number": "1"}],
+        }
+        tdata = {
+            "format_version": 1,
+            "number": "1",
+            "text": xss,
+            "correct_answer": "1",
+            "source": "manual",
+            "points": 1,
+            "manual_grading": False,
+            "no_student_input": False,
+            "shared_context": "",
+            "image": None,
+            "shared_context_image": None,
+            "extra_images": [],
+        }
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("manifest.json", json.dumps(manifest))
+            zf.writestr(f"{folder}/variant.json", json.dumps(vdata))
+            zf.writestr(f"{folder}/tasks/1/task.json", json.dumps(tdata))
+        buf.seek(0)
+
+        class FakeFile:
+            def read(self):
+                return buf.read()
+
+        import_variants_from_zip(FakeFile())
+        task = Task.objects.get(variant__number="xss_zip_v")
+        # Текущее поведение: текст сохраняется без санитизации (известная уязвимость)
+        self.assertEqual(task.text, xss)
+
+
+class ExamTimerTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.school_class = SchoolClass.objects.create(name="10Г", exam_type=ExamType.OGE)
+        self.student = Student(full_name="Таймеров Тест", school_class=self.school_class)
+        self.student.set_password("pass")
+        self.student.save()
+        self.variant = Variant.objects.create(number="timer_v1", exam_type=ExamType.OGE)
+        self.task = Task.objects.create(
+            variant=self.variant, number="1", text="1+1=?", correct_answer="2", points=1
+        )
+        self.client.post("/login/", {"full_name": "Таймеров Тест", "password": "pass"})
+
+    def _expire_attempt(self, attempt):
+        Attempt.objects.filter(id=attempt.id).update(started_at=timezone.now() - timedelta(hours=5))
+        attempt.refresh_from_db()
+
+    def test_save_answer_returns_403_when_expired(self):
+        self.client.get(f"/exam/{self.variant.id}/")
+        attempt = Attempt.objects.get(student=self.student, is_finished=False)
+        answer = Answer.objects.get(attempt=attempt, task=self.task)
+        self._expire_attempt(attempt)
+
+        resp = self.client.post(
+            "/exam/save-answer/",
+            json.dumps({"answer_id": answer.id, "value": "2"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(json.loads(resp.content).get("error"), "time_expired")
+
+    def test_start_exam_redirects_to_results_when_expired(self):
+        self.client.get(f"/exam/{self.variant.id}/")
+        attempt = Attempt.objects.get(student=self.student, is_finished=False)
+        self._expire_attempt(attempt)
+
+        resp = self.client.get(f"/exam/{self.variant.id}/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("results", resp.url)
+        attempt.refresh_from_db()
+        self.assertTrue(attempt.is_finished)
