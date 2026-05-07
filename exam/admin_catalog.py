@@ -5,6 +5,7 @@ import re
 import threading
 import uuid
 
+from django.contrib import messages
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
@@ -424,6 +425,7 @@ def variant_from_catalog(request):
     if errors:
         return JsonResponse({"ok": False, "errors": errors}, status=400)
 
+    failed_images = []
     try:
         with transaction.atomic():
             variant = Variant.objects.create(number=variant_number, exam_type=exam_type)
@@ -447,7 +449,10 @@ def variant_from_catalog(request):
                         with ct.image.open("rb") as f:
                             task.image.save(ct.image.name.split("/")[-1], _CF(f.read()), save=False)
                     except Exception:
-                        pass
+                        logger.warning(
+                            "Не удалось скопировать изображение ct_id=%s задание №%s", ct.id, task_num_str
+                        )
+                        failed_images.append(task_num_str)
                 if ct.shared_context_image:
                     task.shared_context_image = ct.shared_context_image.name
                 task.save()
@@ -458,10 +463,19 @@ def variant_from_catalog(request):
                             ti.image.save(ci.image.name.split("/")[-1], _CF(f.read()), save=False)
                             ti.save()
                     except Exception:
-                        pass
+                        logger.warning(
+                            "Не удалось скопировать доп. изображение ct_id=%s задание №%s",
+                            ct.id,
+                            task_num_str,
+                        )
     except IntegrityError as e:
         return JsonResponse({"ok": False, "errors": [f"Ошибка: {e}"]}, status=400)
 
+    if failed_images:
+        messages.warning(
+            request,
+            f"Картинки не скопировались для заданий: {', '.join(failed_images)}. Проверьте вручную.",
+        )
     return JsonResponse({"ok": True, "redirect": reverse("admin_variant_edit", args=[variant.id])})
 
 

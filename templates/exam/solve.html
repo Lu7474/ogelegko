@@ -392,6 +392,9 @@ finishForm.addEventListener('submit', async function(e) {
 });
 
 // === Подтверждение завершения с превью (#11) ===
+function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 document.getElementById('finishBtn').addEventListener('click', function() {
     let unanswered = 0;
     let rows = '';
@@ -399,7 +402,7 @@ document.getElementById('finishBtn').addEventListener('click', function() {
         const num = input.dataset.taskNumber;
         const val = input.value.trim();
         if (!val) unanswered++;
-        rows += `<tr><td>${num}</td><td class="${val ? '' : 'empty'}">${val || '— пусто —'}</td></tr>`;
+        rows += `<tr><td>${num}</td><td class="${val ? '' : 'empty'}">${val ? escHtml(val) : '— пусто —'}</td></tr>`;
     });
     // Задания без поля ввода — на проверке учителя
     document.querySelectorAll('.no-input-task').forEach(el => {

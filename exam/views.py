@@ -352,25 +352,25 @@ def _finish_attempt(attempt):
             return
         total_score = 0
         max_score = 0
+        answers_to_update = []
         for answer in attempt.answers.select_related("task").all():
             max_score += answer.task.points
             if answer.task.manual_grading:
-                answer.is_correct = None  # ожидает проверки учителя
+                answer.is_correct = None
                 answer.awarded_points = None
-                answer.save(update_fields=["is_correct", "awarded_points"])
             else:
                 is_correct = check_answer(answer.student_answer, answer.task.correct_answer)
                 answer.is_correct = is_correct
-                answer.save(update_fields=["is_correct"])
                 if is_correct:
                     total_score += answer.task.points
+            answers_to_update.append(answer)
+        Answer.objects.bulk_update(answers_to_update, ["is_correct", "awarded_points"])
         attempt.is_finished = True
         attempt.finished_at = timezone.now()
         attempt.score = total_score
         attempt.max_score = max_score
+        attempt.grade = get_grade_for_attempt(attempt)
         attempt.save()
-    attempt.grade = get_grade_for_attempt(attempt)
-    attempt.save(update_fields=["grade"])
 
 
 def _recalculate_attempt_score(attempt):
