@@ -16,8 +16,8 @@ import urllib3
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 
-from .models import CatalogImportSession, CatalogTask, CatalogTaskImage, TaskSource
-from .parser import ParserError, sanitize_html
+from ..models import CatalogImportSession, CatalogTask, CatalogTaskImage, TaskSource
+from .sdamgia import ParserError, sanitize_html
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from ..parser import _strip_measurement_unit
+from ..parsers.sdamgia import _strip_measurement_unit
 from ..utils import check_answer, get_grade, normalize_answer, normalize_full_name
 
 

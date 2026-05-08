@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 
 from .admin_views import _safe_int, admin_required
 from .models import Answer, Attempt, ExamType, Task, TaskSource, Variant
-from .parser import sanitize_html
+from .parsers.sdamgia import sanitize_html
 from .services.docx_builder import build_variant_docx
 
 logger = logging.getLogger(__name__)
@@ -272,7 +272,7 @@ def variant_delete(request, variant_id):
 def _run_import_job(job_id, url, variant_number):
     """Фоновый поток для импорта варианта."""
     try:
-        from .parser import import_variant_from_sdamgia
+        from .parsers.sdamgia import import_variant_from_sdamgia
 
         variant, parse_errors = import_variant_from_sdamgia(url, variant_number=variant_number or None)
         cache.set(

@@ -24,8 +24,8 @@ from .models import (
     TaskSource,
     Variant,
 )
-from .parser import sanitize_html
-from .pdf_parser import run_pdf_import_job
+from .parsers.pdf import run_pdf_import_job
+from .parsers.sdamgia import sanitize_html
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ _JOB_TTL = 7200  # 2 часа
 def _run_catalog_import_job(job_id, url):
     """Фоновый поток: парсит вариант и добавляет все задания в каталог."""
     try:
-        from .parser import import_variant_to_catalog
+        from .parsers.sdamgia import import_variant_to_catalog
 
         sess = CatalogImportSession.objects.create(
             source=TaskSource.SDAMGIA,
@@ -254,7 +254,7 @@ def catalog_import(request):
         if not errors:
             if import_type == "problem":
                 task_number = _safe_int(task_number_raw) if task_number_raw else None
-                from .parser import import_task_to_catalog
+                from .parsers.sdamgia import import_task_to_catalog
 
                 ct, parse_errors = import_task_to_catalog(url, task_number=task_number)
                 if parse_errors:
@@ -322,7 +322,7 @@ def catalog_unclassified(request):
 @require_POST
 def catalog_assign_number(request, task_id):
     """AJAX/form: назначить номер задания неопределённому заданию."""
-    from .parser import _get_oge_default_points, _is_no_input_task
+    from .parsers.sdamgia import _get_oge_default_points, _is_no_input_task
 
     ct = get_object_or_404(CatalogTask, id=task_id)
     task_number_raw = request.POST.get("task_number", "").strip()
@@ -563,7 +563,7 @@ def _run_fipi_import_job(job_id, proj, exam_type, theme_filter, session_id):
     from django.db import connection
 
     try:
-        from .fipi_parser import import_fipi_to_catalog
+        from .parsers.fipi import import_fipi_to_catalog
 
         themes = [t.strip() for t in theme_filter.split(",") if t.strip()] or [""]
         for theme in themes:
@@ -615,7 +615,7 @@ def catalog_fipi_preview(request):
     if not url:
         return JsonResponse({"error": "Введите URL"}, status=400)
     try:
-        from .fipi_parser import fipi_get_preview
+        from .parsers.fipi import fipi_get_preview
 
         data = fipi_get_preview(url)
         return JsonResponse(data)

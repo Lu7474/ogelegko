@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from .models import CatalogTask, ExamType, Task, TaskSource, Variant
+from ..models import CatalogTask, ExamType, Task, TaskSource, Variant
 
 logger = logging.getLogger(__name__)
 

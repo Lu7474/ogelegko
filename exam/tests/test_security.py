@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.test import Client, TestCase
 
 from ..models import Answer, Attempt, ExamType, SchoolClass, Student, Task, TaskSource, Variant
-from ..parser import sanitize_html
+from ..parsers.sdamgia import sanitize_html
 from ..utils import compute_task_stats
 
 
