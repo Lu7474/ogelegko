@@ -1,7 +1,7 @@
 from django.test import TestCase
 
-from .parser import _strip_measurement_unit
-from .utils import check_answer, get_grade, normalize_answer, normalize_full_name
+from ..parser import _strip_measurement_unit
+from ..utils import check_answer, get_grade, normalize_answer, normalize_full_name
 
 
 class NormalizeAnswerTests(TestCase):
@@ -30,7 +30,7 @@ class NormalizeAnswerTests(TestCase):
         self.assertEqual(normalize_answer("–" + "3"), "-3")
 
     def test_unicode_minus_in_answer_match(self):
-        from .utils import check_answer
+        from ..utils import check_answer
 
         self.assertTrue(check_answer("-5", "−" + "5"))
         self.assertTrue(check_answer("−" + "5", "-5"))

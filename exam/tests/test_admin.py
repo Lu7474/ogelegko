@@ -3,7 +3,7 @@ import json
 from django.contrib.auth.models import User
 from django.test import Client, TestCase
 
-from .models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
+from ..models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
 
 
 class AdminTests(TestCase):

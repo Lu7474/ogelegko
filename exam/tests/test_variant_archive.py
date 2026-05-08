@@ -9,8 +9,8 @@ import zipfile
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
-from .models import ExamType, Task, TaskImage, Variant
-from .services.variant_archive import (
+from ..models import ExamType, Task, TaskImage, Variant
+from ..services.variant_archive import (
     ArchiveImportError,
     export_variants_to_zip,
     import_variants_from_zip,
@@ -207,7 +207,7 @@ class ImportTests(TestCase):
 
     def test_import_does_not_create_attempts_or_answers(self):
         """Тест 8: импорт не создаёт Attempt или Answer."""
-        from .models import Answer, Attempt
+        from ..models import Answer, Attempt
 
         import_variants_from_zip(self._uploaded(self._build_minimal_zip()))
 

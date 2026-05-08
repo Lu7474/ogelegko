@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.test import Client, TestCase
 from django.utils import timezone
 
-from .models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
+from ..models import Answer, Attempt, ExamType, SchoolClass, Student, Task, Variant
 
 
 class ExamFlowTests(TestCase):

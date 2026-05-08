@@ -4,7 +4,7 @@ import openpyxl
 from django.contrib.auth.models import User
 from django.test import Client, TestCase
 
-from .models import ExamType, SchoolClass, Student
+from ..models import ExamType, SchoolClass, Student
 
 
 class AuthTests(TestCase):

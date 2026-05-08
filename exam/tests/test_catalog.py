@@ -5,7 +5,7 @@ import zipfile
 from django.contrib.auth.models import User
 from django.test import Client, TestCase
 
-from .models import CatalogTask, CatalogTaskImage, ExamType, Task, TaskSource, Variant
+from ..models import CatalogTask, CatalogTaskImage, ExamType, Task, TaskSource, Variant
 
 
 class VariantFromCatalogImageTests(TestCase):
