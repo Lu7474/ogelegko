@@ -302,6 +302,9 @@ def _process_pdf_universal(pdf_path, exam_type, session):
     with pdfplumber.open(str(pdf_path)) as pdf:
         for page_num, page in enumerate(pdf.pages):
             text = (page.extract_text() or "").strip()
+            text_hash = CatalogTask.compute_hash(text)
+            if text_hash and CatalogTask.objects.filter(text_hash=text_hash).exists():
+                continue
             page_bytes = _pdf_render_page(fitz_doc, page_num)
             obj = CatalogTask(
                 task_number=None,
@@ -311,6 +314,7 @@ def _process_pdf_universal(pdf_path, exam_type, session):
                 source=TaskSource.PRINT_SOLVE,
                 manual_grading=True,
                 points=2,
+                text_hash=text_hash,
                 import_session=session,
             )
             if page_bytes:

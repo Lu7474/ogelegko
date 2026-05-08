@@ -1,6 +1,8 @@
 import io
 import logging
 
+import requests
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,12 +122,11 @@ def _get_image_bytes(src):
     """Загружает изображение по src (/media/... или http...) и возвращает bytes или None."""
     import os
 
-    import requests as _req
     from django.conf import settings as dj_settings
 
     try:
         if src.startswith("http://") or src.startswith("https://"):
-            r = _req.get(src, timeout=15)
+            r = requests.get(src, timeout=15)
             if r.status_code == 200:
                 return r.content
         elif src.startswith("/media/"):
@@ -139,7 +140,7 @@ def _get_image_bytes(src):
             try:
                 url = default_storage.url(rel)
                 if url.startswith("http://") or url.startswith("https://"):
-                    r = _req.get(url, timeout=15)
+                    r = requests.get(url, timeout=15)
                     if r.status_code == 200:
                         return r.content
                 else:
@@ -331,12 +332,10 @@ def build_variant_docx(variant, include_answers):
 
     Формат: US Letter, узкие поля — параметры эталонного «33 вариант.docx».
     """
-    import requests as _req
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
-    from docx.oxml.ns import qn as _qn
     from docx.shared import Cm, Inches, Pt
 
     doc = Document()
@@ -345,15 +344,15 @@ def build_variant_docx(variant, include_answers):
     style_normal.font.name = "Calibri"
     style_normal.font.size = Pt(11)
     rPr = style_normal.element.get_or_add_rPr()
-    rFonts = rPr.find(_qn("w:rFonts"))
+    rFonts = rPr.find(qn("w:rFonts"))
     if rFonts is None:
         from docx.oxml import OxmlElement as _OE
 
         rFonts = _OE("w:rFonts")
         rPr.insert(0, rFonts)
-    rFonts.set(_qn("w:ascii"), "Calibri")
-    rFonts.set(_qn("w:hAnsi"), "Calibri")
-    rFonts.set(_qn("w:cs"), "Calibri")
+    rFonts.set(qn("w:ascii"), "Calibri")
+    rFonts.set(qn("w:hAnsi"), "Calibri")
+    rFonts.set(qn("w:cs"), "Calibri")
 
     section = doc.sections[0]
     section.page_width = Inches(8.5)
@@ -429,7 +428,7 @@ def build_variant_docx(variant, include_answers):
                     try:
                         ci_url = task.shared_context_image.url
                         ci_data = (
-                            _req.get(ci_url, timeout=15).content
+                            requests.get(ci_url, timeout=15).content
                             if ci_url.startswith("http")
                             else task.shared_context_image.open("rb").read()
                         )
@@ -474,7 +473,7 @@ def build_variant_docx(variant, include_answers):
             try:
                 img_url = task.image.url
                 img_data = (
-                    _req.get(img_url, timeout=15).content
+                    requests.get(img_url, timeout=15).content
                     if img_url.startswith("http")
                     else task.image.open("rb").read()
                 )
