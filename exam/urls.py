@@ -1,26 +1,26 @@
 from django.urls import path
 
-from . import admin_catalog, admin_students, admin_variants, admin_views, views
+from .views import admin_base, admin_catalog, admin_students, admin_variants, student
 
 urlpatterns = [
     # Ученик
-    path("", views.login_view, name="login"),
-    path("login/", views.login_view, name="login"),
-    path("logout/", views.logout_view, name="logout"),
-    path("choose/", views.choose_variant, name="choose_variant"),
-    path("exam/<int:variant_id>/", views.start_exam, name="start_exam"),
-    path("exam/save-answer/", views.save_answer, name="save_answer"),
-    path("exam/finish/<int:attempt_id>/", views.finish_exam, name="finish_exam"),
-    path("results/<int:attempt_id>/", views.results_view, name="results"),
-    path("attempt/<int:attempt_id>/", views.view_attempt, name="view_attempt"),
-    path("attempt/<int:attempt_id>/retry/", views.retry_mistakes, name="retry_mistakes"),
-    path("profile/", views.profile_view, name="profile"),
+    path("", student.login_view, name="login"),
+    path("login/", student.login_view, name="login"),
+    path("logout/", student.logout_view, name="logout"),
+    path("choose/", student.choose_variant, name="choose_variant"),
+    path("exam/<int:variant_id>/", student.start_exam, name="start_exam"),
+    path("exam/save-answer/", student.save_answer, name="save_answer"),
+    path("exam/finish/<int:attempt_id>/", student.finish_exam, name="finish_exam"),
+    path("results/<int:attempt_id>/", student.results_view, name="results"),
+    path("attempt/<int:attempt_id>/", student.view_attempt, name="view_attempt"),
+    path("attempt/<int:attempt_id>/retry/", student.retry_mistakes, name="retry_mistakes"),
+    path("profile/", student.profile_view, name="profile"),
     # Админ — вход / дашборд / экспорт
-    path("admin/", admin_views.admin_login, name="admin_login"),
-    path("admin/logout/", admin_views.admin_logout, name="admin_logout"),
-    path("admin/dashboard/", admin_views.dashboard, name="admin_dashboard"),
-    path("admin/export/", admin_views.export_results, name="admin_export"),
-    path("admin/export/docx/", admin_views.export_results_docx, name="admin_export_docx"),
+    path("admin/", admin_base.admin_login, name="admin_login"),
+    path("admin/logout/", admin_base.admin_logout, name="admin_logout"),
+    path("admin/dashboard/", admin_base.dashboard, name="admin_dashboard"),
+    path("admin/export/", admin_base.export_results, name="admin_export"),
+    path("admin/export/docx/", admin_base.export_results_docx, name="admin_export_docx"),
     # Админ — классы
     path("admin/classes/", admin_students.class_list, name="admin_classes"),
     path("admin/classes/add/", admin_students.class_add, name="admin_class_add"),

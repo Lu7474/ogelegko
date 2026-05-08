@@ -12,7 +12,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
-from .models import Attempt, SchoolClass, Student, Variant
+from ..models import Attempt, SchoolClass, Student, Variant
 
 logger = logging.getLogger(__name__)
 

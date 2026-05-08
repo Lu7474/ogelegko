@@ -123,7 +123,7 @@ class ManualGradingTests(TestCase):
         self.assertIsNone(answer.awarded_points)
 
     def test_grade_answer_awards_points(self):
-        from exam.views import _finish_attempt
+        from exam.views.student import _finish_attempt
 
         client, attempt = self._start_and_answer()
         _finish_attempt(attempt)
@@ -140,7 +140,7 @@ class ManualGradingTests(TestCase):
         self.assertEqual(data["score"], 3)
 
     def test_no_student_input_does_not_break_scoring(self):
-        from exam.views import _finish_attempt
+        from exam.views.student import _finish_attempt
 
         task_no_input = Task.objects.create(
             variant=self.variant,

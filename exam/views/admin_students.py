@@ -11,9 +11,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .admin_views import _safe_int, admin_required
-from .models import Answer, Attempt, ExamType, SchoolClass, Student
-from .utils import compute_task_stats, normalize_full_name
+from ..models import Answer, Attempt, ExamType, SchoolClass, Student
+from ..utils import compute_task_stats, normalize_full_name
+from .admin_base import _safe_int, admin_required
 
 logger = logging.getLogger(__name__)
 
@@ -545,7 +545,7 @@ def attempt_detail(request, attempt_id):
 @admin_required
 @require_POST
 def attempt_grade_answer(request, answer_id):
-    from .views import _recalculate_attempt_score
+    from .student import _recalculate_attempt_score
 
     answer = get_object_or_404(Answer, id=answer_id, task__manual_grading=True)
 
@@ -647,7 +647,7 @@ def attempt_delete(request, attempt_id):
 @admin_required
 def bulk_grade_attempts(request, class_id):
     """Массовая проверка ручных заданий для выбранных попыток."""
-    from .views import _recalculate_attempt_score
+    from .student import _recalculate_attempt_score
 
     school_class = get_object_or_404(SchoolClass, id=class_id)
 

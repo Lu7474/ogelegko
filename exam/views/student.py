@@ -11,8 +11,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Answer, Attempt, Student, Task, Variant
-from .utils import check_answer, get_grade_display, get_grade_for_attempt, normalize_full_name
+from ..models import Answer, Attempt, Student, Task, Variant
+from ..utils import check_answer, get_grade_display, get_grade_for_attempt, normalize_full_name
 
 logger = logging.getLogger(__name__)
 
@@ -515,7 +515,7 @@ def retry_mistakes(request, attempt_id):
     if created:
         from django.core.files.base import ContentFile as _CF
 
-        from .models import TaskImage
+        from ..models import TaskImage
 
         for i, task in enumerate(wrong_tasks, start=1):
             new_task = Task(

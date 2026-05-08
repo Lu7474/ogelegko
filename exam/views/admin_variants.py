@@ -11,10 +11,10 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .admin_views import _safe_int, admin_required
-from .models import Answer, Attempt, ExamType, Task, TaskSource, Variant
-from .parsers.sdamgia import sanitize_html
-from .services.docx_builder import build_variant_docx
+from ..models import Answer, Attempt, ExamType, Task, TaskSource, Variant
+from ..parsers.sdamgia import sanitize_html
+from ..services.docx_builder import build_variant_docx
+from .admin_base import _safe_int, admin_required
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +272,7 @@ def variant_delete(request, variant_id):
 def _run_import_job(job_id, url, variant_number):
     """Фоновый поток для импорта варианта."""
     try:
-        from .parsers.sdamgia import import_variant_from_sdamgia
+        from ..parsers.sdamgia import import_variant_from_sdamgia
 
         variant, parse_errors = import_variant_from_sdamgia(url, variant_number=variant_number or None)
         cache.set(
@@ -453,7 +453,7 @@ def variants_archive_export(request):
     from django.contrib import messages
     from django.http import FileResponse
 
-    from .services.variant_archive import export_variants_to_zip
+    from ..services.variant_archive import export_variants_to_zip
 
     ids = request.POST.getlist("ids")
     if ids:
@@ -476,7 +476,7 @@ def variants_archive_import(request):
     """Импортировать варианты из переносимого ZIP-архива."""
     from django.contrib import messages
 
-    from .services.variant_archive import ArchiveImportError, import_variants_from_zip
+    from ..services.variant_archive import ArchiveImportError, import_variants_from_zip
 
     uploaded = request.FILES.get("archive")
     if not uploaded:
