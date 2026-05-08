@@ -686,8 +686,16 @@ class SecurityTests(TestCase):
         result = sanitize_html("<img src=x onerror=alert(1)>")
         self.assertNotIn("onerror", result)
 
+    def test_sanitize_html_onerror_spaces_around_equals(self):
+        result = sanitize_html("<img src=x onerror = alert(1)>")
+        self.assertNotIn("onerror", result)
+
     def test_sanitize_html_javascript_href(self):
         result = sanitize_html('<a href="javascript:alert(1)">click</a>')
+        self.assertNotIn("javascript:", result)
+
+    def test_sanitize_html_javascript_src(self):
+        result = sanitize_html('<img src="javascript:alert(1)">')
         self.assertNotIn("javascript:", result)
 
     def test_zip_import_text_not_sanitized(self):
@@ -940,3 +948,151 @@ class CatalogTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)
         self.assertEqual(data.get("status"), "unknown")
+
+    def test_pdf_import_status_unknown_job_returns_json(self):
+        resp = self.client.get("/admin/catalog/import-pdf/nonexistent-job/status/?json=1")
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual(data.get("status"), "unknown")
+
+    def test_fipi_export_answers_returns_file(self):
+        CatalogTask.objects.create(
+            task_number=1,
+            exam_type=ExamType.OGE,
+            text="Задание",
+            correct_answer="",
+            source=TaskSource.FIPI,
+            fipi_guid="test-guid-001",
+        )
+        resp = self.client.get("/admin/catalog/fipi-answers/export/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("json", resp["Content-Type"])
+        self.assertIn("attachment", resp["Content-Disposition"])
+
+    def test_fipi_import_answers_updates_correct_answer(self):
+        task = CatalogTask.objects.create(
+            task_number=1,
+            exam_type=ExamType.OGE,
+            text="Задание",
+            correct_answer="",
+            source=TaskSource.FIPI,
+            fipi_guid="test-guid-002",
+        )
+        payload = json.dumps([{"fipi_guid": "test-guid-002", "answer": "42"}]).encode()
+        resp = self.client.post(
+            "/admin/catalog/fipi-answers/import/",
+            {"answers_file": io.BytesIO(payload)},
+        )
+        self.assertEqual(resp.status_code, 302)
+        task.refresh_from_db()
+        self.assertEqual(task.correct_answer, "42")
+
+    def test_catalog_bulk_delete(self):
+        t1 = CatalogTask.objects.create(
+            task_number=1, exam_type=ExamType.OGE, text="т1", correct_answer="1", source=TaskSource.MANUAL
+        )
+        t2 = CatalogTask.objects.create(
+            task_number=2, exam_type=ExamType.OGE, text="т2", correct_answer="2", source=TaskSource.MANUAL
+        )
+        resp = self.client.post(
+            "/admin/catalog/bulk-delete/",
+            {"ids": [str(t1.id), str(t2.id)]},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(CatalogTask.objects.filter(id__in=[t1.id, t2.id]).count(), 0)
+
+
+class BulkGradeTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user("admin_bg", password="pass", is_staff=True)
+        self.client = Client()
+        self.client.login(username="admin_bg", password="pass")
+
+        self.school_class = SchoolClass.objects.create(name="9Д", exam_type=ExamType.OGE)
+        self.student = Student(full_name="Массовый Проверяемый", school_class=self.school_class)
+        self.student.set_password("pass")
+        self.student.save()
+
+        self.variant = Variant.objects.create(number="bulk_v1", exam_type=ExamType.OGE)
+        self.task = Task.objects.create(
+            variant=self.variant, number="1", text="Объясни", correct_answer="", points=3, manual_grading=True
+        )
+        self.attempt = Attempt.objects.create(
+            student=self.student, variant=self.variant, is_finished=True, score=0, max_score=3
+        )
+        self.answer = Answer.objects.create(attempt=self.attempt, task=self.task, student_answer="объяснение")
+
+    def test_bulk_grade_updates_score(self):
+        resp = self.client.post(
+            f"/admin/classes/{self.school_class.id}/bulk-grade/",
+            {
+                "attempt_ids": [str(self.attempt.id)],
+                f"answer_{self.answer.id}": "2",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.answer.refresh_from_db()
+        self.assertEqual(self.answer.awarded_points, 2)
+        self.attempt.refresh_from_db()
+        self.assertEqual(self.attempt.score, 2)
+
+
+class ArchiveImportViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user("admin_ai", password="pass", is_staff=True)
+        self.client.login(username="admin_ai", password="pass")
+
+    def _build_zip(self, number="Import Test"):
+        buf = io.BytesIO()
+        folder = number.replace(" ", "_")
+        manifest = {
+            "format_version": 1,
+            "exported_at": "2026-01-01T00:00:00+00:00",
+            "app": "EGE",
+            "variants_count": 1,
+            "variants": [{"folder": folder, "number": number, "exam_type": "oge"}],
+        }
+        vdata = {
+            "format_version": 1,
+            "number": number,
+            "exam_type": "oge",
+            "max_attempts": 2,
+            "is_active": True,
+            "tasks": [{"folder": "tasks/1", "number": "1"}],
+        }
+        tdata = {
+            "format_version": 1,
+            "number": "1",
+            "text": "Текст задания",
+            "correct_answer": "42",
+            "source": "manual",
+            "points": 1,
+            "manual_grading": False,
+            "no_student_input": False,
+            "shared_context": "",
+            "image": None,
+            "shared_context_image": None,
+            "extra_images": [],
+        }
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("manifest.json", json.dumps(manifest))
+            zf.writestr(f"{folder}/variant.json", json.dumps(vdata))
+            zf.writestr(f"{folder}/tasks/1/task.json", json.dumps(tdata))
+        buf.seek(0)
+        buf.name = "archive.zip"
+        return buf
+
+    def test_import_creates_variant(self):
+        resp = self.client.post(
+            "/admin/variants/archive/import/",
+            {"archive": self._build_zip()},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Variant.objects.filter(number="Import Test").exists())
+
+    def test_import_broken_zip_redirects_with_error(self):
+        broken = io.BytesIO(b"not a zip")
+        broken.name = "bad.zip"
+        resp = self.client.post("/admin/variants/archive/import/", {"archive": broken})
+        self.assertEqual(resp.status_code, 302)
