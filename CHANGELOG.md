@@ -6,6 +6,12 @@
 
 ## [Текущий] — май 2026
 
+### Рефакторинг структуры
+- Представления разбиты на пакет `exam/views/`: `student.py`, `admin_base.py`, `admin_students.py`, `admin_variants.py`, `admin_catalog.py`
+- Парсеры вынесены в пакет `exam/parsers/`: `sdamgia.py`, `pdf.py`, `fipi.py`
+- DOCX-рендерер вынесен из `admin_variants.py` в `services/docx_builder.py`
+- Тесты перенесены в пакет `exam/tests/` с переименованием `tests_*.py` → `test_*.py`
+
 ### Тесты
 - Покрытие расширено с 107 до 183 тестов (+76)
 - Новые файлы: `test_student_views.py`, `test_admin_classes.py`, `test_admin_students.py`, `test_admin_variants.py`, `test_admin_api.py`
