@@ -47,13 +47,12 @@ class ProfileViewTests(TestCase):
         _make_finished_attempt(self.student, self.variant, score=3, max_score=4)
         resp = self.client.get("/profile/")
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("avg_percentage", resp.context)
-        self.assertIsNotNone(resp.context["avg_percentage"])
+        self.assertEqual(resp.context["avg_percentage"], 75)
 
     def test_profile_unauthenticated_redirects(self):
         self.client.session.flush()
         resp = self.client.get("/profile/")
-        self.assertNotEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
 
     def test_profile_trend_computed_with_three_attempts(self):
         for score in [4, 2, 3]:

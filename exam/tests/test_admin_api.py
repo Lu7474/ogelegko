@@ -67,7 +67,7 @@ class ApiNewAttemptsTests(TestCase):
     def test_unauthenticated_redirects(self):
         client = Client()
         resp = client.get("/admin/api/new-attempts/")
-        self.assertNotEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
 
 
 class AttemptDeleteTests(TestCase):
@@ -80,7 +80,7 @@ class AttemptDeleteTests(TestCase):
         resp = self.client.post(f"/admin/attempts/{self.attempt.id}/delete/")
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(Attempt.objects.filter(id=self.attempt.id).exists())
-        self.assertIn(str(student_id), resp.url)
+        self.assertEqual(resp.url, f"/admin/students/{student_id}/stats/")
 
     def test_delete_get_not_allowed(self):
         resp = self.client.get(f"/admin/attempts/{self.attempt.id}/delete/")

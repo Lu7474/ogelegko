@@ -151,6 +151,7 @@ class StudentImportTests(TestCase):
         resp = self.client.post("/admin/students/import/", {"file": xlsx})
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(Student.objects.filter(full_name="Импортов Импорт").exists())
+        self.assertContains(resp, "Успешно добавлено")
 
     def test_import_unknown_class_shows_error(self):
         xlsx = self._make_xlsx([["Ошибков Ошибка", "pass1", "Несуществующий"]])

@@ -138,11 +138,14 @@ class VariantDuplicateTests(TestCase):
         copy = Variant.objects.filter(number="orig_v1_копия").first()
         self.assertIsNotNone(copy)
         self.assertEqual(copy.tasks.count(), 1)
-        self.assertEqual(copy.tasks.first().correct_answer, "42")
+        task_copy = copy.tasks.first()
+        self.assertEqual(task_copy.correct_answer, "42")
+        self.assertEqual(task_copy.text, "задание")
 
     def test_duplicate_twice_uses_counter(self):
         self.client.post(f"/admin/variants/{self.variant.id}/duplicate/")
         self.client.post(f"/admin/variants/{self.variant.id}/duplicate/")
+        self.assertTrue(Variant.objects.filter(number="orig_v1_копия").exists())
         self.assertTrue(Variant.objects.filter(number="orig_v1_копия2").exists())
 
 

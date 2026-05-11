@@ -4,10 +4,10 @@ from django.test import Client, TestCase
 from ..models import Attempt, ExamType, SchoolClass, Student, Task, Variant
 
 
-def _admin_client():
+def _admin_client(username="adm_cls"):
     client = Client()
-    User.objects.create_user("adm_cls", password="pass", is_staff=True)
-    client.login(username="adm_cls", password="pass")
+    User.objects.create_user(username, password="pass", is_staff=True)
+    client.login(username=username, password="pass")
     return client
 
 
