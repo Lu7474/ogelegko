@@ -4,6 +4,15 @@
 
 ---
 
+## [Текущий] — май 2026
+
+### Тесты
+- Покрытие расширено с 107 до 183 тестов (+76)
+- Новые файлы: `test_student_views.py`, `test_admin_classes.py`, `test_admin_students.py`, `test_admin_variants.py`, `test_admin_api.py`
+- Покрыты: `profile_view`, `view_attempt`, `choose_variant`, CRUD классов/учеников/вариантов, `student_import`, `variant_duplicate`, `variant_stats`, bulk-операции вариантов, `api_new_attempts`, `attempt_delete`, `variant_import_status`
+
+---
+
 ## [Текущий] — апрель 2026
 
 ### Безопасность и стабильность
