@@ -40,23 +40,46 @@ Python 3.11 · Django 5.2 · SQLite / PostgreSQL · Cloudinary · WhiteNoise · 
 
 ## Запуск
 
-**Через Docker (рекомендуется):**
+### Через Docker (рекомендуется)
 
 ```bash
+git clone <repo-url>
+cd ogelegko
 docker compose up --build
 ```
 
-Затем создать суперпользователя:
+Создать суперпользователя:
 ```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-**Без Docker:**
+### Локально без Docker
 
 ```bash
-pip install -r requirements.txt && python manage.py migrate && python manage.py createsuperuser
+git clone <repo-url>
+cd ogelegko
+python -m venv env
+env\Scripts\activate        # Windows
+# source env/bin/activate   # Linux / macOS
+pip install -r requirements.txt
+```
+
+Скопировать конфиг окружения:
+```bash
+cp .env.example .env
+```
+
+В `.env` всё уже настроено для локального запуска (SQLite, `DEBUG=True`). `DJANGO_SECRET_KEY` при `DEBUG=True` генерируется автоматически — для прода задайте явно.
+
+```bash
+python manage.py migrate
+python manage.py createsuperuser
 python manage.py runserver
 ```
+
+Для PostgreSQL задайте `DATABASE_URL` в `.env`.
+
+---
 
 Ученики: [http://localhost:8000](http://localhost:8000) · Админ: [http://localhost:8000/admin/](http://localhost:8000/admin/)
 
