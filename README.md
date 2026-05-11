@@ -8,7 +8,7 @@
 
 ## Стек
 
-Python 3.11 · Django 5.2 · SQLite / PostgreSQL · Cloudinary · WhiteNoise · BeautifulSoup4 · PyMuPDF · openpyxl
+Python 3.12 · Django 5.2 · SQLite / PostgreSQL · Cloudinary · WhiteNoise · BeautifulSoup4 · PyMuPDF · openpyxl
 
 ---
 
@@ -43,7 +43,7 @@ Python 3.11 · Django 5.2 · SQLite / PostgreSQL · Cloudinary · WhiteNoise · 
 ### Через Docker (рекомендуется)
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Lu7474/ogelegko.git
 cd ogelegko
 docker compose up --build
 ```
@@ -56,7 +56,7 @@ docker compose exec web python manage.py createsuperuser
 ### Локально без Docker
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Lu7474/ogelegko.git
 cd ogelegko
 python -m venv env
 env\Scripts\activate        # Windows
