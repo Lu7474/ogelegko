@@ -40,6 +40,19 @@ Python 3.11 · Django 5.2 · SQLite / PostgreSQL · Cloudinary · WhiteNoise · 
 
 ## Запуск
 
+**Через Docker (рекомендуется):**
+
+```bash
+docker compose up --build
+```
+
+Затем создать суперпользователя:
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+**Без Docker:**
+
 ```bash
 pip install -r requirements.txt && python manage.py migrate && python manage.py createsuperuser
 python manage.py runserver

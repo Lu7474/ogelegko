@@ -1,0 +1,14 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./media:/app/media
+    environment:
+      DJANGO_DEBUG: "True"
+      DJANGO_SECRET_KEY: "local-dev-secret-key-change-for-production"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"

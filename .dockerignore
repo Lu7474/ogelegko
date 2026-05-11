@@ -1,0 +1,12 @@
+env/
+.env
+db.sqlite3
+*.log
+logs/
+cache/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+staticfiles/
+media/
