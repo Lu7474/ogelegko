@@ -19,13 +19,16 @@
 - `config/` — Django config (settings.py, urls.py, wsgi, asgi)
 - `exam/` — main app:
   - `models.py` — все модели
-  - `views.py` — представления для учеников
-  - `admin_views.py` — хелперы, логин/логаут, дашборд, экспорт
-  - `admin_students.py` — классы, ученики, попытки
-  - `admin_variants.py` — варианты, DOCX-печать, ZIP
-  - `admin_catalog.py` — каталог, импорт (СдамГИА, ФИПИ, PDF)
-  - `urls.py`, `utils.py`, `parsers/`
+  - `views/student.py` — представления для учеников
+  - `views/admin_base.py` — хелперы, логин/логаут, дашборд, экспорт
+  - `views/admin_students.py` — классы, ученики, попытки
+  - `views/admin_variants.py` — варианты, DOCX-печать, ZIP
+  - `views/admin_catalog.py` — каталог, импорт (СдамГИА, ФИПИ, PDF)
+  - `urls.py`, `utils.py`
+  - `parsers/` — sdamgia.py, fipi.py, pdf.py
   - `services/variant_archive.py` — экспорт/импорт вариантов в ZIP
+  - `services/docx_builder.py` — рендеринг вариантов и результатов в DOCX
+  - `tests/` — тесты (test_auth, test_exam, test_admin, test_catalog, test_security, test_utils, test_variant_archive, test_student_views, test_admin_classes, test_admin_students, test_admin_variants, test_admin_api)
 - `templates/` — HTML templates
 - `static/` — static files
 - `media/` — user uploads (local dev only)
